@@ -11,6 +11,7 @@ import alf.io
 from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
+from os.path import join
 import numpy as np
 import seaborn as sns
 from scipy import signal
@@ -21,18 +22,15 @@ from dlc_plotting_functions import peri_plot
 from dlc_analysis_functions import pupil_features
 
 
-def butter_lowpass(cutoff, fs, order=5):
+def butter_filter(data, cutoff, fs, ftype='lowpass', order=5):
     nyq = 0.5 * fs
     normal_cutoff = cutoff / nyq
-    b, a = signal.butter(order, normal_cutoff, btype='low', analog=False)
-    return b, a
-
-
-def butter_lowpass_filter(data, cutoff, fs, order=5):
-    b, a = butter_lowpass(cutoff, fs, order=order)
+    b, a = signal.butter(order, normal_cutoff, btype=ftype, analog=False)
     y = signal.filtfilt(b, a, data)
     return y
 
+
+FIG_PATH = '/home/guido/Figures/DLC/'
 
 # Query sessions with available DLC data using ONE
 one = ONE()
@@ -67,21 +65,22 @@ for i, eid in enumerate(eids):
         print('x')
         continue
 
-    # Transform pixels to mm
+    # Transform pixels to mm and get time between frames
     dlc_dict = px_to_mm(dlc_dict)
+    fs = np.mean(np.diff(dlc_dict['times']))
 
     # Fit pupil and get pupil traces
     pupil_x, pupil_y, diameter = pupil_features(dlc_dict)
-    diameter = butter_lowpass_filter(diameter, 10, 1 / np.mean(np.diff(dlc_dict['times'])), 1)
+    diameter_filt = butter_filter(diameter, 2, 1/fs, 'lowpass', 1)
 
-    pstim_df = peri_plot(diameter, dlc_dict['times'], stim_on_times,
-                         None, np.arange(-1, 1, 0.1), 0.15, 'baseline')
+    pstim_df = peri_plot(diameter_filt, dlc_dict['times'], stim_on_times,
+                         None, np.arange(-1, 2, 0.1), 0.15, 'baseline')
     pstim_avg_df = pstim_df.groupby('timepoint').mean().reset_index()
     pstim_avg_df['eid'] = eid
     pupil_stim_on = pd.concat([pupil_stim_on, pstim_avg_df], ignore_index=True, sort=True)
 
-    rew_df = peri_plot(diameter, dlc_dict['times'], feedback_times[feedback_type == 1],
-                       None, np.arange(-1, 1, 0.1), 0.15, 'baseline')
+    rew_df = peri_plot(diameter_filt, dlc_dict['times'], feedback_times[feedback_type == 1],
+                       None, np.arange(-1, 2, 0.1), 0.15, 'baseline')
     prew_avg_df = rew_df.groupby('timepoint').mean().reset_index()
     prew_avg_df['eid'] = eid
     pupil_reward = pd.concat([pupil_reward, prew_avg_df], ignore_index=True, sort=True)
@@ -117,40 +116,55 @@ for i, eid in enumerate(eids):
     tongue_no_reward = pd.concat([tongue_no_reward, this_avg_df], ignore_index=True, sort=True)
     '''
 
+# Remove outliers
+pupil_stim_on = pupil_stim_on[(pupil_stim_on['trace'] < 0.3) & (pupil_stim_on['trace'] > -0.3)]
+pupil_reward = pupil_reward[(pupil_reward['trace'] < 0.3) & (pupil_reward['trace'] > -0.3)]
+
 # Plot output
-sns.set(style="ticks", context="paper", font_scale=1.5, rc={"lines.linewidth": 2.5})
-f, ((ax1, ax2, ax3, ax4), (ax5, ax6, ax7, ax8)) = plt.subplots(2, 4, figsize=(16, 10))
-plt.tight_layout(pad=4)
+f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(10, 10))
+
+sns.set(style="ticks", context='paper', font_scale=1.8, rc={"lines.linewidth": 3})
 
 sns.lineplot(x='timepoint', y='trace', data=pupil_stim_on, ci=68, ax=ax1)
-ax1.set(ylabel='Baseline subtracted pupil diameter (mm)', xlabel='Time (s)',
-        title='Stimulus onset')
+ax1.set(ylabel='Baseline subtracted\npupil diameter (mm)', xlabel='Time (s)')
 ax1.plot([0, 0], ax1.get_ylim(), 'r')
+ax1.text(0.8, -0.015, 'n = %d mice' % np.size(np.unique(pupil_stim_on['eid'])))
+ax1.text(0, ax1.get_ylim()[1], 'Stimulus Onset', ha='center', color='r')
 
 sns.lineplot(x='timepoint', y='trace', data=pupil_reward, ci=68, ax=ax2)
-ax2.set(ylabel='Baseline subtracted pupil diameter (mm)', xlabel='Time (s)',
-        title='Reward delivery')
+ax2.set(ylabel='Baseline subtracted\npupil diameter (mm)', xlabel='Time (s)')
+ax2.text(0, ax2.get_ylim()[1]+0.001, 'Reward Delivery', ha='center', color='r')
+ax2.text(0.8, -0.015, 'n = %d mice' % np.size(np.unique(pupil_stim_on['eid'])))
 ax2.plot([0, 0], ax2.get_ylim(), 'r')
 
 sns.lineplot(x='timepoint', y='trace', data=paw_left, ci=68, ax=ax3)
-ax3.set(ylabel='Baseline subtracted paw position (mm)', xlabel='Time (s)',
+ax3.set(ylabel='Baseline subtracted\npaw position (mm)', xlabel='Time (s)',
         title='Left rewarded trials')
 ax3.plot([0, 0], ax3.get_ylim(), 'r')
 
 sns.lineplot(x='timepoint', y='trace', data=paw_right, ci=68, ax=ax4)
-ax4.set(ylabel='Baseline subtracted paw position (mm)', xlabel='Time (s)',
+ax4.set(ylabel='Baseline subtracted\npaw position (mm)', xlabel='Time (s)',
         title='Right rewarded trials')
 ax4.plot([0, 0], ax4.get_ylim(), 'r')
-'''
-sns.lineplot(x='timepoint', y='trace', data=tongue_reward, ci=68, ax=ax5)
-ax5.set(ylabel='Baseline subtracted tongue position (mm)', xlabel='Time (s)',
-        title='Rewarded trials')
-ax5.plot([0, 0], ax5.get_ylim(), 'r')
 
-sns.lineplot(x='timepoint', y='trace', data=tongue_no_reward, ci=68, ax=ax6)
-# units='eid', estimator=None, hue='eid', legend=False)
-ax6.set(ylabel='Baseline subtracted tongue position (mm)', xlabel='Time (s)',
-        title='Unrewarded trials', ylim=ax5.get_ylim())
-ax6.plot([0, 0], ax6.get_ylim(), 'r')
-'''
+plt.tight_layout(pad=2)
+sns.despine(trim=True)
+
+plt.savefig(join(FIG_PATH, 'DLC_PEP.png'), dpi=300)
+plt.savefig(join(FIG_PATH, 'DLC_PEP.pdf'), dpi=300)
+
+
+
+f, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 10))
+sns.lineplot(x='timepoint', y='trace', data=pupil_stim_on, hue='eid', estimator=None, ax=ax1)
+ax1.set(ylabel='Baseline subtracted pupil diameter (mm)', xlabel='Time (s)',
+        title='Stimulus onset')
+ax1.plot([0, 0], ax1.get_ylim(), 'r')
+ax1.get_legend().remove()
+
+sns.lineplot(x='timepoint', y='trace', data=pupil_reward, hue='eid', estimator=None, ax=ax2)
+ax2.set(ylabel='Baseline subtracted pupil diameter (mm)', xlabel='Time (s)',
+        title='Stimulus onset')
+ax2.plot([0, 0], ax1.get_ylim(), 'r')
+ax2.get_legend().remove()
 

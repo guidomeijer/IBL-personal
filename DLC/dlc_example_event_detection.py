@@ -20,21 +20,13 @@ import sys
 sys.path.insert(0, '/home/guido/Projects/ibllib/ibllib/dlc_analysis')
 from dlc_basis_functions import px_to_mm
 from dlc_plotting_functions import peri_plot
-from dlc_analysis_functions import pupil_features
+from dlc_analysis_functions import pupil_features, lick_times, sniff_times
 
 
 def butter_filter(data, cutoff, fs, ftype='lowpass', order=5):
     nyq = 0.5 * fs
     normal_cutoff = cutoff / nyq
     b, a = signal.butter(order, normal_cutoff, btype=ftype, analog=False)
-    y = signal.filtfilt(b, a, data)
-    return y
-
-
-def butter_lowpass(data, cutoff, fs, order=5):
-    nyq = 0.5 * fs
-    normal_cutoff = cutoff / nyq
-    b, a = signal.butter(order, normal_cutoff, btype='lowpass', analog=False)
     y = signal.filtfilt(b, a, data)
     return y
 
@@ -107,13 +99,43 @@ for i, eid in enumerate(eids):
     # Get sniffing
     dis = np.sqrt(((dlc_dict['nostril_top_x'] - dlc_dict['nostril_bottom_x'])**2)
                   + ((dlc_dict['nostril_top_y'] - dlc_dict['nostril_bottom_y'])**2))
-    dis_filt = butter_filter(diameter, [5, 12], 1/fs, 'bandpass', 5)
+    dis_filt = butter_filter(dis, [7, 12], 1/fs, 'bandpass', 1)
+    sniff_bouts = sniff_times(dlc_dict, threshold=0.5)
+
+    # Get licking
+    licks, _, dist_lick = lick_times(dlc_dict)
+
+    # Plot tongue
+    fig, ax = plt.subplots(1, 1)
+    ax.imshow(frame_image, 'gray')
+    ax.plot(x, y, 'og', markersize=10)
+    ax.set(ylim=[np.int(dlc_dict['tongue_end_l_y'][FRAME_NR]-50),
+                 np.int(dlc_dict['tongue_end_l_y'][FRAME_NR]+100)],
+           xlim=[np.int(dlc_dict['tongue_end_l_x'][FRAME_NR]-100),
+                 np.int(dlc_dict['tongue_end_l_x'][FRAME_NR]+100)])
+    plt.gca().invert_yaxis()
+    ax.axis('off')
+    plt.savefig(join(FIG_PATH, '%s_%s_tongue.pdf' % (ses_info[i]['subject'], ses_info[i]['lab'])),
+                dpi=300)
+    plt.close(fig=fig)
+
+    fig, ax = plt.subplots(1, 1)
+    ax.plot(dlc_dict['times'], dist_lick)
+    ax.plot(licks, np.zeros(np.size(licks)), 'xr')
+    ax.set(ylabel='Distance tongue\nto spout (mm)', xlabel='Time (s)',
+           xlim=[6, 12], ylim=[-0.2, 3])
+    sns.set(style="ticks", context='talk', font_scale=1.2)
+    plt.tight_layout(pad=2)
+    sns.despine(trim=True)
+    plt.savefig(join(FIG_PATH, '%s_%s_licking.pdf' % (ses_info[i]['subject'],
+                                                      ses_info[i]['lab'])), dpi=300)
+    plt.close(fig=fig)
 
     # Plot pupil
     fig, ax = plt.subplots(1, 1)
     ax.imshow(frame_image, 'gray')
     ax.plot(x, y, 'og', markersize=6)
-    ax.plot(pupil_x[FRAME_NR], pupil_y[FRAME_NR], 'or', markersize=8)
+    ax.plot(pupil_x[FRAME_NR], pupil_y[FRAME_NR], 'or', markersize=10)
     circle = plt.Circle((pupil_x[FRAME_NR], pupil_y[FRAME_NR]), diameter_filt[FRAME_NR]/2,
                         color='r', fill=False, lw=2)
     ax.add_artist(circle)
@@ -132,17 +154,14 @@ for i, eid in enumerate(eids):
     sns.set(style="ticks", context='talk', font_scale=1.2)
     sns.despine(trim=True)
     plt.tight_layout(pad=2)
-    plt.savefig(join(FIG_PATH, '%s_%s_pupil_diameter.png' % (ses_info[i]['subject'],
-                                                             ses_info[i]['lab'])))
+    plt.savefig(join(FIG_PATH, '%s_%s_pupil_diameter.pdf' % (ses_info[i]['subject'],
+                                                             ses_info[i]['lab'])), dpi=300)
     plt.close(fig=fig)
 
+    # Plot nostril
     fig, ax = plt.subplots(1, 1)
     ax.imshow(frame_image, 'gray')
-    ax.plot(x, y, 'or', markersize=10)
-    ax.plot(pupil_x[FRAME_NR], pupil_y[FRAME_NR], 'or', markersize=8)
-    circle = plt.Circle((pupil_x[FRAME_NR], pupil_y[FRAME_NR]), diameter_filt[FRAME_NR]/2,
-                        color='r', fill=False, lw=2)
-    ax.add_artist(circle)
+    ax.plot(x, y, 'og', markersize=10)
     ax.set(ylim=[np.int(dlc_dict['nostril_top_y'][FRAME_NR]-35),
                  np.int(dlc_dict['nostril_top_y'][FRAME_NR]+50)],
            xlim=[np.int(dlc_dict['nostril_top_x'][FRAME_NR]-50),
@@ -154,15 +173,19 @@ for i, eid in enumerate(eids):
     plt.close(fig=fig)
 
     fig, ax = plt.subplots(1, 1)
-    ax.plot(np.arange(0, 600*fs, fs), dis_filt[FRAME_NR:FRAME_NR+600])
-    ax.set(ylabel='Filtered nostril distance (mm)', xlabel='Time (s)')
+    ax.plot(dlc_dict['times'], dis_filt)
+    ax.plot(sniff_bouts, np.ones(np.size(sniff_bouts))*-0.8, 'xr',
+            markersize=8, markeredgewidth=2)
+    ax.set(ylabel='Filtered nostril\ndistance (mm)', xlabel='Time (s)',
+           xlim=[240, 280], ylim=[-1, 1])
     sns.set(style="ticks", context='talk', font_scale=1.2)
     plt.tight_layout(pad=2)
     sns.despine(trim=True)
     plt.savefig(join(FIG_PATH, '%s_%s_nostril_distance.png' % (ses_info[i]['subject'],
-                                                               ses_info[i]['lab'])))
+                                                               ses_info[i]['lab'])), dpi=300)
+    plt.savefig(join(FIG_PATH, '%s_%s_nostril_distance.pdf' % (ses_info[i]['subject'],
+                                                               ses_info[i]['lab'])), dpi=300)
     plt.close(fig=fig)
-
 
 
 
