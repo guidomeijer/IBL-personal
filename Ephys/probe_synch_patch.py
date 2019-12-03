@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 # Settings
 cam_channels = [2, 3, 4]  # Channel mapping
-time_select = [10, 20]  # Recording time to process in seconds
+time_select = [0, 15]  # Recording time to process in seconds
 sampling_freq = 30000  # Sampling frequency
 
 # Define path to data
