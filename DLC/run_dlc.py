@@ -12,7 +12,7 @@ from oneibl.one import ONE
 
 # Query sessions with available DLC data using ONE
 one = ONE()
-dtypes = ['camera.dlc', 'camera.times']
+dtypes = ['odsgratings.times.00']
 eids = one.search(dataset_types=dtypes)
 
 # Loop over sessions
