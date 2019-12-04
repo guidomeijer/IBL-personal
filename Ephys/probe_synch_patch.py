@@ -18,13 +18,17 @@ sampling_freq = 30000  # Sampling frequency
 # Define path to data
 # path_probe00 = 'C:\\Users\\guido\\Google Drive\\TempData\\probe00'
 # path_probe01 = 'C:\\Users\\guido\\Google Drive\\TempData\\probe01'
-path_probe00 = '/home/guido/IBLserver/Subjects/ZM_2407/2019-11-06/001/raw_ephys_data/probe_00'
-path_probe01 = '/home/guido/IBLserver/Subjects/ZM_2407/2019-11-06/001/raw_ephys_data/probe_01'
+# path_probe00 = '/home/guido/IBLserver/Subjects/ZM_2407/2019-11-06/001/raw_ephys_data/probe_00'
+# path_probe01 = '/home/guido/IBLserver/Subjects/ZM_2407/2019-11-06/001/raw_ephys_data/probe_01'
+# path_probe00 = '/home/guido/IBLserver/Subjects/ZM_2407/2019-11-05/002/raw_ephys_data/probe_00'
+# path_probe01 = '/home/guido/IBLserver/Subjects/ZM_2407/2019-11-05/002/raw_ephys_data/probe_01'
+path_probe00 = '/home/guido/IBLserver/Subjects/ZM_2406/2019-11-12/001/raw_ephys_data/probe00'
+path_probe01 = '/home/guido/IBLserver/Subjects/ZM_2406/2019-11-12/001/raw_ephys_data/probe01'
 
 # PROBE 00
-channels_00 = np.load(join(path_probe00, '_spikeglx_sync.channels.probe_00.npy'))
-polarities_00 = np.load(join(path_probe00, '_spikeglx_sync.polarities.probe_00.npy'))
-timestamps_00 = np.load(join(path_probe00, '_spikeglx_sync.times.probe_00.npy'))
+channels_00 = np.load(join(path_probe00, '_spikeglx_sync.channels.probe00.npy'))
+polarities_00 = np.load(join(path_probe00, '_spikeglx_sync.polarities.probe00.npy'))
+timestamps_00 = np.load(join(path_probe00, '_spikeglx_sync.times.probe00.npy'))
 
 # Select only part of the recording
 channels_00 = channels_00[(timestamps_00 > time_select[0]) & (timestamps_00 < time_select[1])]
@@ -39,9 +43,9 @@ for i, cam in enumerate(cam_channels):
         sync_00[np.argmin(np.abs(time_00 - ts))] = polarities_00[timestamps_00 == ts][0] * cam
 
 # PROBE 01
-channels_01 = np.load(join(path_probe01, '_spikeglx_sync.channels.probe_01.npy'))
-polarities_01 = np.load(join(path_probe01, '_spikeglx_sync.polarities.probe_01.npy'))
-timestamps_01 = np.load(join(path_probe01, '_spikeglx_sync.times.probe_01.npy'))
+channels_01 = np.load(join(path_probe01, '_spikeglx_sync.channels.probe01.npy'))
+polarities_01 = np.load(join(path_probe01, '_spikeglx_sync.polarities.probe01.npy'))
+timestamps_01 = np.load(join(path_probe01, '_spikeglx_sync.times.probe01.npy'))
 
 # Select only part of the recording
 channels_01 = channels_01[(timestamps_01 > time_select[0]) & (timestamps_01 < time_select[1])]
@@ -61,17 +65,17 @@ lag = int(np.ceil(np.argmax(corr) - np.size(corr)/2))
 
 # Get first pulse
 if lag < 0:
-    print('Probe 00 started %.2f seconds after probe 01' % time_00[np.abs(lag)])
+    print('Probe 00 started %.2f seconds after probe 01' % (time_00[np.abs(lag)]-time_select[0]))
     first_pulse = np.argmin(np.abs(timestamps_00 - time_00[np.abs(lag)]))
     probe_started_first = '01'
 
     plt.plot(time_01, sync_01)
-    plt.plot(time_00+time_00[np.abs(lag)], sync_00)
+    plt.plot(time_00 + (time_00[np.abs(lag)]-time_select[0]), sync_00)
 
 elif lag > 0:
-    print('Probe 01 started %.2f seconds after probe 00' % time_01[lag])
+    print('Probe 00 started %.2f seconds after probe 01' % (time_00[np.abs(lag)]-time_select[0]))
     probe_started_first = '00'
 
     plt.plot(time_00, sync_00)
-    plt.plot(time_01+time_01[lag], sync_01)
+    plt.plot(time_01 + (time_01[lag]-time_select[0]), sync_01)
 

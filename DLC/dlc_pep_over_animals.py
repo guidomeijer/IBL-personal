@@ -41,6 +41,7 @@ eids = one.search(dataset_types=dtypes)
 # Initialize dataframes
 pupil_stim_on = pd.DataFrame(columns=['eid', 'timepoint', 'trace'])
 pupil_reward = pd.DataFrame(columns=['eid', 'timepoint', 'trace'])
+pupil_no_reward = pd.DataFrame(columns=['eid', 'timepoint', 'trace'])
 paw_left = pd.DataFrame(columns=['eid', 'timepoint', 'trace'])
 paw_right = pd.DataFrame(columns=['eid', 'timepoint', 'trace'])
 tongue_reward = pd.DataFrame(columns=['eid', 'timepoint', 'trace'])
@@ -85,6 +86,12 @@ for i, eid in enumerate(eids):
     prew_avg_df['eid'] = eid
     pupil_reward = pd.concat([pupil_reward, prew_avg_df], ignore_index=True, sort=True)
 
+    no_rew_df = peri_plot(diameter_filt, dlc_dict['times'], feedback_times[feedback_type == -1],
+                          None, np.arange(-1, 2, 0.1), 0.15, 'baseline')
+    p_no_rew_avg_df = no_rew_df.groupby('timepoint').mean().reset_index()
+    p_no_rew_avg_df['eid'] = eid
+    pupil_no_reward = pd.concat([pupil_no_reward, p_no_rew_avg_df], ignore_index=True, sort=True)
+
     # Get paw position
     this_pep_df = peri_plot(dlc_dict['middle_finger_r_x'], dlc_dict['times'],
                             feedback_times[(choice == -1) & (feedback_type == 1)],
@@ -117,8 +124,10 @@ for i, eid in enumerate(eids):
     '''
 
 # Remove outliers
-pupil_stim_on = pupil_stim_on[(pupil_stim_on['trace'] < 0.3) & (pupil_stim_on['trace'] > -0.3)]
-pupil_reward = pupil_reward[(pupil_reward['trace'] < 0.3) & (pupil_reward['trace'] > -0.3)]
+pupil_stim_on = pupil_stim_on[(pupil_stim_on['trace'] < 0.1) & (pupil_stim_on['trace'] > -0.1)]
+pupil_reward = pupil_reward[(pupil_reward['trace'] < 0.1) & (pupil_reward['trace'] > -0.1)]
+pupil_no_reward = pupil_no_reward[(pupil_no_reward['trace'] < 0.1)
+                                  & (pupil_no_reward['trace'] > -0.1)]
 
 # Plot output
 f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(10, 10))
@@ -128,13 +137,15 @@ sns.set(style="ticks", context='paper', font_scale=1.8, rc={"lines.linewidth": 3
 sns.lineplot(x='timepoint', y='trace', data=pupil_stim_on, ci=68, ax=ax1)
 ax1.set(ylabel='Baseline subtracted\npupil diameter (mm)', xlabel='Time (s)')
 ax1.plot([0, 0], ax1.get_ylim(), 'r')
-ax1.text(0.8, -0.015, 'n = %d mice' % np.size(np.unique(pupil_stim_on['eid'])))
+# ax1.text(0.8, -0.01, 'n = %d mice' % np.size(np.unique(pupil_stim_on['eid'])))
 ax1.text(0, ax1.get_ylim()[1], 'Stimulus Onset', ha='center', color='r')
 
-sns.lineplot(x='timepoint', y='trace', data=pupil_reward, ci=68, ax=ax2)
+sns.lineplot(x='timepoint', y='trace', data=pupil_reward, ci=68, ax=ax2, color='g')
+sns.lineplot(x='timepoint', y='trace', data=pupil_no_reward, ci=68, ax=ax2, color='r')
 ax2.set(ylabel='Baseline subtracted\npupil diameter (mm)', xlabel='Time (s)')
+ax2.legend(['Rewarded', 'Unrewarded'], frameon=False, loc=4, fontsize=12)
 ax2.text(0, ax2.get_ylim()[1]+0.001, 'Reward Delivery', ha='center', color='r')
-ax2.text(0.8, -0.015, 'n = %d mice' % np.size(np.unique(pupil_stim_on['eid'])))
+# ax2.text(0.8, -0.01, 'n = %d mice' % np.size(np.unique(pupil_stim_on['eid'])))
 ax2.plot([0, 0], ax2.get_ylim(), 'r')
 
 sns.lineplot(x='timepoint', y='trace', data=paw_left, ci=68, ax=ax3)
@@ -156,13 +167,13 @@ plt.savefig(join(FIG_PATH, 'DLC_PEP.pdf'), dpi=300)
 
 
 f, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 10))
-sns.lineplot(x='timepoint', y='trace', data=pupil_stim_on, hue='eid', estimator=None, ax=ax1)
+sns.lineplot(x='timepoint', y='trace', data=pupil_reward, hue='eid', estimator=None, ax=ax1)
 ax1.set(ylabel='Baseline subtracted pupil diameter (mm)', xlabel='Time (s)',
         title='Stimulus onset')
 ax1.plot([0, 0], ax1.get_ylim(), 'r')
 ax1.get_legend().remove()
 
-sns.lineplot(x='timepoint', y='trace', data=pupil_reward, hue='eid', estimator=None, ax=ax2)
+sns.lineplot(x='timepoint', y='trace', data=pupil_no_reward, hue='eid', estimator=None, ax=ax2)
 ax2.set(ylabel='Baseline subtracted pupil diameter (mm)', xlabel='Time (s)',
         title='Stimulus onset')
 ax2.plot([0, 0], ax1.get_ylim(), 'r')
