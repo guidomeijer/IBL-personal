@@ -25,7 +25,8 @@ d_types = ['_iblrig_taskSettings.raw',
 sessions = pd.read_csv('altanserin_sessions.csv', header=1, index_col=0)
 
 # Load data
-results = pd.DataFrame(columns=['subject', 'bias', 'first_bias', 'condition'])
+results = pd.DataFrame(columns=['subject', 'condition', 'bias', 'first_bias', 'n_trials',
+                                'perf_easy'])
 for i, nickname in enumerate(sessions.index.values):
     eids = one.search(subject=nickname,
                       date_range=[sessions.loc[nickname, 'Pre-vehicle'],
@@ -60,21 +61,26 @@ for i, nickname in enumerate(sessions.index.values):
             bias = (np.sum(this_choice[((this_contr_l == 0) | (this_contr_r == 0))] == -1)
                     / np.size(this_choice[((this_contr_l == 0) | (this_contr_r == 0))]))
             bias_right = np.append(bias_right, bias)
-
         first_bias = (np.mean(bias_right[np.isnan(bias_right) == 0])
                       - np.mean(bias_left[np.isnan(bias_left) == 0]))
+
+        # Calculate performance
+        perf_easy = (np.sum(feedback_type[((contrast_l >= 0.5) | (contrast_r >= 0.5))] == 1)
+                     / np.size(feedback_type[((contrast_l >= 0.5) | (contrast_r >= 0.5))]))*100
 
         # Add to dataframe
         results.loc[results.shape[0]+1, 'subject'] = nickname
         results.loc[results.shape[0], 'bias'] = left-right
-        # results.loc[results.shape[0], 'first_bias'] = np.mean(all_bias[np.isnan(all_bias) == 0])
         results.loc[results.shape[0], 'first_bias'] = first_bias
+        results.loc[results.shape[0], 'n_trials'] = np.size(choice)
+        results.loc[results.shape[0], 'perf_easy'] = perf_easy
         results.loc[results.shape[0], 'condition'] = j
 
-results[['bias', 'first_bias']] = results[['bias', 'first_bias']].astype(float)
+results[['bias', 'first_bias', 'n_trials', 'perf_easy']] = results[
+            ['bias', 'first_bias', 'n_trials', 'perf_easy']].astype(float)
 results['subject'] = results['subject'].astype(str)
 
-f, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4), sharey=True)
+f, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
 sns.lineplot(x='condition', y='bias', hue='subject', data=results, ax=ax1)
 ax1.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
         xlabel='', ylabel='Bias', title='Overall bias strenght',
