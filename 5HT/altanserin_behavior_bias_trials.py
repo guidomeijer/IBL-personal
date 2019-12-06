@@ -77,5 +77,9 @@ sns.lineplot(x='condition', y='bias', hue='trial', data=results,
 ax1.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
         xlabel='', ylabel='Bias', title='Overall bias strenght',
         ylim=[-0.1, 0.6])
+legend = ax1.legend(loc=[0.05, 0.62], frameon=False)
+legend.texts[0].set_text('Trials')
+legend.texts[0].set_position((0.1,0.2))
+sns.despine(trim=True)
 
 plt.tight_layout(pad=2)
