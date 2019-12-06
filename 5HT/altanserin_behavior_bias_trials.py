@@ -7,22 +7,24 @@ Created on Tue Dec  3 12:10:23 2019
 
 import pandas as pd
 import numpy as np
+from os.path import join
 import matplotlib.pyplot as plt
 import seaborn as sns
 from oneibl.one import ONE
 one = ONE()
 
 # Settings
-FIRST_TRIALS = [10, 12, 14, 16, 18]
+FIRST_TRIALS = [10, 12, 14, 16]
+FIG_PATH = '/home/guido/Figures/5HT'
+
+# Load in session dates
+sessions = pd.read_csv('altanserin_sessions.csv', header=1, index_col=0)
 d_types = ['_iblrig_taskSettings.raw',
            'trials.probabilityLeft',
            'trials.contrastLeft',
            'trials.contrastRight',
            'trials.feedbackType',
            'trials.choice']
-
-# Load in session dates
-sessions = pd.read_csv('altanserin_sessions.csv', header=1, index_col=0)
 
 # Load data
 results = pd.DataFrame(columns=['subject', 'condition', 'bias', 'trial'])
@@ -54,9 +56,9 @@ for i, nickname in enumerate(sessions.index.values):
 
             # Calculate bias per contrast for first trials
             first_left = (np.sum(first_choice_l[first_contrast_l == 0] == -1)
-                    / np.size(first_choice_l[first_contrast_l == 0]))
+                          / np.size(first_choice_l[first_contrast_l == 0]))
             first_right = (np.sum(first_choice_r[first_contrast_r == 0] == -1)
-                     / np.size(first_choice_r[first_contrast_r == 0]))
+                           / np.size(first_choice_r[first_contrast_r == 0]))
             first_bias[t] = first_right-first_left
 
             # Add to dataframe
@@ -74,12 +76,15 @@ f, ax1 = plt.subplots(1, 1, figsize=(6, 6))
 palette = sns.color_palette('GnBu_d', np.size(FIRST_TRIALS))
 sns.lineplot(x='condition', y='bias', hue='trial', data=results,
              ci=68, palette=palette, ax=ax1)
-ax1.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
-        xlabel='', ylabel='Bias', title='Overall bias strenght',
-        ylim=[-0.1, 0.6])
-legend = ax1.legend(loc=[0.05, 0.62], frameon=False)
+ax1.set(xticks=[0, 1, 2], xticklabels=['Pre-\nvehicle', '5HT2a\nantagonist', 'Post-\nvehicle'],
+        xlabel='', ylabel='Bias', ylim=[-0.1, 0.6])
+legend = ax1.legend(loc=[0.05, 0.62], frameon=False, fontsize=12)
 legend.texts[0].set_text('Trials')
-legend.texts[0].set_position((0.1,0.2))
+legend.texts[0].set_position((0.1, 0.1))
+plt.setp(ax1.xaxis.get_majorticklabels(), rotation=40)
+sns.set(context='paper', font_scale=1.5, style='ticks')
 sns.despine(trim=True)
-
 plt.tight_layout(pad=2)
+
+plt.savefig(join(FIG_PATH, '5HT2a_block_bias.pdf'), dpi=300)
+plt.savefig(join(FIG_PATH, '5HT2a_block_bias.png'), dpi=300)

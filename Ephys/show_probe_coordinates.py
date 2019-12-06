@@ -9,14 +9,14 @@ Created on Thu Nov 21 12:34:22 2019
 from oneibl.one import ONE
 one = ONE()
 
-mouse_id = 'ZM_2407'
+mouse_id = 'ZM_1897'
 
 eids, ses_info = one.search(subject=mouse_id, dataset_types='spikes.times', details=True)
-dtypes = ['_iblrig_taskSettings.raw', 'probes.trajectory']
+dtypes = ['_iblrig_taskSettings.raw', 'probes.trajectory', 'trials.feedback_times']
 
 print('\nMouse ID: %s' % mouse_id)
 for i, eid in enumerate(eids):
-    d, traj = one.load(eid, dataset_types=dtypes, download_only=False, dclass_output=False)
+    d, traj, trials = one.load(eid, dataset_types=dtypes, download_only=False, dclass_output=False)
 
     print('\nSession: %s' % ses_info[i]['start_time'][:10])
     for p in range(len(traj)):
@@ -24,3 +24,4 @@ for i, eid in enumerate(eids):
                                                    round(traj[p]['y']/1000, 1),
                                                    round(traj[p]['x']/1000, 1),
                                                    round(traj[p]['depth']/1000, 1)))
+        print(len(trials))

@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from fit_psytrack import fit_model
+from fit_psytrack import fit_model, plot_psytrack
 
 # Settings
 TRIAL_WIN = [5, 10]
@@ -63,6 +63,10 @@ for i, nickname in enumerate(sessions.index.values):
                               'trial': trial_vec}))
 
     # Plot results
+    plot_psytrack(pre, prob_l_pre)
+    plot_psytrack(drug, prob_l_drug)
+    plot_psytrack(post, prob_l_post)
+
     f, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4), sharey=True)
     sns.lineplot(x='trial', y='bias', data=pre_left, ax=ax1)
     sns.lineplot(x='trial', y='bias', data=drug_left, ax=ax1)
