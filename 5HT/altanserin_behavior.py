@@ -13,7 +13,7 @@ from oneibl.one import ONE
 one = ONE()
 
 # Settings
-FIRST_TRIALS = 10
+FIRST_TRIALS = 20
 d_types = ['_iblrig_taskSettings.raw',
            'trials.probabilityLeft',
            'trials.contrastLeft',
@@ -41,28 +41,27 @@ for i, nickname in enumerate(sessions.index.values):
         right = (np.sum(choice[((contrast_l == 0) | (contrast_r == 0)) & (prob_l == 0.8)] == -1)
                  / np.size(choice[((contrast_l == 0) | (contrast_r == 0)) & (prob_l == 0.8)]))
 
-        # Calculate bias in first trials after block switch
+        # Get the first trials after block switch
         left_blocks = np.where(np.diff(prob_l) > 0.5)[0]
-        bias_left = np.zeros(0)
+        first_contrast_l = np.zeros(0)
+        first_choice_l = np.zeros(0)
         for k, ind in enumerate(left_blocks):
-            this_choice = choice[ind+1:ind+FIRST_TRIALS+1]
-            this_contr_l = contrast_l[ind+1:ind+FIRST_TRIALS+1]
-            this_contr_r = contrast_r[ind+1:ind+FIRST_TRIALS+1]
-            bias = (np.sum(this_choice[((this_contr_l == 0) | (this_contr_r == 0))] == -1)
-                    / np.size(this_choice[((this_contr_l == 0) | (this_contr_r == 0))]))
-            bias_left = np.append(bias_left, bias)
+            first_contrast_l = np.append(first_contrast_l, contrast_l[ind+1:ind+FIRST_TRIALS+1])
+            first_choice_l = np.append(first_choice_l, choice[ind+1:ind+FIRST_TRIALS+1])
 
         right_blocks = np.where(np.diff(prob_l) < -0.5)[0]
-        bias_right = np.zeros(0)
+        first_contrast_r = np.zeros(0)
+        first_choice_r = np.zeros(0)
         for k, ind in enumerate(right_blocks):
-            this_choice = choice[ind+1:ind+FIRST_TRIALS+1]
-            this_contr_l = contrast_l[ind+1:ind+FIRST_TRIALS+1]
-            this_contr_r = contrast_r[ind+1:ind+FIRST_TRIALS+1]
-            bias = (np.sum(this_choice[((this_contr_l == 0) | (this_contr_r == 0))] == -1)
-                    / np.size(this_choice[((this_contr_l == 0) | (this_contr_r == 0))]))
-            bias_right = np.append(bias_right, bias)
-        first_bias = (np.mean(bias_right[np.isnan(bias_right) == 0])
-                      - np.mean(bias_left[np.isnan(bias_left) == 0]))
+            first_contrast_r = np.append(first_contrast_r, contrast_r[ind+1:ind+FIRST_TRIALS+1])
+            first_choice_r = np.append(first_choice_r, choice[ind+1:ind+FIRST_TRIALS+1])
+
+        # Calculate bias per contrast for first trials
+        first_left = (np.sum(first_choice_l[first_contrast_l == 0] == -1)
+                / np.size(first_choice_l[first_contrast_l == 0]))
+        first_right = (np.sum(first_choice_r[first_contrast_r == 0] == -1)
+                 / np.size(first_choice_r[first_contrast_r == 0]))
+        first_bias = first_right-first_left
 
         # Calculate performance
         perf_easy = (np.sum(feedback_type[((contrast_l >= 0.5) | (contrast_r >= 0.5))] == 1)

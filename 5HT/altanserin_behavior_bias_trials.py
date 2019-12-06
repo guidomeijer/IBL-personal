@@ -13,7 +13,7 @@ from oneibl.one import ONE
 one = ONE()
 
 # Settings
-FIRST_TRIALS = 10
+FIRST_TRIALS = [10, 12, 14, 16, 18]
 d_types = ['_iblrig_taskSettings.raw',
            'trials.probabilityLeft',
            'trials.contrastLeft',
@@ -25,7 +25,7 @@ d_types = ['_iblrig_taskSettings.raw',
 sessions = pd.read_csv('altanserin_sessions.csv', header=1, index_col=0)
 
 # Load data
-results = pd.DataFrame(columns=['subject', 'bias', 'first_bias', 'condition'])
+results = pd.DataFrame(columns=['subject', 'condition', 'bias', 'trial'])
 for i, nickname in enumerate(sessions.index.values):
     eids = one.search(subject=nickname,
                       date_range=[sessions.loc[nickname, 'Pre-vehicle'],
@@ -34,66 +34,48 @@ for i, nickname in enumerate(sessions.index.values):
         d, prob_l, contrast_l, contrast_r, feedback_type, choice = one.load(
                     eid, d_types, dclass_output=False)
 
-        # Calculate bias
-        contrast_s = contrast_r
-        contrast_s[np.isnan(contrast_r)] = -contrast_l[np.isnan(contrast_r)]
-        bias_contrast = pd.DataFrame(index=np.unique(contrast_s), columns=['bias'])
-        for c, contrast in enumerate(np.unique(contrast_s)):
-            left = (np.sum(choice[(contrast_s == contrast) & (prob_l == 0.2)] == -1)
-                    / np.size(choice[(contrast_s == contrast) & (prob_l == 0.2)]))
-            right = (np.sum(choice[(contrast_s == contrast) & (prob_l == 0.8)] == -1)
-                     / np.size(choice[(contrast_s == contrast) & (prob_l == 0.8)]))
-            bias_contrast.loc[contrast,'bias'] = left-right
+        first_bias = np.zeros(np.size(FIRST_TRIALS))
+        for t, trial in enumerate(FIRST_TRIALS):
 
+            # Get the first trials after block switch
+            left_blocks = np.where(np.diff(prob_l) > 0.5)[0]
+            first_contrast_l = np.zeros(0)
+            first_choice_l = np.zeros(0)
+            for k, ind in enumerate(left_blocks):
+                first_contrast_l = np.append(first_contrast_l, contrast_l[ind+1:ind+trial+1])
+                first_choice_l = np.append(first_choice_l, choice[ind+1:ind+trial+1])
 
-        left = (np.sum(choice[((contrast_l == 0) | (contrast_r == 0)) & (prob_l == 0.2)] == -1)
-                / np.size(choice[((contrast_l == 0) | (contrast_r == 0)) & (prob_l == 0.2)]))
-        right = (np.sum(choice[((contrast_l == 0) | (contrast_r == 0)) & (prob_l == 0.8)] == -1)
-                 / np.size(choice[((contrast_l == 0) | (contrast_r == 0)) & (prob_l == 0.8)]))
+            right_blocks = np.where(np.diff(prob_l) < -0.5)[0]
+            first_contrast_r = np.zeros(0)
+            first_choice_r = np.zeros(0)
+            for k, ind in enumerate(right_blocks):
+                first_contrast_r = np.append(first_contrast_r, contrast_r[ind+1:ind+trial+1])
+                first_choice_r = np.append(first_choice_r, choice[ind+1:ind+trial+1])
 
-        # Calculate bias in first trials after block switch
-        left_blocks = np.where(np.diff(prob_l) > 0.5)[0]
-        bias_left = np.zeros(0)
-        for k, ind in enumerate(left_blocks):
-            this_choice = choice[ind+1:ind+FIRST_TRIALS+1]
-            this_contr_l = contrast_l[ind+1:ind+FIRST_TRIALS+1]
-            this_contr_r = contrast_r[ind+1:ind+FIRST_TRIALS+1]
-            bias = (np.sum(this_choice[((this_contr_l == 0) | (this_contr_r == 0))] == -1)
-                    / np.size(this_choice[((this_contr_l == 0) | (this_contr_r == 0))]))
-            bias_left = np.append(bias_left, bias)
+            # Calculate bias per contrast for first trials
+            first_left = (np.sum(first_choice_l[first_contrast_l == 0] == -1)
+                    / np.size(first_choice_l[first_contrast_l == 0]))
+            first_right = (np.sum(first_choice_r[first_contrast_r == 0] == -1)
+                     / np.size(first_choice_r[first_contrast_r == 0]))
+            first_bias[t] = first_right-first_left
 
-        right_blocks = np.where(np.diff(prob_l) < -0.5)[0]
-        bias_right = np.zeros(0)
-        for k, ind in enumerate(right_blocks):
-            this_choice = choice[ind+1:ind+FIRST_TRIALS+1]
-            this_contr_l = contrast_l[ind+1:ind+FIRST_TRIALS+1]
-            this_contr_r = contrast_r[ind+1:ind+FIRST_TRIALS+1]
-            bias = (np.sum(this_choice[((this_contr_l == 0) | (this_contr_r == 0))] == -1)
-                    / np.size(this_choice[((this_contr_l == 0) | (this_contr_r == 0))]))
-            bias_right = np.append(bias_right, bias)
+            # Add to dataframe
+            this_result = pd.DataFrame({'bias': first_bias,
+                                        'trial': [str(w) for w in FIRST_TRIALS],
+                                        'subject': nickname,
+                                        'condition': j})
+            results = results.append(this_result, sort=False)
 
-        first_bias = (np.mean(bias_right[np.isnan(bias_right) == 0])
-                      - np.mean(bias_left[np.isnan(bias_left) == 0]))
+results = results.reset_index()
+results['bias'] = results['bias'].astype(float)
+results['# trials after block change'] = results['trial']
 
-        # Add to dataframe
-        results.loc[results.shape[0]+1, 'subject'] = nickname
-        results.loc[results.shape[0], 'bias'] = left-right
-        # results.loc[results.shape[0], 'first_bias'] = np.mean(all_bias[np.isnan(all_bias) == 0])
-        results.loc[results.shape[0], 'first_bias'] = first_bias
-        results.loc[results.shape[0], 'condition'] = j
-
-results[['bias', 'first_bias']] = results[['bias', 'first_bias']].astype(float)
-results['subject'] = results['subject'].astype(str)
-
-f, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4), sharey=True)
-sns.lineplot(x='condition', y='bias', hue='subject', data=results, ax=ax1)
+f, ax1 = plt.subplots(1, 1, figsize=(6, 6))
+palette = sns.color_palette('GnBu_d', np.size(FIRST_TRIALS))
+sns.lineplot(x='condition', y='bias', hue='trial', data=results,
+             ci=68, palette=palette, ax=ax1)
 ax1.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
         xlabel='', ylabel='Bias', title='Overall bias strenght',
-        ylim=[0, 0.6])
-
-sns.lineplot(x='condition', y='first_bias', hue='subject', data=results, ax=ax2)
-ax2.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
-        xlabel='', ylabel='Bias', title='Bias in first %d trials after switch' % FIRST_TRIALS,
-        ylim=[0, 0.6])
+        ylim=[-0.1, 0.6])
 
 plt.tight_layout(pad=2)
