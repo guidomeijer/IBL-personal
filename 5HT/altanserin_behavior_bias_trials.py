@@ -7,15 +7,16 @@ Created on Tue Dec  3 12:10:23 2019
 
 import pandas as pd
 import numpy as np
-from os.path import join
+from os.path import join, expanduser
 import matplotlib.pyplot as plt
 import seaborn as sns
+
 from oneibl.one import ONE
 one = ONE()
 
 # Settings
 FIRST_TRIALS = [10, 12, 14, 16]
-FIG_PATH = '/home/guido/Figures/5HT'
+FIG_PATH = join(expanduser('~'), 'Figures', '5HT')
 
 # Load in session dates
 sessions = pd.read_csv('altanserin_sessions.csv', header=1, index_col=0)
