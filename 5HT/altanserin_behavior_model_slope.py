@@ -8,11 +8,13 @@ Created on Tue Dec  3 12:10:23 2019
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from os.path import join, expanduser
 import seaborn as sns
 from fit_psytrack import fit_model, plot_psytrack
 
 # Settings
 TRIAL_WIN = [0, 15]
+FIG_PATH = join(expanduser('~'), 'Figures', '5HT')
 
 # Load in session dates
 sessions = pd.read_csv('altanserin_sessions.csv', header=1, index_col=0)
@@ -51,12 +53,17 @@ for i, nickname in enumerate(sessions.index.values):
                                                      'slope_right': np.mean(right_slope),
                                                      'slope_abs': np.mean(np.abs(np.append(
                                                                      left_slope, right_slope)))}))
+        plt.savefig(join(FIG_PATH, 'psytrack_fit_%s_%s.png' % (nickname, condition)), dpi=300)
+        plt.savefig(join(FIG_PATH, 'psytrack_fit_%s_%s.pdf' % (nickname, condition)), dpi=300)
 
 f, ax1 = plt.subplots(1, 1, figsize=(5, 5))
-sns.lineplot(x='condition', y='slope_abs', data=results, hue='subject', style='subject',
-             legend=False, lw=3, markers=True, ax=ax1)
+sns.lineplot(x='condition', y='slope_abs', data=results, style='subject',
+             legend=False, lw=3, markers=['o', 'o'], dashes=['', ''], ax=ax1)
 ax1.set(ylabel='Speed of bias switch (absolute slope)',
         xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a antagonist', 'Post-vehicle'],
         ylim=[0, 12])
 sns.set(context='paper', font_scale=1.5, style='ticks')
 sns.despine(trim=True)
+
+plt.savefig(join(FIG_PATH, 'altanserin_slope_model.png'), dpi=300)
+plt.savefig(join(FIG_PATH, 'altanserin_slope_model.pdf'), dpi=300)

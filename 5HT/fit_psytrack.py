@@ -115,10 +115,10 @@ def fit_model(nickname, date_range, volatility=False, previous_trials=0):
     # Fit model
     print('Fitting model..')
     hyp, evd, wMode, hess = hyperOpt(D, hyper, weights, optList)
-    return wMode, prob_l
+    return wMode, prob_l, hyp
 
 
-def plot_psytrack(wMode, prob_l):
+def plot_psytrack(wMode, prob_l, plot_stim=True):
 
     f, ax1 = plt.subplots(1, 1, figsize=(10, 5))
     block_switch = np.where(np.abs(np.diff(prob_l)) > 0.1)[0]
@@ -134,10 +134,12 @@ def plot_psytrack(wMode, prob_l):
             ax1.fill([block_switch[i], block_switch[i], block_switch[i+1], block_switch[i+1]],
                      [-4, 4, 4, -4], color=[1, 0.6, 0.6])
     ax1.plot(wMode[0], color='k', lw=3)
-    ax1.plot(wMode[1], color='r', lw=3)
-    ax1.plot(wMode[2], color='b', lw=3)
+    if plot_stim is True:
+        ax1.plot(wMode[1], color='r', lw=3)
+        ax1.plot(wMode[2], color='b', lw=3)
     ax1.legend(['Bias', 'Left stimulus', 'Right stimulus'], fontsize=12)
     ax1.set(ylabel='Weight', xlabel='Trials')
     sns.set(context='paper', font_scale=1.5, style='ticks')
     sns.despine(trim=True)
     plt.tight_layout(pad=2)
+    return ax1
