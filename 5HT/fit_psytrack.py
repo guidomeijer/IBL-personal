@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-def fit_model(nickname, date_range, volatility=False, previous_trials=0):
+def fit_model(nickname, date_range, previous_trials=0):
 
     # Find sessions in ONE
     one = ONE()
@@ -81,27 +81,19 @@ def fit_model(nickname, date_range, volatility=False, previous_trials=0):
                                                     contrast_r_log[i:-i])))
 
     # Create input dict
-    if volatility is False:
-        D = {'name': nickname,
-             'y': choice,
-             'correct': correct,
-             'dayLength': n_trials,
-             'inputs': {'s1': s1_log, 's2': s2_log}
-             }
-    else:
-        D = {'name': nickname,
-             'y': choice,
-             'correct': correct,
-             'dayLength': n_trials,
-             'inputs': {'s1': s1_log, 's2': s2_log}
-             }
+    D = {'name': nickname,
+         'y': choice,
+         'correct': correct,
+         'dayLength': n_trials,
+         'inputs': {'s1': s1_log, 's2': s2_log}
+         }
 
     # Model parameters
     weights = {'bias': 1,
                's1': previous_trials+1,
                's2': previous_trials+1}
     K = np.sum([weights[i] for i in weights.keys()])
-    if (volatility is False) | (np.size(n_trials) == 1):
+    if np.size(n_trials) == 1:
         hyper = {'sigInit': 2**4.,
                  'sigma': [2**-4.]*K,
                  'sigDay': None}
@@ -115,7 +107,12 @@ def fit_model(nickname, date_range, volatility=False, previous_trials=0):
     # Fit model
     print('Fitting model..')
     hyp, evd, wMode, hess = hyperOpt(D, hyper, weights, optList)
-    return wMode, prob_l, hyp
+
+    if np.size(n_trials) == 1:
+        return wMode, prob_l
+    else:
+        return wMode, prob_l, hyp, n_trials
+
 
 
 def plot_psytrack(wMode, prob_l, plot_stim=True):
