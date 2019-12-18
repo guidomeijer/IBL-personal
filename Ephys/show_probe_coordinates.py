@@ -9,7 +9,7 @@ Created on Thu Nov 21 12:34:22 2019
 from oneibl.one import ONE
 one = ONE()
 
-mouse_id = 'ZM_1898'
+mouse_id = 'ZM_1897'
 
 eids, ses_info = one.search(subject=mouse_id, dataset_types='spikes.times', details=True)
 dtypes = ['_iblrig_taskSettings.raw', 'probes.trajectory', 'trials.feedback_times']
@@ -23,7 +23,9 @@ for i, eid in enumerate(eids):
     print('\nSession date: %s\nSession eid: %s' % (ses_info[i]['start_time'][:10], eid))
     print('%d trials' % len(trials))
     for p in range(len(traj)):
-        print('\n%s\nAP: %s\nML: %s\nDepth: %s' % (traj[p]['label'],
+        print('\n%s\nAP: %s\nML: %s\nDepth: %s\nPhi: %s\nTheta: %s' % (traj[p]['label'],
                                                    round(traj[p]['y']/1000, 1),
                                                    round(traj[p]['x']/1000, 1),
-                                                   round(traj[p]['depth']/1000, 1)))
+                                                   round(traj[p]['depth']/1000, 1),
+                                                   round(traj[p]['phi'], 1),
+                                                   round(traj[p]['theta'], 1)))
