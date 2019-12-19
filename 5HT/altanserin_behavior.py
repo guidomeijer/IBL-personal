@@ -8,12 +8,14 @@ Created on Tue Dec  3 12:10:23 2019
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from os.path import join, expanduser
 import seaborn as sns
 from oneibl.one import ONE
 one = ONE()
 
 # Settings
-FIRST_TRIALS = 20
+FIRST_TRIALS = 15
+FIG_PATH = join(expanduser('~'), 'Figures', '5HT')
 d_types = ['_iblrig_taskSettings.raw',
            'trials.probabilityLeft',
            'trials.contrastLeft',
@@ -31,6 +33,10 @@ for i, nickname in enumerate(sessions.index.values):
     eids = one.search(subject=nickname,
                       date_range=[sessions.loc[nickname, 'Pre-vehicle'],
                                   sessions.loc[nickname, 'Post-vehicle']])
+
+    if len(eids) > 3:
+        eids = eids[0:3]
+
     for j, eid in enumerate(eids):
         d, prob_l, contrast_l, contrast_r, feedback_type, choice = one.load(
                     eid, d_types, dclass_output=False)
@@ -79,15 +85,22 @@ results[['bias', 'first_bias', 'n_trials', 'perf_easy']] = results[
             ['bias', 'first_bias', 'n_trials', 'perf_easy']].astype(float)
 results['subject'] = results['subject'].astype(str)
 
-f, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
-sns.lineplot(x='condition', y='bias', hue='subject', data=results, ax=ax1)
+f, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+sns.lineplot(x='condition', y='bias', hue='subject', data=results, lw=3, ax=ax1)
 ax1.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
         xlabel='', ylabel='Bias', title='Overall bias strenght',
         ylim=[0, 0.6])
-
-sns.lineplot(x='condition', y='first_bias', hue='subject', data=results, ax=ax2)
+plt.setp(ax1.xaxis.get_majorticklabels(), rotation=40)
+handles, labels = ax1.get_legend_handles_labels()
+ax1.legend(fontsize=10, frameon=False, handles=handles[1:], labels=labels[1:])
+sns.lineplot(x='condition', y='first_bias', hue='subject', data=results,
+             legend=False, lw=3, ax=ax2)
 ax2.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
         xlabel='', ylabel='Bias', title='Bias in first %d trials after switch' % FIRST_TRIALS,
-        ylim=[0, 0.6])
-
+        ylim=[-0.1, 0.5])
+plt.setp(ax2.xaxis.get_majorticklabels(), rotation=40)
+sns.set(context='paper', font_scale=1.5, style='ticks')
+sns.despine(trim=True)
 plt.tight_layout(pad=2)
+plt.savefig(join(FIG_PATH, '5HT2a_bias.pdf'), dpi=300)
+plt.savefig(join(FIG_PATH, '5HT2a_bias.png'), dpi=300)
