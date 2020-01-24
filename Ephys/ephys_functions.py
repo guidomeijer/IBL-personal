@@ -9,9 +9,10 @@ from oneibl.one import ONE
 import pandas as pd
 
 
-def data_path():
-    path = 'C:\\Users\\guido\\Downloads\\FlatIron\\mainenlab\\Subjects'
-    return path
+def paths():
+    data_path = 'C:\\Users\\guido\\Downloads\\FlatIron\\mainenlab\\Subjects'
+    fig_path = 'C:\\Users\\guido\\Figures\\Ephys'
+    return data_path, fig_path
 
 
 def download_data(nickname, date):
