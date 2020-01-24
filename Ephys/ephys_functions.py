@@ -23,16 +23,20 @@ def download_data(nickname, date):
               'spikes.clusters',
               'clusters.probes',
               'clusters.channels',
+              'clusters.metrics',
               'probes.trajectory',
               'trials.choice',
+              'trials.intervals',
               'trials.contrastLeft',
               'trials.contrastRight',
               'trials.feedback_times',
+              'trials.goCue_times',
               'trials.feedbackType',
               'trials.probabilityLeft',
               'trials.reponse_times',
               'trials.stimOn_times']
     one.load(eid[0], dataset_types=dtypes, download_only=True)
+    # one.load(eid[0], clobber=False, download_only=True)
 
 
 def frontal_sessions():
