@@ -7,6 +7,7 @@ Created on Wed Jan 22 16:22:01 2020
 
 from oneibl.one import ONE
 from os.path import expanduser, join
+import pandas as pd
 
 
 def paths():
@@ -14,7 +15,7 @@ def paths():
         data_path = '/media/guido/data/Flatiron/mainenlab/Subjects'
     else:
         data_path = join(expanduser('~'), 'Downloads', 'FlatIron', 'mainenlab', 'Subjects')
-    fig_path = join(expanduser('~'), 'Figures', 'Ephys')
+    fig_path = join(expanduser('~'), 'Figures', '5HT', 'ephys')
     return data_path, fig_path
 
 
@@ -39,3 +40,13 @@ def download_data(nickname, date):
               'trials.response_times',
               'trials.stimOn_times']
     one.load(eid[0], dataset_types=dtypes, download_only=True)
+
+
+def frontal_sessions():
+    sessions = pd.DataFrame(data={'subject': ['ZM_1897'],
+                                  'date': ['2019-12-06'],
+                                  'probe': ['00']})
+    return sessions
+
+
+

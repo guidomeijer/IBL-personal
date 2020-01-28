@@ -17,7 +17,7 @@ import numpy as np
 FIG_PATH = join(expanduser('~'), 'Figures', '5HT')
 
 # Load in data
-data = loadmat(join(expanduser('~'), 'Data', '5HT', 'guido_analysis_13dec2019.mat'))
+data = loadmat(join(expanduser('~'), 'Data', '5HT', 'guido_analysis_20dec2019.mat'))
 runlength = data['X'][0]
 parameters = data['pnames'][0]
 
@@ -35,7 +35,7 @@ sns.lineplot(x='condition', y='max_prob', hue='subject', data=results, legend=Fa
              ax=ax1, lw=3)
 ax1.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
         xlabel='', ylabel='Lenght of integration window (tau)',
-        title='Fitted runing average model', ylim=[2, 4])
+        title='Fitted running average model', ylim=[1, 4])
 plt.setp(ax1.xaxis.get_majorticklabels(), rotation=40)
 sns.set(context='paper', font_scale=1.5, style='ticks')
 sns.despine(trim=True)

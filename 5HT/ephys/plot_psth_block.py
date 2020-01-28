@@ -21,6 +21,7 @@ sessions = frontal_sessions()
 T_BIN = 0.01
 
 DATA_PATH, FIG_PATH = paths()
+FIG_PATH = '/home/guido/Figures/Ephys/'
 for i in range(sessions.shape[0]):
     # Download data if required
     if download is True:
@@ -52,8 +53,8 @@ for i in range(sessions.shape[0]):
                                           include_raster=True)
         plt.title('Stimulus onset')
         plt.savefig(join(FIG_PATH, 'PSTH', '%s' % sessions.loc[i, 'subject'],
-                         '%s' % sessions.loc[i, 'date'], ''
-                                                      sessions.loc[i, 'probe'], cluster)))
+                         '%s' % sessions.loc[i, 'date'],
+                         'p%s_n%s' % (sessions.loc[i, 'probe'], cluster)))
         plt.close(fig)
 
 
