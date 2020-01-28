@@ -10,18 +10,13 @@ from os.path import join
 import alf.io as ioalf
 import matplotlib.pyplot as plt
 import brainbox as bb
-import ibllib.plots as iblplt
-
-from brainbox.processing import bincount2D
 import numpy as np
 from ephys_functions import download_data, paths, frontal_sessions
 
 download = False
 sessions = frontal_sessions()
-T_BIN = 0.01
 
 DATA_PATH, FIG_PATH = paths()
-FIG_PATH = '/home/guido/Figures/Ephys/'
 for i in range(sessions.shape[0]):
     # Download data if required
     if download is True:
@@ -46,15 +41,21 @@ for i in range(sessions.shape[0]):
         spikes.clusters, clusters.metrics.cluster_id[clusters.metrics.ks2_label == 'good'])]
 
     for n, cluster in enumerate(spikes.clusters):
-        fig = plt.figure()
+        fig, ax = plt.subplots(1, 1)
         bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters,
-                                          trials.stimOn_times[trials.contrastLeft == 0],
+                                          trials.goCue_times[(trials.contrastLeft == 1)
+                                                              | (trials.contrastRight == 1)],
                                           cluster, t_before=1, t_after=2, error_bars='sem',
-                                          include_raster=True)
-        plt.title('Stimulus onset')
-        plt.savefig(join(FIG_PATH, 'PSTH', '%s' % sessions.loc[i, 'subject'],
-                         '%s' % sessions.loc[i, 'date'],
-                         'p%s_n%s' % (sessions.loc[i, 'probe'], cluster)))
-        plt.close(fig)
+                                          include_raster=False, ax=ax)
+        bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters,
+                                          trials.goCue_times[(trials.contrastLeft == 0)
+                                                              | (trials.contrastRight == 0)],
+                                          cluster, t_before=1, t_after=2, error_bars='sem',
+                                          include_raster=False, ax=ax)
+        plt.title('0% contrast trials (t=0: go cue)')
+        plt.savefig(join(FIG_PATH, 'PSTH', 'p%s_n%s' % (sessions.loc[i, 'probe'], cluster)))
+        plt.close()
+
+
 
 
