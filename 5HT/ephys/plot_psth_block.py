@@ -43,19 +43,17 @@ for i in range(sessions.shape[0]):
     for n, cluster in enumerate(spikes.clusters):
         fig, ax = plt.subplots(1, 1)
         bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters,
-                                          trials.goCue_times[(trials.contrastLeft == 1)
-                                                              | (trials.contrastRight == 1)],
-                                          cluster, t_before=1, t_after=2, error_bars='sem',
-                                          include_raster=False, ax=ax)
+                                          trials.goCue_times[((trials.probabilityLeft > 0.5)
+                                                              & (trials.choice == -1))],
+                                          cluster, t_before=1, t_after=2, error_bars='sem', ax=ax)
         bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters,
-                                          trials.goCue_times[(trials.contrastLeft == 0)
-                                                              | (trials.contrastRight == 0)],
+                                          trials.goCue_times[((trials.probabilityLeft < 0.5)
+                                                              & (trials.choice == -1))],
                                           cluster, t_before=1, t_after=2, error_bars='sem',
-                                          include_raster=False, ax=ax)
+                                          pethline_kwargs={'color': 'red', 'lw': 2},
+                                          errbar_kwargs={'color': 'red', 'alpha': 0.5}, ax=ax)
+        plt.legend(['Left block', 'Right block'])
         plt.title('0% contrast trials (t=0: go cue)')
         plt.savefig(join(FIG_PATH, 'PSTH', 'p%s_n%s' % (sessions.loc[i, 'probe'], cluster)))
         plt.close()
-
-
-
 
