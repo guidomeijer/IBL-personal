@@ -36,9 +36,20 @@ for i in range(sessions.shape[0]):
 
     # Only use single units
     spikes.times = spikes.times[np.isin(
-        spikes.clusters, clusters.metrics.cluster_id[clusters.metrics.ks2_label == 'good'])]
+            spikes.clusters, clusters.metrics.cluster_id[clusters.metrics.ks2_label == 'good'])]
     spikes.clusters = spikes.clusters[np.isin(
-        spikes.clusters, clusters.metrics.cluster_id[clusters.metrics.ks2_label == 'good'])]
+            spikes.clusters, clusters.metrics.cluster_id[clusters.metrics.ks2_label == 'good'])]
+
+    # Only use responsive neurons
+    resp_neurons = bb.task.responsive_units(spikes.times, spikes.clusters, trials.goCue_times)[0]
+    spikes.times = spikes.times[np.isin(spikes.clusters, resp_neurons)]
+    spikes.clusters = spikes.clusters[np.isin(spikes.clusters, resp_neurons)]
+
+    # Get ROC curve
+    bb.task.calculate_roc(spikes.times, spikes.clusters,
+                          trials.goCue_times[((trials.probabilityLeft > 0.5)
+                                              & (trials.choice == -1))])
+
 
     for n, cluster in enumerate(spikes.clusters):
         fig, ax = plt.subplots(1, 1)
