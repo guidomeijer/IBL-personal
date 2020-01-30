@@ -5,8 +5,8 @@ Created on Wed Jan 22 16:16:30 2020
 @author: guido
 """
 
-from os import listdir
-from os.path import join
+from os import listdir, mkdir
+from os.path import join, isdir
 import alf.io as ioalf
 import matplotlib.pyplot as plt
 import brainbox as bb
@@ -17,6 +17,7 @@ download = False
 sessions = frontal_sessions()
 
 DATA_PATH, FIG_PATH = paths()
+FIG_PATH = join(FIG_PATH, 'PSTH')
 for i in range(sessions.shape[0]):
     # Download data if required
     if download is True:
@@ -45,13 +46,30 @@ for i in range(sessions.shape[0]):
     spikes.times = spikes.times[np.isin(spikes.clusters, resp_neurons)]
     spikes.clusters = spikes.clusters[np.isin(spikes.clusters, resp_neurons)]
 
-    # Get ROC curve
-    bb.task.calculate_roc(spikes.times, spikes.clusters,
-                          trials.goCue_times[((trials.probabilityLeft > 0.5)
-                                              & (trials.choice == -1))])
+    # Calculate whether neuron discriminates
+    trial_times = trials.goCue_times[((trials.probabilityLeft > 0.55)
+                                      | (trials.probabilityLeft < 0.55))]
+    trial_blocks = (trials.probabilityLeft[((trials.probabilityLeft > 0.55)
+                                            | (trials.probabilityLeft < 0.55))] > 0.55).astype(int)
 
+    auc_roc, cluster_ids, auc_sig = bb.task.calculate_roc(spikes.times, spikes.clusters, trial_times,
+                                                          trial_blocks, pre_time=0.5, post_time=0,
+                                                          bootstrap=True, n_bootstrap=100)
 
-    for n, cluster in enumerate(spikes.clusters):
+    auc_sig = cluster_ids[(auc_roc > 0.65) | (auc_roc < 0.35)]
+
+    # Make directories
+    if not isdir(join(FIG_PATH, '%s' % sessions.loc[i, 'subject'])):
+        mkdir(join(FIG_PATH, '%s' % sessions.loc[i, 'subject']))
+    if not isdir(join(FIG_PATH, '%s' % sessions.loc[i, 'subject'],
+                      '%s' % sessions.loc[i, 'date'])):
+        mkdir(join(FIG_PATH, '%s' % sessions.loc[i, 'subject'], '%s' % sessions.loc[i, 'date']))
+    if not isdir(join(FIG_PATH, '%s' % sessions.loc[i, 'subject'],
+                      '%s' % sessions.loc[i, 'date'], 'blocks')):
+        mkdir(join(FIG_PATH, '%s' % sessions.loc[i, 'subject'], '%s' % sessions.loc[i, 'date'],
+                   'blocks'))
+
+    for n, cluster in enumerate(auc_sig):
         fig, ax = plt.subplots(1, 1)
         bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters,
                                           trials.goCue_times[((trials.probabilityLeft > 0.5)
@@ -64,7 +82,10 @@ for i in range(sessions.shape[0]):
                                           pethline_kwargs={'color': 'red', 'lw': 2},
                                           errbar_kwargs={'color': 'red', 'alpha': 0.5}, ax=ax)
         plt.legend(['Left block', 'Right block'])
-        plt.title('0% contrast trials (t=0: go cue)')
-        plt.savefig(join(FIG_PATH, 'PSTH', 'p%s_n%s' % (sessions.loc[i, 'probe'], cluster)))
-        plt.close()
-
+        plt.title('t=0: go cue')
+        plt.savefig(join(FIG_PATH,
+                         '%s' % sessions.loc[i, 'subject'],
+                         '%s' % sessions.loc[i, 'date'],
+                         'significant_roc',
+                         'p%s_n%s' % (sessions.loc[i, 'probe'], cluster)))
+        plt.close(fig)
