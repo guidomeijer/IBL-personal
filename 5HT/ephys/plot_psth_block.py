@@ -11,10 +11,15 @@ import alf.io as ioalf
 import matplotlib.pyplot as plt
 import brainbox as bb
 import numpy as np
-from ephys_functions import download_data, paths, frontal_sessions
+from ephys_functions import download_data, paths, sessions
 
 download = False
-sessions = frontal_sessions()
+frontal_control = 'frontal'
+
+if frontal_control == 'frontal':
+    sessions, _ = sessions()
+elif frontal_control == 'control':
+    _, sessions = sessions()
 
 DATA_PATH, FIG_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'PSTH')
@@ -41,23 +46,23 @@ for i in range(sessions.shape[0]):
     spikes.clusters = spikes.clusters[np.isin(
             spikes.clusters, clusters.metrics.cluster_id[clusters.metrics.ks2_label == 'good'])]
 
-    # Only use responsive neurons
-    resp_neurons = bb.task.responsive_units(spikes.times, spikes.clusters, trials.goCue_times)[0]
-    spikes.times = spikes.times[np.isin(spikes.clusters, resp_neurons)]
-    spikes.clusters = spikes.clusters[np.isin(spikes.clusters, resp_neurons)]
-
     # Calculate whether neuron discriminates
     trial_times = trials.goCue_times[((trials.probabilityLeft > 0.55)
                                       | (trials.probabilityLeft < 0.55))]
     trial_blocks = (trials.probabilityLeft[((trials.probabilityLeft > 0.55)
                                             | (trials.probabilityLeft < 0.55))] > 0.55).astype(int)
 
-    auc_roc, cluster_ids, auc_sig = bb.task.calculate_roc(spikes.times, spikes.clusters, trial_times,
-                                                          trial_blocks, pre_time=0.5, post_time=0,
-                                                          bootstrap=True, n_bootstrap=100)
+    auc_roc, cluster_ids = bb.task.calculate_roc(spikes.times, spikes.clusters,
+                                                 trial_times, trial_blocks,
+                                                 pre_time=0.5, post_time=0)
+    sig_units = cluster_ids[(auc_roc < 0.4) | (auc_roc > 0.6)]
 
-    auc_sig = cluster_ids[(auc_roc > 0.65) | (auc_roc < 0.35)]
-
+    """
+    sig_units, p_values, _ = bb.task.differentiate_units(spikes.times, spikes.clusters,
+                                                         trial_times, trial_blocks,
+                                                         pre_time=0.5, post_time=0,
+                                                         test='ranksums', alpha=0.01)
+    """
     # Make directories
     if not isdir(join(FIG_PATH, '%s' % sessions.loc[i, 'subject'])):
         mkdir(join(FIG_PATH, '%s' % sessions.loc[i, 'subject']))
@@ -65,27 +70,30 @@ for i in range(sessions.shape[0]):
                       '%s' % sessions.loc[i, 'date'])):
         mkdir(join(FIG_PATH, '%s' % sessions.loc[i, 'subject'], '%s' % sessions.loc[i, 'date']))
     if not isdir(join(FIG_PATH, '%s' % sessions.loc[i, 'subject'],
-                      '%s' % sessions.loc[i, 'date'], 'blocks')):
+                      '%s' % sessions.loc[i, 'date'], frontal_control)):
         mkdir(join(FIG_PATH, '%s' % sessions.loc[i, 'subject'], '%s' % sessions.loc[i, 'date'],
-                   'blocks'))
+                   frontal_control))
 
-    for n, cluster in enumerate(auc_sig):
+    for n, cluster in enumerate(sig_units):
         fig, ax = plt.subplots(1, 1)
         bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters,
-                                          trials.goCue_times[((trials.probabilityLeft > 0.5)
-                                                              & (trials.choice == -1))],
+                                          trials.goCue_times[(trials.probabilityLeft > 0.5)],
                                           cluster, t_before=1, t_after=2, error_bars='sem', ax=ax)
+        y_lim_1 = ax.get_ylim()
         bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters,
-                                          trials.goCue_times[((trials.probabilityLeft < 0.5)
-                                                              & (trials.choice == -1))],
+                                          trials.goCue_times[(trials.probabilityLeft < 0.5)],
                                           cluster, t_before=1, t_after=2, error_bars='sem',
                                           pethline_kwargs={'color': 'red', 'lw': 2},
                                           errbar_kwargs={'color': 'red', 'alpha': 0.5}, ax=ax)
+        y_lim_2 = ax.get_ylim()
+        if y_lim_1[1] > y_lim_2[1]:
+            ax.set(ylim=y_lim_1)
         plt.legend(['Left block', 'Right block'])
         plt.title('t=0: go cue')
         plt.savefig(join(FIG_PATH,
                          '%s' % sessions.loc[i, 'subject'],
                          '%s' % sessions.loc[i, 'date'],
-                         'significant_roc',
-                         'p%s_n%s' % (sessions.loc[i, 'probe'], cluster)))
+                         frontal_control,
+                         'p%s_c%s_n%s' % (sessions.loc[i, 'probe'],
+                                          clusters.channels[n], cluster)))
         plt.close(fig)

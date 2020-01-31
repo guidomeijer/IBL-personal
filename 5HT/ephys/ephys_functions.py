@@ -42,11 +42,11 @@ def download_data(nickname, date):
     one.load(eid[0], dataset_types=dtypes, download_only=True)
 
 
-def frontal_sessions():
-    sessions = pd.DataFrame(data={'subject': ['ZM_1897'],
-                                  'date': ['2019-12-06'],
-                                  'probe': ['00']})
-    return sessions
-
-
-
+def sessions():
+    frontal_sessions = pd.DataFrame(data={'subject': ['ZM_2240', 'ZM_2240', 'ZM_2240'],
+                                          'date': ['2020-01-21', '2020-01-22', '2020-01-23'],
+                                          'probe': ['00', '00', '00']})
+    control_sessions = pd.DataFrame(data={'subject': ['ZM_2240', 'ZM_2240'],
+                                          'date': ['2020-01-22', '2020-01-24'],
+                                          'probe': ['01', '00']})
+    return frontal_sessions, control_sessions

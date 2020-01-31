@@ -4,3 +4,5 @@
 Ephys/__pycache__/
 
 5HT/ephys/__pycache__/
+
+*.csv#
