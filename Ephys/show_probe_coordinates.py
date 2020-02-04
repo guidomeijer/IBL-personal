@@ -11,14 +11,18 @@ one = ONE()
 
 mouse_id = 'ZM_2240'
 
-eids, ses_info = one.search(subject=mouse_id, dataset_types='spikes.times', details=True)
 dtypes = ['_iblrig_taskSettings.raw', 'probes.trajectory', 'trials.feedback_times']
+eids, ses_info = one.search(subject=mouse_id, dataset_types=dtypes, details=True)
 
 print('\nMouse ID: %s' % mouse_id)
 for i, eid in enumerate(eids):
     d = one.load(eid, dataset_types=dtypes, download_only=False, dclass_output=False)
-    traj = d[2]
-    trials = d[3]
+    if len(d) == 3:
+        trials = d[2]
+        traj = d[1]
+    elif len(d) == 4:
+        traj = d[2]
+        trials = d[3]
     if trials is None:
         continue
 

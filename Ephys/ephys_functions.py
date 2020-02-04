@@ -39,3 +39,23 @@ def download_data(nickname, date):
               'trials.response_times',
               'trials.stimOn_times']
     one.load(eid[0], dataset_types=dtypes, download_only=True)
+
+
+def dataset_types_to_download():
+    dtypes = ['_iblrig_taskSettings.raw',
+              'spikes.times',
+              'spikes.clusters',
+              'clusters.channels',
+              'clusters.metrics',
+              'probes.trajectory',
+              'trials.choice',
+              'trials.intervals',
+              'trials.contrastLeft',
+              'trials.contrastRight',
+              'trials.feedback_times',
+              'trials.goCue_times',
+              'trials.feedbackType',
+              'trials.probabilityLeft',
+              'trials.response_times',
+              'trials.stimOn_times']
+    return dtypes
