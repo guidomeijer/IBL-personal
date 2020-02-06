@@ -12,6 +12,7 @@ import matplotlib
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from pathlib import Path
 from sklearn.model_selection import KFold
 from sklearn.metrics import f1_score, confusion_matrix
 
@@ -94,6 +95,13 @@ def sessions():
     return frontal_sessions, control_sessions
 
 
+def one_session_path(eid):
+    one = ONE()
+    ses = one.alyx.rest('sessions', 'read', id=eid)
+    return Path(one._par.CACHE_DIR, ses['lab'], 'Subjects', ses['subject'],
+                ses['start_time'][:10], str(ses['number']).zfill(3))
+
+
 def decoding(resp, labels, clf, num_splits):
     """
     Parameters
@@ -130,3 +138,44 @@ def decoding(resp, labels, clf, num_splits):
     unique_labels, label_counts = np.unique(labels, return_counts=True)
     cm = confusion_matrix(y_true, y_pred, labels=unique_labels)
     return f1, cm
+
+
+def get_spike_counts_in_bins(spike_times, spike_clusters, intervals):
+    """
+    Return the number of spikes in a sequence of time intervals, for each neuron.
+
+    Parameters
+    ----------
+    spike_times : 1D array
+        spike times (in seconds)
+    spike_clusters : 1D array
+        cluster ids corresponding to each event in `spikes`
+    intervals : 2D array of shape (n_events, 2)
+        the start and end times of the events
+
+    Returns
+    ---------
+    counts : 2D array of shape (n_neurons, n_events)
+        the spike counts of all neurons ffrom scipy.stats import sem, tor all events
+        value (i, j) is the number of spikes of neuron `neurons[i]` in interval #j
+    cluster_ids : 1D array
+        list of cluster ids
+    """
+
+    # Check input
+    assert intervals.ndim == 2
+    assert intervals.shape[1] == 2
+
+    # For each neuron and each interval, the number of spikes in the interval.
+    cluster_ids = np.unique(spike_clusters)
+    n_neurons = len(cluster_ids)
+    n_intervals = intervals.shape[0]
+    counts = np.zeros((n_neurons, n_intervals), dtype=np.uint32)
+    for j in range(n_intervals):
+        t0, t1 = intervals[j, :]
+        # Count the number of spikes in the window, for each neuron.
+        x = np.bincount(
+            spike_clusters[(t0 <= spike_times) & (spike_times < t1)],
+            minlength=cluster_ids.max() + 1)
+        counts[:, j] = x[cluster_ids]
+    return counts, cluster_ids

@@ -12,11 +12,12 @@ import matplotlib.pyplot as plt
 import shutil
 import brainbox as bb
 import numpy as np
+from scipy import stats
 from functions_5HT import download_data, paths, sessions
 
-download = True
-overwrite = False
-frontal_control = 'Control'
+download = False
+overwrite = True
+frontal_control = 'Frontal'
 
 if frontal_control == 'Frontal':
     sessions, _ = sessions()
@@ -54,19 +55,37 @@ for i in range(sessions.shape[0]):
     # Calculate whether neuron discriminates
     trial_times = trials.goCue_times[((trials.probabilityLeft > 0.55)
                                       | (trials.probabilityLeft < 0.55))]
-    trial_blocks = (trials.probabilityLeft[((trials.probabilityLeft > 0.55)
-                                            | (trials.probabilityLeft < 0.55))] > 0.55).astype(int)
+    trial_blocks = (trials.probabilityLeft[(((trials.probabilityLeft > 0.55)
+                                            | (trials.probabilityLeft < 0.55)))] > 0.55).astype(
+                                                                                            int)
+    """
     auc_roc, cluster_ids = bb.task.calculate_roc(spikes.times, spikes.clusters,
                                                  trial_times, trial_blocks,
                                                  pre_time=0.5, post_time=0)
-    sig_units = cluster_ids[(auc_roc < 0.4) | (auc_roc > 0.6)]
+    roc_units = cluster_ids[(auc_roc < 0.4) | (auc_roc > 0.6)]
+    """
 
-    """
-    sig_units, p_values, _ = bb.task.differentiate_units(spikes.times, spikes.clusters,
-                                                         trial_times, trial_blocks,
-                                                         pre_time=0.5, post_time=0,
-                                                         test='ranksums', alpha=0.01)
-    """
+    time_bins = np.arange(0, 1, 0.2)
+    for j, time in enumerate(time_bins):
+        sig_units, _, p_values, cluster_ids = bb.task.differentiate_units(spikes.times,
+                                                                          spikes.clusters,
+                                                                          trial_times,
+                                                                          trial_blocks,
+                                                                          pre_time=time+0.2,
+                                                                          post_time=-time,
+                                                                          test='ranksums',
+                                                                          alpha=0.05)
+        if j == 0:
+            all_p_values = p_values
+        else:
+            all_p_values = np.column_stack((all_p_values, p_values))
+    p_values = np.zeros(all_p_values.shape[0])
+    for j in range(all_p_values.shape[0]):
+        _, p_values[j] = stats.combine_pvalues(all_p_values[j, :])
+
+    diff_units = cluster_ids[p_values < 0.05]
+    # diff_units = roc_units
+
     # Make directories
     if (isdir(join(FIG_PATH, frontal_control, '%s_%s' % (sessions.loc[i, 'subject'],
                                                          sessions.loc[i, 'date'])))
@@ -77,15 +96,15 @@ for i in range(sessions.shape[0]):
                                                             sessions.loc[i, 'date']))):
         mkdir(join(FIG_PATH, frontal_control, '%s_%s' % (sessions.loc[i, 'subject'],
                                                          sessions.loc[i, 'date'])))
-        for n, cluster in enumerate(sig_units):
+        for n, cluster in enumerate(diff_units):
             fig, ax = plt.subplots(1, 1)
             bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters,
-                                              trials.stimOn_times[(trials.probabilityLeft > 0.5)],
+                                              trials.stimOn_times[(trials.probabilityLeft > 0.55)],
                                               cluster, t_before=1, t_after=2,
                                               error_bars='sem', ax=ax)
             y_lim_1 = ax.get_ylim()
             bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters,
-                                              trials.stimOn_times[(trials.probabilityLeft < 0.5)],
+                                              trials.stimOn_times[(trials.probabilityLeft < 0.45)],
                                               cluster, t_before=1, t_after=2, error_bars='sem',
                                               pethline_kwargs={'color': 'red', 'lw': 2},
                                               errbar_kwargs={'color': 'red', 'alpha': 0.5}, ax=ax)
@@ -93,7 +112,7 @@ for i in range(sessions.shape[0]):
             if y_lim_1[1] > y_lim_2[1]:
                 ax.set(ylim=y_lim_1)
             plt.legend(['Left block', 'Right block'])
-            plt.title('t=0: Stimulus Onset')
+            plt.title('Stimulus Onset')
             plt.savefig(join(FIG_PATH, frontal_control,
                              '%s_%s' % (sessions.loc[i, 'subject'], sessions.loc[i, 'date']),
                              'p%s_d%s_n%s' % (sessions.loc[i, 'probe'],

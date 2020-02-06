@@ -11,9 +11,9 @@ from os.path import expanduser, join
 
 def paths():
     if expanduser('~') == '/home/guido':
-        data_path = '/media/guido/data/Flatiron/mainenlab/Subjects'
+        data_path = '/media/guido/data/Flatiron/'
     else:
-        data_path = join(expanduser('~'), 'Downloads', 'FlatIron', 'mainenlab', 'Subjects')
+        data_path = join(expanduser('~'), 'Downloads', 'FlatIron')
     fig_path = join(expanduser('~'), 'Figures', 'Ephys')
     return data_path, fig_path
 

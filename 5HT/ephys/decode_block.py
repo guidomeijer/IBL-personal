@@ -14,17 +14,18 @@ import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.linear_model import LogisticRegression
-from functions_5HT import download_data, paths, sessions, decoding, plot_settings
+from functions_5HT import (download_data, paths, sessions, decoding, plot_settings,
+                           get_spike_counts_in_bins)
 
 # Settings
-DOWNLOAD = True
+DOWNLOAD = False
 OVERWRITE = False
-FRONTAL_CONTROL = 'Control'
+FRONTAL_CONTROL = 'Frontal'
 DEPTH_BIN_CENTERS = np.arange(200, 4000, 200)
 DEPTH_BIN_SIZE = 300
 PRE_TIME = 0.5
 POST_TIME = 0
-DECODER = 'bayes'
+DECODER = 'regression'  # bayes, regression or forest
 ITERATIONS = 500
 NUM_SPLITS = 5
 
@@ -54,10 +55,10 @@ for i in range(sessions.shape[0]):
                       sessions.loc[i, 'date'], ses_nr, 'alf', 'probe%s' % sessions.loc[i, 'probe'])
 
     if not isfile(join(
-            SAVE_PATH, 'Decoding', 'Blocks', '%s_%s_%s.npy' % (FRONTAL_CONTROL,
-                                                               sessions.loc[i, 'subject'],
-                                                               sessions.loc[i, 'date']))) or (
-                                                                     OVERWRITE is True):
+            SAVE_PATH, 'Decoding', 'Blocks', '%s_%s_%s_%s.npy' % (FRONTAL_CONTROL, DECODER,
+                                                                  sessions.loc[i, 'subject'],
+                                                                  sessions.loc[i, 'date']))) or (
+                                                                          OVERWRITE is True):
         # Load in data
         spikes = ioalf.load_object(probe_path, 'spikes')
         clusters = ioalf.load_object(probe_path, 'clusters')
@@ -84,7 +85,7 @@ for i in range(sessions.shape[0]):
 
         # Get matrix of all neuronal responses
         times = np.column_stack(((trial_times - PRE_TIME), (trial_times + POST_TIME)))
-        resp, cluster_ids = bb.task._get_spike_counts_in_bins(spikes.times, spikes.clusters, times)
+        resp, cluster_ids = get_spike_counts_in_bins(spikes.times, spikes.clusters, times)
         resp = np.rot90(resp)
 
         # Initialize decoder
@@ -136,12 +137,12 @@ for i in range(sessions.shape[0]):
         ax2.set(xlabel='Number of neurons')
         ax2.invert_yaxis()
         plot_settings()
-        plt.savefig(join(FIG_PATH, '%s_%s_%s' % (FRONTAL_CONTROL,
-                                                 sessions.loc[i, 'subject'],
-                                                 sessions.loc[i, 'date'])))
+        plt.savefig(join(FIG_PATH, '%s_%s_%s_%s' % (FRONTAL_CONTROL, DECODER,
+                                                    sessions.loc[i, 'subject'],
+                                                    sessions.loc[i, 'date'])))
         plt.close(f)
 
         # Save decoding performance
         np.save(join(SAVE_PATH, 'Decoding', 'Blocks',
-                     '%s_%s_%s' % (FRONTAL_CONTROL, sessions.loc[i, 'subject'],
-                                   sessions.loc[i, 'date'])), f1_over_shuffled)
+                     '%s_%s_%s_%s' % (FRONTAL_CONTROL, DECODER, sessions.loc[i, 'subject'],
+                                      sessions.loc[i, 'date'])), f1_over_shuffled)
