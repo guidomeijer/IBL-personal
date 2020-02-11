@@ -17,7 +17,7 @@ from ephys_functions import paths
 from oneibl.one import ONE
 one = ONE()
 
-OVERWRITE = False
+OVERWRITE = True
 
 
 def one_session_path(eid):
@@ -38,13 +38,15 @@ for i, eid in enumerate(eids):
 
     # Load in data
     session_path = one_session_path(eid)
-    spikes = one.load_object(eid, 'spikes', download_only=True)
-    if len(spikes) != 0:
-        probes = one.load_object(eid, 'probes', download_only=False)
-        probe_path = session_path.joinpath('alf', probes['description'][0]['label'])
-        spikes = alf.io.load_object(probe_path, object='spikes')
-        clusters = alf.io.load_object(probe_path, object='clusters')
-        trials = one.load_object(eid, 'trials')
+    trials = one.load_object(eid, 'trials')
+    probes = one.load_object(eid, 'probes', download_only=False)
+    for p in range(len(probes['trajectory'])):
+        probe_path = session_path.joinpath('alf', probes['description'][p]['label'])
+        try:
+            spikes = alf.io.load_object(probe_path, object='spikes')
+            clusters = alf.io.load_object(probe_path, object='clusters')
+        except Exception:
+            continue
 
         # Only use single units
         spikes.times = spikes.times[np.isin(
@@ -76,8 +78,9 @@ for i, eid in enumerate(eids):
                                                   error_bars='sem', ax=ax)
                 plt.title('Stimulus Onset')
                 plt.savefig(join(FIG_PATH, 'StimOn', '%s_%s' % (nickname, ses_date),
-                                 'd%s_n%s' % (int(
-                                     clusters.depths[clusters.metrics.cluster_id == cluster][0]),
+                                 'p0%d_d%s_n%s' % (
+                                     p, int(clusters.depths[
+                                         clusters.metrics.cluster_id == cluster][0]),
                                      cluster)))
                 plt.close(fig)
 
@@ -95,13 +98,16 @@ for i, eid in enumerate(eids):
             for n, cluster in enumerate(sig_units):
                 fig, ax = plt.subplots(1, 1)
                 bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters,
-                                                  trials.feedback_times[trials.feedbackType == 1],
+                                                  trials.feedback_times[
+                                                      trials.feedbackType == 1],
                                                   cluster, t_before=1, t_after=2,
                                                   error_bars='sem', ax=ax)
                 plt.title('Reward delivery')
                 plt.savefig(join(FIG_PATH, 'Reward', '%s_%s' % (nickname, ses_date),
-                                 'd%s_n%s' % (int(
-                                     clusters.depths[clusters.metrics.cluster_id == cluster][0]),
+                                 'p0%d_d%s_n%s' % (
+                                     p, int(
+                                         clusters.depths[
+                                             clusters.metrics.cluster_id == cluster][0]),
                                      cluster)))
                 plt.close(fig)
 
@@ -119,12 +125,14 @@ for i, eid in enumerate(eids):
             for n, cluster in enumerate(sig_units):
                 fig, ax = plt.subplots(1, 1)
                 bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters,
-                                                  trials.feedback_times[trials.feedbackType == -1],
+                                                  trials.feedback_times[
+                                                      trials.feedbackType == -1],
                                                   cluster, t_before=1, t_after=2,
                                                   error_bars='sem', ax=ax)
                 plt.title('Reward omission')
                 plt.savefig(join(FIG_PATH, 'RewardOmission', '%s_%s' % (nickname, ses_date),
-                                 'd%s_n%s' % (int(
-                                     clusters.depths[clusters.metrics.cluster_id == cluster][0]),
+                                 'p0%d_d%s_n%s' % (
+                                     p, int(clusters.depths[
+                                         clusters.metrics.cluster_id == cluster][0]),
                                      cluster)))
                 plt.close(fig)

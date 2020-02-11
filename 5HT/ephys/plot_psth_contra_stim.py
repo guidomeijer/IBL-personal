@@ -23,7 +23,7 @@ if frontal_control == 'Frontal':
 elif frontal_control == 'Control':
     _, sessions = sessions()
 
-DATA_PATH, FIG_PATH = paths()
+DATA_PATH, FIG_PATH, _ = paths()
 FIG_PATH = join(FIG_PATH, 'PSTH', 'ContraStim')
 for i in range(sessions.shape[0]):
     # Download data if required
@@ -53,13 +53,13 @@ for i in range(sessions.shape[0]):
 
     # Get trial indices
     r_in_l_block = trials.stimOn_times[((trials.probabilityLeft > 0.55)
-                                        & (trials.contrastRight == 1))]
+                                        & (trials.contrastRight > 0.1))]
     r_in_r_block = trials.stimOn_times[((trials.probabilityLeft < 0.45)
-                                        & (trials.contrastRight == 1))]
+                                        & (trials.contrastRight > 0.1))]
     l_in_r_block = trials.stimOn_times[((trials.probabilityLeft < 0.45)
-                                        & (trials.contrastLeft == 1))]
+                                        & (trials.contrastLeft > 0.1))]
     l_in_l_block = trials.stimOn_times[((trials.probabilityLeft > 0.55)
-                                        & (trials.contrastLeft == 1))]
+                                        & (trials.contrastLeft > 0.1))]
 
     # Make directories
     if (isdir(join(FIG_PATH, frontal_control, '%s_%s' % (sessions.loc[i, 'subject'],
@@ -73,13 +73,13 @@ for i in range(sessions.shape[0]):
                                                          sessions.loc[i, 'date'])))
 
         # Right stim
-        sig_units, p_values, _ = bb.task.differentiate_units(spikes.times, spikes.clusters,
-                                                             np.append(r_in_l_block,
-                                                                       r_in_r_block),
-                                                             np.append(np.zeros(len(r_in_l_block)),
-                                                                       np.ones(len(r_in_r_block))),
-                                                             pre_time=0, post_time=0.5,
-                                                             test='ranksums', alpha=0.05)
+        sig_units = bb.task.differentiate_units(spikes.times, spikes.clusters,
+                                                np.append(r_in_l_block,
+                                                          r_in_r_block),
+                                                np.append(np.zeros(len(r_in_l_block)),
+                                                          np.ones(len(r_in_r_block))),
+                                                pre_time=0, post_time=0.5,
+                                                test='ranksums', alpha=0.05)[0]
         for n, cluster in enumerate(sig_units):
             fig, ax = plt.subplots(1, 1)
             bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters, r_in_r_block,
@@ -102,13 +102,13 @@ for i in range(sessions.shape[0]):
             plt.close(fig)
 
         # Left stim
-        sig_units, p_values, _ = bb.task.differentiate_units(spikes.times, spikes.clusters,
-                                                             np.append(l_in_r_block,
-                                                                       l_in_l_block),
-                                                             np.append(np.zeros(len(l_in_r_block)),
-                                                                       np.ones(len(l_in_l_block))),
-                                                             pre_time=0, post_time=0.5,
-                                                             test='ranksums', alpha=0.05)
+        sig_units = bb.task.differentiate_units(spikes.times, spikes.clusters,
+                                                np.append(l_in_r_block,
+                                                          l_in_l_block),
+                                                np.append(np.zeros(len(l_in_r_block)),
+                                                          np.ones(len(l_in_l_block))),
+                                                pre_time=0, post_time=0.5,
+                                                test='ranksums', alpha=0.05)[0]
         for n, cluster in enumerate(sig_units):
             fig, ax = plt.subplots(1, 1)
             bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters, l_in_l_block,

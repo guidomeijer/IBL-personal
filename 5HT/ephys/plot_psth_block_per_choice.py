@@ -15,9 +15,9 @@ import numpy as np
 from scipy import stats
 from functions_5HT import download_data, paths, sessions
 
-download = True
+download = False
 overwrite = True
-frontal_control = 'Control'
+frontal_control = 'Frontal'
 
 if frontal_control == 'Frontal':
     sessions, _ = sessions()
@@ -63,30 +63,33 @@ for i in range(sessions.shape[0]):
         mkdir(join(FIG_PATH, frontal_control, '%s_%s' % (sessions.loc[i, 'subject'],
                                                          sessions.loc[i, 'date'])))
 
-        # Calculate whether neuron discriminates blocks
+        # Calculate whether neuron discriminates for left choice
         trial_times = trials.goCue_times[
                             ((trials.probabilityLeft > 0.55)
-                             | (trials.probabilityLeft < 0.45))]
+                             | (trials.probabilityLeft < 0.55)) & (trials.choice == -1)]
         trial_blocks = (trials.probabilityLeft[
                 (((trials.probabilityLeft > 0.55)
-                  | (trials.probabilityLeft < 0.45)))] > 0.55).astype(int)
+                  | (trials.probabilityLeft < 0.55))) & (trials.choice == -1)] > 0.55).astype(int)
 
         diff_units = bb.task.differentiate_units(spikes.times, spikes.clusters,
                                                  trial_times, trial_blocks,
-                                                 pre_time=1, post_time=0, alpha=0.01)[0]
+                                                 pre_time=0.5, post_time=0, alpha=0.01)[0]
 
-        print('%d out of %d neurons differentiate between blocks' % (
+        print('%d out of %d neurons differentiate blocks for left choice' % (
                                         len(diff_units), len(np.unique(spikes.clusters))))
 
         for n, cluster in enumerate(diff_units):
             fig, ax = plt.subplots(1, 1)
             bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters,
-                                              trials.stimOn_times[trials.probabilityLeft > 0.55],
+                                              trials.stimOn_times[
+                                                  ((trials.probabilityLeft > 0.55)
+                                                   & (trials.choice == -1))],
                                               cluster, t_before=1, t_after=2,
                                               error_bars='sem', ax=ax)
             y_lim_1 = ax.get_ylim()
             bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters,
-                                              trials.stimOn_times[trials.probabilityLeft < 0.45],
+                                              trials.stimOn_times[((trials.probabilityLeft < 0.45)
+                                                                   & (trials.choice == -1))],
                                               cluster, t_before=1, t_after=2, error_bars='sem',
                                               pethline_kwargs={'color': 'red', 'lw': 2},
                                               errbar_kwargs={'color': 'red', 'alpha': 0.5}, ax=ax)
@@ -94,11 +97,54 @@ for i in range(sessions.shape[0]):
             if y_lim_1[1] > y_lim_2[1]:
                 ax.set(ylim=y_lim_1)
             plt.legend(['Left block', 'Right block'])
-            plt.title('Stimulus onset')
+            plt.title('Leftward choices')
             plt.savefig(join(FIG_PATH, frontal_control,
                              '%s_%s' % (sessions.loc[i, 'subject'], sessions.loc[i, 'date']),
-                             'p%s_d%s_n%s' % (sessions.loc[i, 'probe'],
-                                              int(clusters.depths[
+                             'left_p%s_d%s_n%s' % (sessions.loc[i, 'probe'],
+                                                   int(clusters.depths[
+                                                       clusters.metrics.cluster_id == cluster][0]),
+                                                   cluster)))
+            plt.close(fig)
+
+        # Calculate whether neuron discriminates for right choice
+        trial_times = trials.goCue_times[
+                            ((trials.probabilityLeft > 0.55)
+                             | (trials.probabilityLeft < 0.55)) & (trials.choice == 1)]
+        trial_blocks = (trials.probabilityLeft[
+                (((trials.probabilityLeft > 0.55)
+                  | (trials.probabilityLeft < 0.55))) & (trials.choice == 1)] > 0.55).astype(int)
+
+        diff_units = bb.task.differentiate_units(spikes.times, spikes.clusters,
+                                                 trial_times, trial_blocks,
+                                                 pre_time=0.5, post_time=0, alpha=0.01)[0]
+
+        print('%d out of %d neurons differentiate blocks for right choice' % (
+                                        len(diff_units), len(np.unique(spikes.clusters))))
+
+        for n, cluster in enumerate(diff_units):
+            fig, ax = plt.subplots(1, 1)
+            bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters,
+                                              trials.stimOn_times[
+                                                  ((trials.probabilityLeft > 0.55)
+                                                   & (trials.choice == 1))],
+                                              cluster, t_before=1, t_after=2,
+                                              error_bars='sem', ax=ax)
+            y_lim_1 = ax.get_ylim()
+            bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters,
+                                              trials.stimOn_times[((trials.probabilityLeft < 0.45)
+                                                                   & (trials.choice == 1))],
+                                              cluster, t_before=1, t_after=2, error_bars='sem',
+                                              pethline_kwargs={'color': 'red', 'lw': 2},
+                                              errbar_kwargs={'color': 'red', 'alpha': 0.5}, ax=ax)
+            y_lim_2 = ax.get_ylim()
+            if y_lim_1[1] > y_lim_2[1]:
+                ax.set(ylim=y_lim_1)
+            plt.legend(['Left block', 'Right block'])
+            plt.title('Rightward choices')
+            plt.savefig(join(FIG_PATH, frontal_control,
+                             '%s_%s' % (sessions.loc[i, 'subject'], sessions.loc[i, 'date']),
+                             'right_p%s_d%s_n%s' % (sessions.loc[i, 'probe'],
+                                                    int(clusters.depths[
                                                       clusters.metrics.cluster_id == cluster][0]),
-                                              cluster)))
+                                                    cluster)))
             plt.close(fig)
