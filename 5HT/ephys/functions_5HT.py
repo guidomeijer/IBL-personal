@@ -14,6 +14,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from pathlib import Path
 from sklearn.model_selection import KFold
+from sklearn.metrics import roc_auc_score, accuracy_score
 from sklearn.metrics import f1_score, confusion_matrix
 
 
@@ -29,6 +30,7 @@ def paths():
 
 def plot_settings():
     plt.tight_layout()
+    sns.despine(trim=True)
     sns.set(style="ticks", context="paper", font_scale=1.4)
     matplotlib.rcParams['pdf.fonttype'] = 42
     matplotlib.rcParams['ps.fonttype'] = 42
@@ -128,16 +130,22 @@ def decoding(resp, labels, clf, num_splits):
     kf = KFold(n_splits=num_splits, shuffle=True)
     y_pred = np.array([])
     y_true = np.array([])
+    y_auroc = np.array([])
     for train_index, test_index in kf.split(resp):
         train_resp = resp[train_index]
         test_resp = resp[test_index]
         clf.fit(train_resp, [labels[j] for j in train_index])
         y_pred = np.append(y_pred, clf.predict(test_resp))
         y_true = np.append(y_true, [labels[j] for j in test_index])
-    f1 = f1_score(y_true, y_pred, labels=np.unique(labels), average='micro')
+        probs = clf.predict_proba(test_resp)
+        probs = probs[:, 1]  # keep positive only
+        y_auroc = np.append(y_auroc, roc_auc_score([labels[j] for j in test_index], probs))
+    accuracy = accuracy_score(y_true, y_pred)
+    f1 = f1_score(y_true, y_pred)
+    auroc = np.mean(y_auroc)
     unique_labels, label_counts = np.unique(labels, return_counts=True)
     cm = confusion_matrix(y_true, y_pred, labels=unique_labels)
-    return f1, cm
+    return accuracy, f1, auroc, cm
 
 
 def get_spike_counts_in_bins(spike_times, spike_clusters, intervals):
