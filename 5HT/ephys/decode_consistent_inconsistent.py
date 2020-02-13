@@ -18,16 +18,16 @@ from functions_5HT import (download_data, paths, sessions, decoding, plot_settin
 
 # Settings
 DOWNLOAD = False
-OVERWRITE = False
+OVERWRITE = True
 FRONTAL_CONTROL = 'Frontal'
 DEPTH_BIN_CENTERS = np.arange(200, 4000, 200)
-DEPTH_BIN_SIZE = 300
+DEPTH_BIN_SIZE = 500
 PRE_TIME = 0
 POST_TIME = 0.5
 MIN_CONTRAST = 0.1
-DECODER = 'bayes'  # bayes, regression or forest
-ITERATIONS = 100
-NUM_SPLITS = 5
+DECODER = 'forest'  # bayes, regression or forest
+ITERATIONS = 1
+NUM_SPLITS = 3
 
 if FRONTAL_CONTROL == 'Frontal':
     sessions, _ = sessions()
@@ -89,7 +89,6 @@ for i in range(sessions.shape[0]):
         trial_consistent[consistent == 1] = 1
         trial_consistent[inconsistent == 1] = 2
         trial_consistent = trial_consistent[(consistent == 1) | (inconsistent == 1)]
-        trial_consistent_shuffle = trial_consistent.copy()
 
         # Get matrix of all neuronal responses
         times = np.column_stack(((trial_times - PRE_TIME), (trial_times + POST_TIME)))
@@ -107,7 +106,8 @@ for i in range(sessions.shape[0]):
             raise Exception('DECODER must be forest, bayes or regression')
 
         # Decode block identity
-        f1_over_shuffled = np.empty(len(DEPTH_BIN_CENTERS))
+        f1_score = np.empty(len(DEPTH_BIN_CENTERS))
+        au_roc = np.empty(len(DEPTH_BIN_CENTERS))
         n_clusters = np.empty(len(DEPTH_BIN_CENTERS))
         significant_depth = np.zeros(len(DEPTH_BIN_CENTERS), dtype=bool)
         for j, depth in enumerate(DEPTH_BIN_CENTERS):
@@ -116,28 +116,24 @@ for i in range(sessions.shape[0]):
                                           & (clusters.depths < depth+(DEPTH_BIN_SIZE/2)))]
             if len(depth_clusters) <= 2:
                 n_clusters[j] = len(depth_clusters)
-                f1_over_shuffled[j] = np.nan
+                f1_score[j] = np.nan
+                au_roc[j] = np.nan
                 continue
             f1_scores = np.empty(ITERATIONS)
-            f1_scores_shuffle = np.empty(ITERATIONS)
+            au_rocs = np.empty(ITERATIONS)
             for it in range(ITERATIONS):
-                f1_scores[it], _ = decoding(resp[:, np.isin(cluster_ids, depth_clusters)],
-                                            trial_consistent, clf, NUM_SPLITS)
-                np.random.shuffle(trial_consistent_shuffle)
-                f1_scores_shuffle[it], _ = decoding(resp[:, np.isin(cluster_ids, depth_clusters)],
-                                                    trial_consistent_shuffle, clf, NUM_SPLITS)
-            f1_over_shuffled[j] = np.mean(f1_scores) - np.mean(f1_scores_shuffle)
+                f1_scores[it], au_rocs[it], _ = decoding(
+                            resp[:, np.isin(cluster_ids, depth_clusters)],
+                            trial_consistent, clf, NUM_SPLITS)
+            f1_score[j] = np.mean(f1_scores)
+            au_roc[j] = np.mean(au_rocs)
             n_clusters[j] = len(depth_clusters)
-
-            # Determine significance
-            if np.percentile(f1_scores, 0.5) > np.mean(f1_scores_shuffle):
-                significant_depth[j] = True
 
         # Plot decoding versus depth
         f, (ax1, ax2) = plt.subplots(1, 2, sharey=True, figsize=(8, 6))
-        ax1.plot(f1_over_shuffled, DEPTH_BIN_CENTERS, lw=2)
-        ax1.set(ylabel='Depth (um)', xlabel='Decoding performance\n(F1 score over shuffled)',
-                title='Decoding of block identity', xlim=[-0.1, 0.4])
+        ax1.plot(au_roc, DEPTH_BIN_CENTERS, lw=2)
+        ax1.set(ylabel='Depth (um)', xlabel='Decoding performance (AUROC)',
+                title='Decoding of block identity', xlim=[0.5, 0.6])
         # for j, (x, y) in enumerate(zip(f1_over_shuffled[significant_depth],
         #                                DEPTH_BIN_CENTERS[significant_depth])):
         #   ax1.text(x+0.02, y+30, '*', va='center')
@@ -145,6 +141,7 @@ for i in range(sessions.shape[0]):
         ax2.set(xlabel='Number of neurons')
         ax2.invert_yaxis()
         plot_settings()
+        sdfkuhsdf
         plt.savefig(join(FIG_PATH, '%s_%s_%s_%s' % (FRONTAL_CONTROL, DECODER,
                                                     sessions.loc[i, 'subject'],
                                                     sessions.loc[i, 'date'])))
@@ -153,4 +150,4 @@ for i in range(sessions.shape[0]):
         # Save decoding performance
         np.save(join(SAVE_PATH, 'Decoding', 'ContraStim',
                      '%s_%s_%s_%s' % (FRONTAL_CONTROL, DECODER, sessions.loc[i, 'subject'],
-                                      sessions.loc[i, 'date'])), f1_over_shuffled)
+                                      sessions.loc[i, 'date'])), au_roc)

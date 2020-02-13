@@ -9,7 +9,7 @@ Created on Thu Nov 21 12:34:22 2019
 from oneibl.one import ONE
 one = ONE()
 
-mouse_id = 'ZM_1898'
+mouse_id = 'ZM_2407'
 
 dtypes = ['_iblrig_taskSettings.raw', 'probes.trajectory', 'trials.feedback_times']
 eids, ses_info = one.search(subject=mouse_id, dataset_types=dtypes, details=True)

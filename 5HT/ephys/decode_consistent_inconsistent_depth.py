@@ -18,7 +18,7 @@ from functions_5HT import (download_data, paths, sessions, decoding, plot_settin
 
 # Settings
 DOWNLOAD = False
-OVERWRITE = False
+OVERWRITE = True
 FRONTAL_CONTROL = 'Frontal'
 DEPTH_BIN_CENTERS = np.arange(200, 4000, 200)
 DEPTH_BIN_SIZE = 300

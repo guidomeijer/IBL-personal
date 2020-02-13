@@ -22,7 +22,7 @@ from ephys_functions import paths
 from oneibl.one import ONE
 one = ONE()
 
-OVERWRITE = False
+MIN_CONTRAST = 0.1
 
 
 def one_session_path(eid):
@@ -92,6 +92,16 @@ for i, eid in enumerate(eids):
                                                  event_times, event_choices,
                                                  alpha=0.01)[0]
 
+        # Get visual side neurons
+        event_times = trials.stimOn_times[(trials.contrastRight > MIN_CONTRAST)
+                                          | (trials.contrastLeft > MIN_CONTRAST)]
+        event_sides = np.isnan(trials.contrastRight[
+                            (trials.contrastRight > MIN_CONTRAST)
+                            | (trials.contrastLeft > MIN_CONTRAST)]).astype(int)
+        sig_side = bb.task.differentiate_units(spikes.times, spikes.clusters,
+                                               event_times, event_sides,
+                                               alpha=0.01)[0]
+
         resp = resp.append(pd.DataFrame(index=[0],
                                         data={'subject': nickname,
                                               'date': ses_date,
@@ -105,6 +115,8 @@ for i, eid in enumerate(eids):
                                                        / len(np.unique(spikes.clusters))),
                                               'choice': (sig_choice.shape[0]
                                                          / len(np.unique(spikes.clusters))),
+                                              'side': (sig_side.shape[0]
+                                                       / len(np.unique(spikes.clusters))),
                                               'ML': probes.trajectory[p]['x'],
                                               'AP': probes.trajectory[p]['y'],
                                               'DV': probes.trajectory[p]['z'],
@@ -121,7 +133,6 @@ X_LIM = [-5000, 5000]
 
 fig, (ax1, ax2, ax3) = plt.subplots(1, 3, sharey=True, figsize=(18, 8))
 ax1.plot([0, 0], [-4200, 0], color='k')
-ax1.scatter(0, 0, color='k')
 ax1.plot([X_LIM[0], 0], [-6000, -4200], color='k')
 ax1.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax1.plot([X_LIM[0], 0], [2000, 0], color='k')
@@ -133,7 +144,6 @@ ax1.set(xlim=X_LIM, ylim=Y_LIM, ylabel='AP coordinates (um)',
 ax1.get_legend().remove()
 
 ax2.plot([0, 0], [-4200, 0], color='k')
-ax2.scatter(0, 0, color='k')
 ax2.plot([X_LIM[0], 0], [-6000, -4200], color='k')
 ax2.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax2.plot([X_LIM[0], 0], [2000, 0], color='k')
@@ -145,7 +155,6 @@ ax2.set(xlim=X_LIM, ylim=Y_LIM, ylabel='AP coordinates (um)',
 ax2.get_legend().remove()
 
 ax3.plot([0, 0], [-4200, 0], color='k')
-ax3.scatter(0, 0, color='k')
 ax3.plot([X_LIM[0], 0], [-6000, -4200], color='k')
 ax3.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax3.plot([X_LIM[0], 0], [2000, 0], color='k')
@@ -168,7 +177,7 @@ leg.texts[5].set_text('# neurons')
 plt.savefig(join(FIG_PATH, 'all_responsive_unit_map'))
 
 
-fig, ax1 = plt.subplots(1, 1, sharey=True, figsize=(8, 7))
+fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True, figsize=(14, 7))
 ax1.plot([0, 0], [-4200, 0], color='k')
 ax1.scatter(0, 0, color='k')
 ax1.plot([X_LIM[0], 0], [-6000, -4200], color='k')
@@ -180,6 +189,17 @@ plot_h = sns.scatterplot(x='ML', y='AP', data=resp, size='n_neurons', hue='choic
                          ax=ax1)
 ax1.set(xlim=X_LIM, ylim=Y_LIM, ylabel='AP coordinates (um)',
         xlabel='ML coordinates (um)', title='Choice')
+
+ax2.plot([0, 0], [-4200, 0], color='k')
+ax2.plot([X_LIM[0], 0], [-6000, -4200], color='k')
+ax2.plot([0, X_LIM[1]], [-4200, -6000], color='k')
+ax2.plot([X_LIM[0], 0], [2000, 0], color='k')
+ax2.plot([0, X_LIM[1]], [-0, 2000], color='k')
+plot_h = sns.scatterplot(x='ML', y='AP', data=resp, size='n_neurons', hue='side',
+                         palette='YlOrRd', size_norm=(50, 600), sizes=(50, 200), hue_norm=(0, 0.4),
+                         ax=ax1)
+ax2.set(xlim=X_LIM, ylim=Y_LIM, ylabel='AP coordinates (um)',
+        xlabel='ML coordinates (um)', title='Stimulus side')
 
 # Fix legend
 leg = plot_h.legend(loc=(1.05, 0.5))

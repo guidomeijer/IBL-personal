@@ -140,12 +140,11 @@ def decoding(resp, labels, clf, num_splits):
         probs = clf.predict_proba(test_resp)
         probs = probs[:, 1]  # keep positive only
         y_auroc = np.append(y_auroc, roc_auc_score([labels[j] for j in test_index], probs))
-    accuracy = accuracy_score(y_true, y_pred)
     f1 = f1_score(y_true, y_pred)
     auroc = np.mean(y_auroc)
     unique_labels, label_counts = np.unique(labels, return_counts=True)
     cm = confusion_matrix(y_true, y_pred, labels=unique_labels)
-    return accuracy, f1, auroc, cm
+    return f1, auroc, cm
 
 
 def get_spike_counts_in_bins(spike_times, spike_clusters, intervals):
