@@ -2,6 +2,9 @@
 """
 Created on Wed Jan 22 16:16:30 2020
 
+Decode whether a stimulus is consistent or inconsistent with the block for frontal and control
+recordings.
+
 @author: guido
 """
 
@@ -141,7 +144,6 @@ for i in range(sessions.shape[0]):
         ax2.set(xlabel='Number of neurons')
         ax2.invert_yaxis()
         plot_settings()
-        sdfkuhsdf
         plt.savefig(join(FIG_PATH, '%s_%s_%s_%s' % (FRONTAL_CONTROL, DECODER,
                                                     sessions.loc[i, 'subject'],
                                                     sessions.loc[i, 'date'])))

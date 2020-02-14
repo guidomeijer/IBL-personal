@@ -2,6 +2,9 @@
 """
 Created on Wed Jan 22 16:16:30 2020
 
+Decode whether a stimulus is consistent or inconsistent with the block for frontal and control
+recordings seperated by probe depth.
+
 @author: guido
 """
 

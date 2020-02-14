@@ -2,6 +2,8 @@
 """
 Created on Wed Jan 22 16:16:30 2020
 
+LDA score of the population response between the two blocks and the actual probability left
+
 @author: guido
 """
 

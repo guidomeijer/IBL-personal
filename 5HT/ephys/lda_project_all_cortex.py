@@ -3,6 +3,8 @@
 """
 Created on Thu Feb  6 10:56:57 2020
 
+Get LDA score between blocks of all superficial recordings
+
 @author: guido
 """
 
@@ -89,7 +91,7 @@ for i, eid in enumerate(eids):
             nickname = ses_info[i]['subject']
             ses_date = ses_info[i]['start_time'][:10]
             lda_result = lda_result.append(pd.DataFrame(
-                index=[0], data={'subject': nicknadecoding_resultme, 'date': ses_date, 'eid': eid,
+                index=[0], data={'subject': nickname, 'date': ses_date, 'eid': eid,
                                  'r': r,
                                  'ML': probes.trajectory[p]['x'],
                                  'AP': probes.trajectory[p]['y'],

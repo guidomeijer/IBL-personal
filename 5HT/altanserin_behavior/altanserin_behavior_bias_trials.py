@@ -10,7 +10,6 @@ import numpy as np
 from os.path import join, expanduser
 import matplotlib.pyplot as plt
 import seaborn as sns
-
 from oneibl.one import ONE
 one = ONE()
 
@@ -20,7 +19,7 @@ FIG_PATH = join(expanduser('~'), 'Figures', '5HT')
 MAX_CONTRAST = 0.1
 
 # Load in session dates
-sessions = pd.read_csv('altanserin_sessions_second_week.csv', header=1, index_col=0)
+sessions = pd.read_csv('altanserin_sessions.csv', header=1)
 d_types = ['_iblrig_taskSettings.raw',
            'trials.probabilityLeft',
            'trials.contrastLeft',
@@ -29,21 +28,15 @@ d_types = ['_iblrig_taskSettings.raw',
            'trials.choice']
 
 # Load data
-results = pd.DataFrame(columns=['subject', 'condition', 'bias', 'trial', 'bias_rel'])
-for i, nickname in enumerate(np.unique(sessions.index.values)):
-    # for s, ses in enumerate(sessions.loc[nickname, 'Session'].values):
-    ses = 2
-    eids = one.search(subject=nickname,
-                      date_range=[sessions[sessions['Session'] == ses].loc[
-                                                                  nickname, 'Pre-vehicle'],
-                                  sessions[sessions['Session'] == ses].loc[
-                                                                  nickname, 'Post-vehicle']])
-    if len(eids) > 3:
-        eids = eids[0:3]
-
-    for j, eid in enumerate(eids):
-        d, prob_l, contrast_l, contrast_r, feedback_type, choice = one.load(
-                    eid, d_types, dclass_output=False)
+results = pd.DataFrame()
+for i in range(sessions.shape[0]):
+    for j, day in enumerate(['Pre-vehicle', 'Drug', 'Post-vehicle']):
+        eid = one.search(subject=sessions.loc[i, 'Nickname'],
+                         date_range=[sessions.loc[i, day], sessions.loc[i, day]],
+                         task_protocol='_iblrig_tasks_biasedChoiceWorld')
+        assert len(eid) == 1
+        d, prob_l, contrast_l, contrast_r, feedback_type, choice = one.load(eid[0], d_types,
+                                                                            dclass_output=False)
 
         first_bias = np.zeros(np.size(FIRST_TRIALS))
         for t, trial in enumerate(FIRST_TRIALS):
@@ -73,28 +66,55 @@ for i, nickname in enumerate(np.unique(sessions.index.values)):
         # Add to dataframe
         this_result = pd.DataFrame({'bias': first_bias,
                                     'trial': [str(w) for w in FIRST_TRIALS],
-                                    'subject': nickname,
-                                    'condition': j})
+                                    'subject': sessions.loc[i, 'Nickname'],
+                                    'condition': day,
+                                    'week': sessions.loc[i, 'Week']})
         results = results.append(this_result, sort=False)
 
 results = results.reset_index()
 results['bias'] = results['bias'].astype(float)
-results_rel = results.copy()
 
-f, ax1 = plt.subplots(1, 1, figsize=(6, 6))
+# Get bias normalized to pre-vehicle
+results.loc[results['condition'] == 'Pre-vehicle', 'bias_rel'] = (
+                        results.loc[results['condition'] == 'Pre-vehicle', 'bias'].values
+                        / results.loc[results['condition'] == 'Pre-vehicle', 'bias'].values)
+results.loc[results['condition'] == 'Drug', 'bias_rel'] = (
+                        results.loc[results['condition'] == 'Drug', 'bias'].values
+                        / results.loc[results['condition'] == 'Pre-vehicle', 'bias'].values)
+results.loc[results['condition'] == 'Post-vehicle', 'bias_rel'] = (
+                        results.loc[results['condition'] == 'Post-vehicle', 'bias'].values
+                        / results.loc[results['condition'] == 'Pre-vehicle', 'bias'].values)
+
+# Plot results
+f, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
 palette = sns.color_palette('GnBu_d', np.size(FIRST_TRIALS))
 
-sns.lineplot(x='condition', y='bias', hue='trial', data=results,
-             ci=68, palette=palette, ax=ax1)
-ax1.set(xticks=[0, 1, 2], xticklabels=['Pre-\nvehicle', '5HT2a\nantagonist', 'Post-\nvehicle'],
-        xlabel='', ylabel='Bias', ylim=[-0.1, 0.6])
-legend = ax1.legend(loc=[0.05, 0.62], frameon=False, fontsize=12)
-legend.texts[0].set_text('Trials')
+sns.lineplot(x='condition', y='bias', units='subject', estimator=None, hue='subject', sort=False,
+             data=results[(results['week'] == 1) & (results['trial'] == str(FIRST_TRIALS[0]))],
+             ax=ax1)
+ax1.set(xlabel='', ylabel='Bias', ylim=[-0.1, 0.6])
+plt.setp(ax1.xaxis.get_majorticklabels(), rotation=40)
+
+sns.lineplot(x='condition', y='bias', units='subject', estimator=None, hue='subject', sort=False,
+             data=results[(results['week'] == 2) & (results['trial'] == str(FIRST_TRIALS[0]))],
+             ax=ax2)
+ax2.set(xlabel='', ylabel='Bias', ylim=[-0.1, 0.6])
+plt.setp(ax2.xaxis.get_majorticklabels(), rotation=40)
+
+sns.set(context='paper', font_scale=1.5, style='ticks')
+plt.tight_layout(pad=2)
+
+f, ax1 = plt.subplots(1, 1, figsize=(6, 6))
+sns.lineplot(x='condition', y='bias_rel', hue='trial', data=results,
+             ci=68, palette=palette, sort=False, ax=ax1)
+ax1.set(xlabel='', ylabel='Bias', title='5HT2a antagonist (altanserin)')
+legend = ax1.legend(loc=[0.05, 0.1], frameon=False, fontsize=12)
+legend.texts[0].set_text('First trials')
 legend.texts[0].set_position((0.1, 0.1))
 plt.setp(ax1.xaxis.get_majorticklabels(), rotation=40)
 
 sns.set(context='paper', font_scale=1.5, style='ticks')
-sns.despine(trim=True)
 plt.tight_layout(pad=2)
+sns.despine()
 plt.savefig(join(FIG_PATH, '5HT2a_block_bias.pdf'), dpi=300)
 plt.savefig(join(FIG_PATH, '5HT2a_block_bias.png'), dpi=300)

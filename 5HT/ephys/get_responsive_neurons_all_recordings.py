@@ -3,6 +3,8 @@
 """
 Created on Wed Feb  5 12:28:36 2020
 
+Get all responsive neurons for all recordings
+
 @author: guido
 """
 

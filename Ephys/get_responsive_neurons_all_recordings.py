@@ -185,10 +185,11 @@ ax1.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax1.plot([X_LIM[0], 0], [2000, 0], color='k')
 ax1.plot([0, X_LIM[1]], [-0, 2000], color='k')
 plot_h = sns.scatterplot(x='ML', y='AP', data=resp, size='n_neurons', hue='choice',
-                         palette='YlOrRd', size_norm=(50, 600), sizes=(50, 200), hue_norm=(0, 0.4),
-                         ax=ax1)
+                         palette='YlOrRd', size_norm=(50, 600), sizes=(50, 200),
+                         hue_norm=(0, 0.45), ax=ax1)
 ax1.set(xlim=X_LIM, ylim=Y_LIM, ylabel='AP coordinates (um)',
         xlabel='ML coordinates (um)', title='Choice')
+ax1.get_legend().remove()
 
 ax2.plot([0, 0], [-4200, 0], color='k')
 ax2.plot([X_LIM[0], 0], [-6000, -4200], color='k')
@@ -196,8 +197,8 @@ ax2.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax2.plot([X_LIM[0], 0], [2000, 0], color='k')
 ax2.plot([0, X_LIM[1]], [-0, 2000], color='k')
 plot_h = sns.scatterplot(x='ML', y='AP', data=resp, size='n_neurons', hue='side',
-                         palette='YlOrRd', size_norm=(50, 600), sizes=(50, 200), hue_norm=(0, 0.4),
-                         ax=ax1)
+                         palette='YlOrRd', size_norm=(50, 600), sizes=(50, 200),
+                         hue_norm=(0, 0.45), ax=ax2)
 ax2.set(xlim=X_LIM, ylim=Y_LIM, ylabel='AP coordinates (um)',
         xlabel='ML coordinates (um)', title='Stimulus side')
 

@@ -3,6 +3,8 @@
 """
 Created on Thu Feb  6 10:56:57 2020
 
+Decode left/right block identity from all recordings
+
 @author: guido
 """
 

@@ -3,6 +3,8 @@
 """
 Created on Thu Feb  6 10:56:57 2020
 
+Decode whether a stimulus is consistent or inconsistent with the block for all recordings
+
 @author: guido
 """
 

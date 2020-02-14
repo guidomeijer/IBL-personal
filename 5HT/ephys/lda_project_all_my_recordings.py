@@ -3,6 +3,8 @@
 """
 Created on Thu Feb  6 10:56:57 2020
 
+Get LDA score between blocks of all recording done by Guido
+
 @author: guido
 """
 

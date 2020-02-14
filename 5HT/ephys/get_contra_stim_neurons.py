@@ -1,3 +1,10 @@
+"""
+
+Get percentage of neurons that significantly differentiate stimuli that are consistent or
+inconsistent with the block probability.
+
+"""
+
 
 from os import mkdir
 from os.path import join, isdir

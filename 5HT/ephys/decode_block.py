@@ -2,6 +2,8 @@
 """
 Created on Wed Jan 22 16:16:30 2020
 
+Decode left/right block identity from frontal and control recordings
+
 @author: guido
 """
 
