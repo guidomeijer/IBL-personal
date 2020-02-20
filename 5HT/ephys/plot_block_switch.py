@@ -16,13 +16,14 @@ import numpy as np
 import seaborn as sns
 from functions_5HT import download_data, paths, sessions
 
-DOWNLOAD = False
+DOWNLOAD = True
 OVERWRITE = True
 FRONTAL_CONTROL = 'Frontal'
-TRIAL_CENTERS = np.arange(-15, 31, 5)
-TRIAL_WIN = 10
+TRIAL_CENTERS = np.arange(-10, 21, 3)
+TRIAL_WIN = 5
 PRE_TIME = 1
 POST_TIME = 0
+BASELINE_TRIAL_WIN = 10
 
 if FRONTAL_CONTROL == 'Frontal':
     sessions, _ = sessions()
@@ -67,7 +68,7 @@ for i in range(sessions.shape[0]):
     diff_units = bb.task.differentiate_units(spikes.times, spikes.clusters,
                                              trial_times, trial_blocks,
                                              pre_time=PRE_TIME, post_time=POST_TIME,
-                                             alpha=0.01)[0]
+                                             alpha=0.05)[0]
 
     # Get spike counts for all trials
     times = np.column_stack(((trials.stimOn_times - PRE_TIME), (trials.stimOn_times + POST_TIME)))
@@ -82,15 +83,18 @@ for i in range(sessions.shape[0]):
     block_switch = pd.DataFrame(columns=['mean_spike_count', 'trial_center',
                                          'switch_side', 'cluster_id'])
     for s, switch in enumerate(all_switches):
+        baseline_counts = spike_counts[np.isin(cluster_ids, diff_units),
+                                       switch-BASELINE_TRIAL_WIN:switch]
         for t, trial in enumerate(TRIAL_CENTERS):
             this_counts = spike_counts[np.isin(cluster_ids, diff_units),
                                        int(switch+(trial-(TRIAL_WIN/2))):int(
                                                                switch+(trial+(TRIAL_WIN/2)))]
             block_switch = block_switch.append(pd.DataFrame(
-                                        data={'mean_spike_count': np.mean(this_counts, axis=1),
-                                              'trial_center': trial,
-                                              'cluster_id': diff_units,
-                                              'switch_side': switch_sides[s]}), sort=False)
+                                    data={'mean_spike_count': (np.mean(this_counts, axis=1)
+                                                               - np.mean(baseline_counts, axis=1)),
+                                          'trial_center': trial,
+                                          'cluster_id': diff_units,
+                                          'switch_side': switch_sides[s]}), sort=False)
 
     # Make directories
     if (isdir(join(FIG_PATH, FRONTAL_CONTROL, '%s_%s' % (sessions.loc[i, 'subject'],
@@ -107,7 +111,12 @@ for i in range(sessions.shape[0]):
             fig, ax = plt.subplots(1, 1)
             sns.lineplot(x='trial_center', y='mean_spike_count', hue='switch_side',
                          data=block_switch.loc[block_switch['cluster_id'] == cluster], ci=68)
-            ax.set(ylabel='Mean spike rate (spk/s)', xlabel='Trials relative to block switch')
+            y_lim = ax.get_ylim()
+            ax.plot([0, 0], y_lim, color=[0.6, 0.6, 0.6], linestyle='dashed')
+            ax.set(ylabel='Baseline subtracted spike rate (spk/s)',
+                   xlabel='Trials relative to block switch')
+            legend = ax.legend()
+            legend.texts[0].set_text('Block switch to')
             plt.savefig(join(FIG_PATH, FRONTAL_CONTROL,
                              '%s_%s' % (sessions.loc[i, 'subject'], sessions.loc[i, 'date']),
                              'p%s_d%s_n%s' % (sessions.loc[i, 'probe'],

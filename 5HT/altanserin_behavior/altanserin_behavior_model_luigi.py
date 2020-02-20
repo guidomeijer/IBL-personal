@@ -17,7 +17,7 @@ import numpy as np
 FIG_PATH = join(expanduser('~'), 'Figures', '5HT')
 
 # Load in data
-data = loadmat(join(expanduser('~'), 'Data', '5HT', 'guido_analysis_20dec2019.mat'))
+data = loadmat(join(expanduser('~'), 'Data', '5HT', 'guido_analysis_14feb2020.mat'))
 runlength = data['X'][0]
 parameters = data['pnames'][0]
 

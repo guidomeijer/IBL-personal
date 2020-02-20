@@ -19,7 +19,7 @@ from functions_5HT import download_data, paths, sessions
 download = False
 overwrite = True
 frontal_control = 'Frontal'
-INCL_UNITS = 'blocks'  # blocks or contrastim
+INCL_UNITS = 'contrastim'  # blocks or contrastim
 MIN_CONTRAST = 0.1
 FIRST_TRIALS = [10, 20, 30]
 TRIAL_WIN = 10
@@ -125,6 +125,7 @@ for i in range(sessions.shape[0]):
                     errbar_kwargs={'color': colors[t], 'alpha': 0.5}, ax=ax)
                 y_lim_max[t] = ax.get_ylim()[1]
             ax.set(ylim=[0, np.max(y_lim_max)])
+            ax.legend(FIRST_TRIALS, title='Trials after block switch')
             plt.savefig(join(FIG_PATH, frontal_control, '%s_%s' % (sessions.loc[i, 'subject'],
                                                                    sessions.loc[i, 'date']),
                              'p%s_d%s_n%s' % (sessions.loc[i, 'probe'], int(clusters.depths[

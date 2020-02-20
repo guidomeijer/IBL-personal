@@ -95,10 +95,11 @@ for i in range(sessions.shape[0]):
                 ax.set(ylim=y_lim_1)
             plt.legend(['Consistent', 'Inconsistent'])
             plt.title('Stimulus Onset (right side)')
-            plt.savefig(join(FIG_PATH, frontal_control,
-                             '%s_%s' % (sessions.loc[i, 'subject'], sessions.loc[i, 'date']),
-                             'p%s_c%s_n%s' % (sessions.loc[i, 'probe'],
-                                              clusters.channels[n], cluster)))
+            plt.savefig(join(FIG_PATH, frontal_control, '%s_%s' % (sessions.loc[i, 'subject'],
+                                                                   sessions.loc[i, 'date']),
+                             'p%s_d%s_n%s' % (sessions.loc[i, 'probe'], int(clusters.depths[
+                                 clusters.metrics.cluster_id == cluster][0]),
+                                             cluster)))
             plt.close(fig)
 
         # Left stim
@@ -124,8 +125,9 @@ for i in range(sessions.shape[0]):
                 ax.set(ylim=y_lim_1)
             plt.legend(['Consistent', 'Inconsistent'])
             plt.title('Stimulus Onset (left side)')
-            plt.savefig(join(FIG_PATH, frontal_control,
-                             '%s_%s' % (sessions.loc[i, 'subject'], sessions.loc[i, 'date']),
-                             'p%s_c%s_n%s' % (sessions.loc[i, 'probe'],
-                                              clusters.channels[n], cluster)))
+            plt.savefig(join(FIG_PATH, frontal_control, '%s_%s' % (sessions.loc[i, 'subject'],
+                                                                   sessions.loc[i, 'date']),
+                             'p%s_d%s_n%s' % (sessions.loc[i, 'probe'], int(clusters.depths[
+                                 clusters.metrics.cluster_id == cluster][0]),
+                                             cluster)))
             plt.close(fig)

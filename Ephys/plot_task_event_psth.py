@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 import alf.io
 import brainbox as bb
+import seaborn as sns
 import shutil
 import numpy as np
 from ephys_functions import paths
@@ -27,10 +28,12 @@ def one_session_path(eid):
 
 
 # Get list of recordings
-eids, ses_info = one.search(user='guido', dataset_types='spikes.times', details=True)
+eids, ses_info = one.search(user='guido', subject='ZM_2241', dataset_types='spikes.times',
+                            details=True)
+# eids, ses_info = one.search(user='guido', dataset_types='spikes.times', details=True)
 
 # Set path to save plots
-DATA_PATH, FIG_PATH = paths()
+DATA_PATH, FIG_PATH, _ = paths()
 FIG_PATH = join(FIG_PATH, 'PSTH')
 
 # Loop over recordings
@@ -72,11 +75,13 @@ for i, eid in enumerate(eids):
             mkdir(join(FIG_PATH, 'StimOn', '%s_%s' % (nickname, ses_date)))
             for n, cluster in enumerate(sig_units):
                 fig, ax = plt.subplots(1, 1)
+                sns.set(style="ticks", context="paper", font_scale=2)
                 bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters,
                                                   trials.stimOn_times, cluster,
                                                   t_before=1, t_after=2,
                                                   error_bars='sem', ax=ax)
-                plt.title('Stimulus Onset')
+                # plt.title('Stimulus Onset')
+                plt.tight_layout()
                 plt.savefig(join(FIG_PATH, 'StimOn', '%s_%s' % (nickname, ses_date),
                                  'p0%d_d%s_n%s' % (
                                      p, int(clusters.depths[
@@ -97,12 +102,14 @@ for i, eid in enumerate(eids):
             mkdir(join(FIG_PATH, 'Reward', '%s_%s' % (nickname, ses_date)))
             for n, cluster in enumerate(sig_units):
                 fig, ax = plt.subplots(1, 1)
+                sns.set(style="ticks", context="paper", font_scale=2)
                 bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters,
                                                   trials.feedback_times[
                                                       trials.feedbackType == 1],
                                                   cluster, t_before=1, t_after=2,
                                                   error_bars='sem', ax=ax)
-                plt.title('Reward delivery')
+                # plt.title('Reward delivery')
+                plt.tight_layout()
                 plt.savefig(join(FIG_PATH, 'Reward', '%s_%s' % (nickname, ses_date),
                                  'p0%d_d%s_n%s' % (
                                      p, int(
@@ -124,12 +131,14 @@ for i, eid in enumerate(eids):
             mkdir(join(FIG_PATH, 'RewardOmission', '%s_%s' % (nickname, ses_date)))
             for n, cluster in enumerate(sig_units):
                 fig, ax = plt.subplots(1, 1)
+                sns.set(style="ticks", context="paper", font_scale=2)
                 bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters,
                                                   trials.feedback_times[
                                                       trials.feedbackType == -1],
                                                   cluster, t_before=1, t_after=2,
                                                   error_bars='sem', ax=ax)
-                plt.title('Reward omission')
+                # plt.title('Reward omission')
+                plt.tight_layout()
                 plt.savefig(join(FIG_PATH, 'RewardOmission', '%s_%s' % (nickname, ses_date),
                                  'p0%d_d%s_n%s' % (
                                      p, int(clusters.depths[

@@ -131,7 +131,8 @@ resp.to_csv(join(SAVE_PATH, 'responsive_units_map.csv'))
 Y_LIM = [-6000, 4000]
 X_LIM = [-5000, 5000]
 
-fig, (ax1, ax2, ax3) = plt.subplots(1, 3, sharey=True, figsize=(18, 8))
+fig, (ax1, ax2, ax3) = plt.subplots(1, 3, sharey=True, figsize=(20, 8))
+sns.set(style="ticks", context="paper", font_scale=2)
 ax1.plot([0, 0], [-4200, 0], color='k')
 ax1.plot([X_LIM[0], 0], [-6000, -4200], color='k')
 ax1.plot([0, X_LIM[1]], [-4200, -6000], color='k')
@@ -166,18 +167,19 @@ ax3.set(xlim=X_LIM, ylim=Y_LIM, ylabel='AP coordinates (um)',
         xlabel='ML coordinates (um)', title='Reward omission')
 
 # Fix legend
-leg = plot_h.legend(loc=(1.05, 0.5))
-leg.texts[0].set_text('Prop. neurons')
+leg = plot_h.legend(loc=(1, 0.5))
+leg.texts[0].set_text('% cells')
 leg.texts[1].set_text('0.25')
 leg.texts[2].set_text('0.5')
 leg.texts[3].set_text('0.75')
 leg.texts[4].set_text('1')
-leg.texts[5].set_text('# neurons')
+leg.texts[5].set_text('# cells')
 
 plt.savefig(join(FIG_PATH, 'all_responsive_unit_map'))
 
 
 fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True, figsize=(14, 7))
+sns.set(style="ticks", context="paper", font_scale=2)
 ax1.plot([0, 0], [-4200, 0], color='k')
 ax1.scatter(0, 0, color='k')
 ax1.plot([X_LIM[0], 0], [-6000, -4200], color='k')
@@ -204,12 +206,12 @@ ax2.set(xlim=X_LIM, ylim=Y_LIM, ylabel='AP coordinates (um)',
 
 # Fix legend
 leg = plot_h.legend(loc=(1.05, 0.5))
-leg.texts[0].set_text('Prop. neurons')
+leg.texts[0].set_text('% cells')
 leg.texts[1].set_text('0.05')
 leg.texts[2].set_text('0.15')
 leg.texts[3].set_text('0.30')
 leg.texts[4].set_text('0.45')
-leg.texts[5].set_text('# neurons')
+leg.texts[5].set_text('# cels')
 
 plt.tight_layout()
 plt.savefig(join(FIG_PATH, 'choice_responsive_unit_map'))
