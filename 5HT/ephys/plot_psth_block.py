@@ -16,7 +16,7 @@ from scipy import stats
 from functions_5HT import download_data, paths, sessions
 
 download = True
-overwrite = True
+overwrite = False
 frontal_control = 'Control'
 
 if frontal_control == 'Frontal':
@@ -73,7 +73,7 @@ for i in range(sessions.shape[0]):
 
         diff_units = bb.task.differentiate_units(spikes.times, spikes.clusters,
                                                  trial_times, trial_blocks,
-                                                 pre_time=1, post_time=0, alpha=0.01)[0]
+                                                 pre_time=1, post_time=0, alpha=0.05)[0]
 
         print('%d out of %d neurons differentiate between blocks' % (
                                         len(diff_units), len(np.unique(spikes.clusters))))

@@ -16,12 +16,12 @@ import numpy as np
 import seaborn as sns
 from functions_5HT import download_data, paths, sessions
 
-DOWNLOAD = True
+DOWNLOAD = False
 OVERWRITE = True
 FRONTAL_CONTROL = 'Frontal'
 TRIAL_CENTERS = np.arange(-10, 21, 3)
 TRIAL_WIN = 5
-PRE_TIME = 1
+PRE_TIME = 0.5
 POST_TIME = 0
 BASELINE_TRIAL_WIN = 10
 
@@ -67,8 +67,7 @@ for i in range(sessions.shape[0]):
               | (trials.probabilityLeft < 0.45)))] > 0.55).astype(int)
     diff_units = bb.task.differentiate_units(spikes.times, spikes.clusters,
                                              trial_times, trial_blocks,
-                                             pre_time=PRE_TIME, post_time=POST_TIME,
-                                             alpha=0.05)[0]
+                                             pre_time=PRE_TIME, post_time=POST_TIME)[0]
 
     # Get spike counts for all trials
     times = np.column_stack(((trials.stimOn_times - PRE_TIME), (trials.stimOn_times + POST_TIME)))
@@ -90,8 +89,9 @@ for i in range(sessions.shape[0]):
                                        int(switch+(trial-(TRIAL_WIN/2))):int(
                                                                switch+(trial+(TRIAL_WIN/2)))]
             block_switch = block_switch.append(pd.DataFrame(
-                                    data={'mean_spike_count': (np.mean(this_counts, axis=1)
-                                                               - np.mean(baseline_counts, axis=1)),
+                                    data={'sub_spike_count': (np.mean(this_counts, axis=1)
+                                                              - np.mean(baseline_counts, axis=1)),
+                                          'spike_count': np.mean(this_counts, axis=1),
                                           'trial_center': trial,
                                           'cluster_id': diff_units,
                                           'switch_side': switch_sides[s]}), sort=False)
@@ -108,8 +108,8 @@ for i in range(sessions.shape[0]):
                                                          sessions.loc[i, 'date'])))
 
         for n, cluster in enumerate(diff_units):
-            fig, ax = plt.subplots(1, 1)
-            sns.lineplot(x='trial_center', y='mean_spike_count', hue='switch_side',
+            fig, ax = plt.subplots(1, 1, figsize=(9, 7))
+            sns.lineplot(x='trial_center', y='sub_spike_count', hue='switch_side',
                          data=block_switch.loc[block_switch['cluster_id'] == cluster], ci=68)
             y_lim = ax.get_ylim()
             ax.plot([0, 0], y_lim, color=[0.6, 0.6, 0.6], linestyle='dashed')
@@ -117,6 +117,25 @@ for i in range(sessions.shape[0]):
                    xlabel='Trials relative to block switch')
             legend = ax.legend()
             legend.texts[0].set_text('Block switch to')
+            plt.tight_layout()
+            plt.savefig(join(FIG_PATH, FRONTAL_CONTROL,
+                             '%s_%s' % (sessions.loc[i, 'subject'], sessions.loc[i, 'date']),
+                             'p%s_d%s_n%s_sub' % (sessions.loc[i, 'probe'],
+                                                  int(clusters.depths[
+                                                      clusters.metrics.cluster_id == cluster][0]),
+                                                  cluster)))
+            plt.close(fig)
+
+            fig, ax = plt.subplots(1, 1, figsize=(9, 7))
+            sns.lineplot(x='trial_center', y='spike_count', hue='switch_side',
+                         data=block_switch.loc[block_switch['cluster_id'] == cluster], ci=68)
+            y_lim = ax.get_ylim()
+            ax.plot([0, 0], y_lim, color=[0.6, 0.6, 0.6], linestyle='dashed')
+            ax.set(ylabel='Spike rate (spk/s)',
+                   xlabel='Trials relative to block switch')
+            legend = ax.legend()
+            legend.texts[0].set_text('Block switch to')
+            plt.tight_layout()
             plt.savefig(join(FIG_PATH, FRONTAL_CONTROL,
                              '%s_%s' % (sessions.loc[i, 'subject'], sessions.loc[i, 'date']),
                              'p%s_d%s_n%s' % (sessions.loc[i, 'probe'],

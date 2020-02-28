@@ -17,20 +17,22 @@ import seaborn as sns
 import brainbox as bb
 from scipy import stats
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+from sklearn.model_selection import LeaveOneOut
 from functions_5HT import paths, plot_settings, one_session_path
 from oneibl.one import ONE
 one = ONE()
 
 # Settings
-PRE_TIME = 1
-POST_TIME = -0.5
+PRE_TIME = 0.5
+POST_TIME = 0
 MIN_TRIALS = 400
-MIN_NEURONS = 50
+MIN_NEURONS = 20
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
 
 # Get list of recordings
-eids, ses_info = one.search(dataset_types='spikes.times', details=True)
+eids, ses_info = one.search(dataset_types='spikes.times',
+                            task_protocol='_iblrig_tasks_ephysChoiceWorld', details=True)
 
 lda_result = pd.DataFrame()
 for i, eid in enumerate(eids):
@@ -78,14 +80,22 @@ for i, eid in enumerate(eids):
                                       | (trials.probabilityLeft < 0.45)))] > 0.55).astype(int)
 
             # Transform to LDA
-            lda = LDA(n_components=1)
-            lda_transform = lda.fit_transform(np.rot90(spike_counts), trial_blocks)
+            resp = np.rot90(spike_counts)
+            loo = LeaveOneOut()
+            lda_transform = np.zeros(resp.shape[0])
+            for train_index, test_index in loo.split(resp):
+                lda = LDA(n_components=1)
+                lda.fit(resp[train_index], trial_blocks[train_index])
+                lda_transform[test_index] = np.rot90(lda.transform(resp[test_index]))[0]
+            lda_convolve = np.convolve(lda_transform, np.ones((10,))/10, mode='same')
+
+            # Get LDA distance between class means
+            lda_dist = (np.abs(np.mean(lda_transform[trial_blocks == 0]))
+                        + np.abs(np.mean(lda_transform[trial_blocks == 1])))
 
             # Correlate probability left with lda score
-            r = stats.pearsonr(np.rot90(lda_transform)[0],
-                               trials.probabilityLeft[
-                                   (trials.probabilityLeft > 0.55)
-                                   | (trials.probabilityLeft < 0.45)])[0]
+            r = stats.pearsonr(lda_convolve, trials.probabilityLeft[
+                        (trials.probabilityLeft > 0.55) | (trials.probabilityLeft < 0.45)])[0]
 
             # Add to dataframe
             nickname = ses_info[i]['subject']
@@ -93,6 +103,7 @@ for i, eid in enumerate(eids):
             lda_result = lda_result.append(pd.DataFrame(
                 index=[0], data={'subject': nickname, 'date': ses_date, 'eid': eid,
                                  'r': r,
+                                 'lda_dist': lda_dist,
                                  'ML': probes.trajectory[p]['x'],
                                  'AP': probes.trajectory[p]['y'],
                                  'DV': probes.trajectory[p]['z'],
@@ -100,7 +111,7 @@ for i, eid in enumerate(eids):
                                  'theta': probes.trajectory[p]['theta'],
                                  'depth': probes.trajectory[p]['depth']}))
 
-lda_result.to_csv(join(DATA_PATH, 'lda_block_all_cortex'))
+lda_result.to_csv(join(DATA_PATH, 'lda_block_all_cortex.csv'))
 
 # Plot
 Y_LIM = [-6000, 4000]
@@ -112,16 +123,16 @@ ax1.plot([X_LIM[0], 0], [-6000, -4200], color='k')
 ax1.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax1.plot([X_LIM[0], 0], [2000, 0], color='k')
 ax1.plot([0, X_LIM[1]], [-0, 2000], color='k')
-plot_h = sns.scatterplot(x='ML', y='AP', data=lda_result, hue='r', palette='YlOrRd', size='r',
-                         sizes=(50, 100), ax=ax1)
+plot_h = sns.scatterplot(x='ML', y='AP', data=lda_result, hue='r', palette='YlOrRd', s=100,
+                         hue_norm=(0, 1), ax=ax1)
 
 # Fix legend
-leg = plot_h.legend(loc=(1.05, 0.5))
+leg = plot_h.legend(loc=(0.75, 0.5))
 leg.texts[0].set_text('Corr. coef. (r)')
-leg.texts[1].set_text('0.4')
-leg.texts[2].set_text('0.6')
-leg.texts[3].set_text('0.8')
+leg.texts[1].set_text('0.25')
+leg.texts[2].set_text('0.5')
+leg.texts[3].set_text('0.75')
 leg.texts[4].set_text('1')
 
 plot_settings()
-plt.savefig(join(FIG_PATH, 'LDA_all_cortex'))
+plt.savefig(join(FIG_PATH, 'LDA_corr_all_cortex'))

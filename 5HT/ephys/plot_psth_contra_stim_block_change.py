@@ -18,8 +18,8 @@ from functions_5HT import download_data, paths, sessions
 
 download = False
 overwrite = True
-frontal_control = 'Frontal'
-INCL_UNITS = 'contrastim'  # blocks or contrastim
+frontal_control = 'Control'
+INCL_UNITS = 'blocks'  # blocks or contrastim
 MIN_CONTRAST = 0.1
 FIRST_TRIALS = [10, 20, 30]
 TRIAL_WIN = 10
@@ -65,18 +65,23 @@ for i in range(sessions.shape[0]):
     switch_to_l = [i for i, x in enumerate(np.diff(trials.probabilityLeft) > 0.3) if x]
     switch_to_r = [i for i, x in enumerate(np.diff(trials.probabilityLeft) < -0.3) if x]
     trial_id = np.arange(len(trials.stimOn_times))
-    trial_ind = np.zeros(len(trials.stimOn_times))
+    left_ind = np.zeros(len(trials.stimOn_times))
+    right_ind = np.zeros(len(trials.stimOn_times))
     for t, trial in enumerate(FIRST_TRIALS):
         for s, switch in enumerate(switch_to_l):
-            trial_ind[((trial_id >= switch+(trial-TRIAL_WIN)) & (trial_id <= switch+trial)
-                       & (trials.contrastLeft > MIN_CONTRAST))] = t+1
+            left_ind[((trial_id >= switch+(trial-TRIAL_WIN)) & (trial_id <= switch+trial)
+                      & (trials.contrastLeft > MIN_CONTRAST))] = t+1
+    for t, trial in enumerate(FIRST_TRIALS):
+        for s, switch in enumerate(switch_to_r):
+            right_ind[((trial_id >= switch+(trial-TRIAL_WIN)) & (trial_id <= switch+trial)
+                       & (trials.contrastRight > MIN_CONTRAST))] = t+1
 
     # Get significant units
     if INCL_UNITS == 'contrastim':
         spike_counts = []
         for t, trial in enumerate(FIRST_TRIALS):
-            times = np.column_stack(((trials.stimOn_times[trial_ind == t+1] - TEST_TIME_WIN[0]),
-                                     (trials.stimOn_times[trial_ind == t+1] + TEST_TIME_WIN[1])))
+            times = np.column_stack(((trials.stimOn_times[left_ind == t+1] - TEST_TIME_WIN[0]),
+                                     (trials.stimOn_times[left_ind == t+1] + TEST_TIME_WIN[1])))
             counts, cluster_ids = bb.task._get_spike_counts_in_bins(spikes.times,
                                                                     spikes.clusters, times)
             spike_counts.append(counts)
@@ -115,17 +120,32 @@ for i in range(sessions.shape[0]):
 
         # Get block switches
         for c, cluster in enumerate(sig_units):
-            f, ax = plt.subplots(1, 1)
+            f, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 8))
             y_lim_max = np.zeros(len(FIRST_TRIALS))
             for t, trial in enumerate(FIRST_TRIALS):
                 bb.plot.peri_event_time_histogram(
-                    spikes.times, spikes.clusters, trials.stimOn_times[trial_ind == t+1],
+                    spikes.times, spikes.clusters, trials.stimOn_times[left_ind == t+1],
                     cluster, t_before=PLOT_TIME_WIN[0], t_after=PLOT_TIME_WIN[1], error_bars='sem',
                     pethline_kwargs={'color': colors[t], 'lw': 2},
-                    errbar_kwargs={'color': colors[t], 'alpha': 0.5}, ax=ax)
-                y_lim_max[t] = ax.get_ylim()[1]
-            ax.set(ylim=[0, np.max(y_lim_max)])
-            ax.legend(FIRST_TRIALS, title='Trials after block switch')
+                    errbar_kwargs={'color': colors[t], 'alpha': 0.5}, ax=ax1)
+                y_lim_max[t] = ax1.get_ylim()[1]
+            ax1.set(ylim=[0, np.max(y_lim_max)], title='Stimulus onset (left)')
+            legend = ax1.legend(FIRST_TRIALS, title='Trials after block switch',
+                                fontsize=14, frameon=True)
+            plt.setp(legend.get_title(), fontsize=14)
+            y_lim_max = np.zeros(len(FIRST_TRIALS))
+            for t, trial in enumerate(FIRST_TRIALS):
+                bb.plot.peri_event_time_histogram(
+                    spikes.times, spikes.clusters, trials.stimOn_times[right_ind == t+1],
+                    cluster, t_before=PLOT_TIME_WIN[0], t_after=PLOT_TIME_WIN[1], error_bars='sem',
+                    pethline_kwargs={'color': colors[t], 'lw': 2},
+                    errbar_kwargs={'color': colors[t], 'alpha': 0.5}, ax=ax2)
+                y_lim_max[t] = ax2.get_ylim()[1]
+            ax2.set(ylim=[0, np.max(y_lim_max)], title='Stimulus onset (right)')
+            legend = ax2.legend(FIRST_TRIALS, title='Trials after block switch',
+                                fontsize=14, frameon=True)
+            plt.setp(legend.get_title(), fontsize=14)
+            plt.tight_layout()
             plt.savefig(join(FIG_PATH, frontal_control, '%s_%s' % (sessions.loc[i, 'subject'],
                                                                    sessions.loc[i, 'date']),
                              'p%s_d%s_n%s' % (sessions.loc[i, 'probe'], int(clusters.depths[

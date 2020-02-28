@@ -14,7 +14,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from pathlib import Path
 from sklearn.model_selection import KFold
-from sklearn.metrics import roc_auc_score, accuracy_score
+from sklearn.metrics import roc_auc_score
 from sklearn.metrics import f1_score, confusion_matrix
 
 
@@ -82,16 +82,32 @@ def sessions():
                                                     '00',
                                                     '00',
                                                     '00']})
-    control_sessions = pd.DataFrame(data={'lab': ['mainenlab',
+    control_sessions = pd.DataFrame(data={'lab': ['danlab',
+                                                  'danlab',
+                                                  'churchlandlab',
+                                                  'mainenlab',
+                                                  'mainenlab',
                                                   'mainenlab',
                                                   'mainenlab'],
-                                          'subject': ['ZM_2240',
+                                          'subject': ['DY_010',
+                                                      'DY_010',
+                                                      'CSHL049',
+                                                      'ZM_1897',
+                                                      'ZM_2240',
                                                       'ZM_2240',
                                                       'ZM_2241'],
-                                          'date': ['2020-01-22',
+                                          'date': ['2020-01-23',
+                                                   '2020-02-04',
+                                                   '2020-01-13',
+                                                   '2019-12-06',
+                                                   '2020-01-22',
                                                    '2020-01-24',
                                                    '2020-01-28'],
-                                          'probe': ['01',
+                                          'probe': ['00',
+                                                    '00',
+                                                    '00',
+                                                    '00',
+                                                    '01',
                                                     '00',
                                                     '00']})
     return frontal_sessions, control_sessions
@@ -116,6 +132,7 @@ def decoding(resp, labels, clf, num_splits):
         sklearn decoder object
     NUM_SPLITS : int
         The n in n-fold cross validation
+        input '1' for leave-one-out cross-validation
 
     Returns
     -------
@@ -127,11 +144,11 @@ def decoding(resp, labels, clf, num_splits):
     """
     assert resp.shape[0] == labels.shape[0]
 
-    kf = KFold(n_splits=num_splits, shuffle=True)
+    cv = KFold(n_splits=num_splits, shuffle=True)
     y_pred = np.array([])
     y_true = np.array([])
     y_auroc = np.array([])
-    for train_index, test_index in kf.split(resp):
+    for train_index, test_index in cv.split(resp):
         train_resp = resp[train_index]
         test_resp = resp[test_index]
         clf.fit(train_resp, [labels[j] for j in train_index])

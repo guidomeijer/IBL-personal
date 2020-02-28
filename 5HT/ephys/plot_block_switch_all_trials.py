@@ -19,7 +19,7 @@ from functions_5HT import download_data, paths, sessions
 DOWNLOAD = False
 OVERWRITE = True
 FRONTAL_CONTROL = 'Frontal'
-PRE_TIME = 1
+PRE_TIME = 0.5
 POST_TIME = 0
 TRIAL_WIN_SIZE = 10
 

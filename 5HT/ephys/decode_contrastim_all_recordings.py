@@ -23,19 +23,21 @@ from oneibl.one import ONE
 one = ONE()
 
 # Settings
-PRE_TIME = 1
-POST_TIME = -0.5
+PRE_TIME = 0
+POST_TIME = 0.3
 MIN_CONTRAST = 0.1
-MIN_TRIALS = 200
+MIN_TRIALS = 500
 MIN_NEURONS = 20
-ITERATIONS = 500
-NUM_SPLITS = 5
+NUM_SPLITS = 3
+ITERATIONS = 100
+
 DECODER = 'forest'
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
 
 # Get list of recordings
-eids, ses_info = one.search(dataset_types='spikes.times', details=True)
+eids, ses_info = one.search(dataset_types='spikes.times',
+                            task_protocol='_iblrig_tasks_ephysChoiceWorld', details=True)
 
 results = pd.DataFrame()
 for i, eid in enumerate(eids):
@@ -52,81 +54,109 @@ for i, eid in enumerate(eids):
         continue
     for p in range(len(probes['trajectory'])):
         # Select shallow penetrations
-        # if (probes['trajectory'][p]['theta'] == 15)and (probes['trajectory'][p]['depth'] < 4500):
-        probe_path = session_path.joinpath('alf', probes['description'][p]['label'])
-        try:
-            spikes = alf.io.load_object(probe_path, object='spikes')
-            clusters = alf.io.load_object(probe_path, object='clusters')
-        except Exception:
-            print('Could not load spikes or clusters Bunch, skipping recording')
-            continue
+        if (probes['trajectory'][p]['theta'] == 15) and (probes['trajectory'][p]['depth'] < 4500):
+            probe_path = session_path.joinpath('alf', probes['description'][p]['label'])
+            try:
+                spikes = alf.io.load_object(probe_path, object='spikes')
+                clusters = alf.io.load_object(probe_path, object='clusters')
+            except Exception:
+                print('Could not load spikes or clusters Bunch, skipping recording')
+                continue
+            if trials.stimOn_times.shape[0] < MIN_TRIALS:
+                continue
 
-        # Only use good single units
-        clusters_to_use = clusters.metrics.ks2_label == 'good'
-        if clusters_to_use.sum() < MIN_NEURONS:
-            continue
-        spikes.times = spikes.times[
-                np.isin(spikes.clusters, clusters.metrics.cluster_id[clusters_to_use])]
-        spikes.clusters = spikes.clusters[
-                np.isin(spikes.clusters, clusters.metrics.cluster_id[clusters_to_use])]
-        clusters.depths = clusters.depths[clusters_to_use]
-        cluster_ids = clusters.metrics.cluster_id[clusters_to_use]
+            # Only use good single units
+            clusters_to_use = clusters.metrics.ks2_label == 'good'
+            if clusters_to_use.sum() < MIN_NEURONS:
+                continue
+            spikes.times = spikes.times[
+                    np.isin(spikes.clusters, clusters.metrics.cluster_id[clusters_to_use])]
+            spikes.clusters = spikes.clusters[
+                    np.isin(spikes.clusters, clusters.metrics.cluster_id[clusters_to_use])]
+            clusters.depths = clusters.depths[clusters_to_use]
+            cluster_ids = clusters.metrics.cluster_id[clusters_to_use]
 
-        # Get trial indices
-        inconsistent = (((trials.probabilityLeft > 0.55)
-                         & (trials.contrastRight > MIN_CONTRAST))
-                        | ((trials.probabilityLeft < 0.45)
-                           & (trials.contrastLeft > MIN_CONTRAST)))
-        consistent = (((trials.probabilityLeft > 0.55)
-                       & (trials.contrastLeft > MIN_CONTRAST))
-                      | ((trials.probabilityLeft < 0.45)
-                         & (trials.contrastRight > MIN_CONTRAST)))
-        trial_times = trials.stimOn_times[(consistent == 1) | (inconsistent == 1)]
-        if trial_times.shape[0] < MIN_TRIALS:
-            continue
-        trial_consistent = np.zeros(consistent.shape[0])
-        trial_consistent[consistent == 1] = 1
-        trial_consistent[inconsistent == 1] = 2
-        trial_consistent = trial_consistent[(consistent == 1) | (inconsistent == 1)]
-        trial_consistent_shuffle = trial_consistent.copy()
+            # Get matrix of neuronal responses
+            times = np.column_stack(((trials.stimOn_times - PRE_TIME),
+                                     (trials.stimOn_times + POST_TIME)))
+            resp, cluster_ids = bb.task._get_spike_counts_in_bins(spikes.times, spikes.clusters,
+                                                                  times)
+            resp = np.rot90(resp)
 
-        # Get matrix of all neuronal responses
-        times = np.column_stack(((trial_times - PRE_TIME), (trial_times + POST_TIME)))
-        resp, cluster_ids = bb.task._get_spike_counts_in_bins(spikes.times, spikes.clusters, times)
-        resp = np.rot90(resp)
+            # Initialize decoder
+            if DECODER == 'forest':
+                clf = RandomForestClassifier(n_estimators=100)
+            elif DECODER == 'bayes':
+                clf = GaussianNB()
+            elif DECODER == 'regression':
+                clf = LogisticRegression(solver='liblinear', multi_class='auto')
+            else:
+                raise Exception('DECODER must be forest, bayes or regression')
 
-        # Initialize decoder
-        if DECODER == 'forest':
-            clf = RandomForestClassifier(n_estimators=100)
-        elif DECODER == 'bayes':
-            clf = GaussianNB()
-        elif DECODER == 'regression':
-            clf = LogisticRegression(solver='liblinear', multi_class='auto')
-        else:
-            raise Exception('DECODER must be forest, bayes or regression')
+            # Get trial indices of inconsistent trials during left high blocks
+            incon_l_block = ((trials.probabilityLeft > 0.55)
+                             & (trials.contrastRight > MIN_CONTRAST))
+            cons_l_block = ((trials.probabilityLeft > 0.55)
+                            & (trials.contrastLeft > MIN_CONTRAST))
+            consistent_l = np.zeros(cons_l_block.shape[0])
+            consistent_l[cons_l_block == 1] = 1
+            consistent_l[incon_l_block == 1] = 2
+            resp_l = resp[(consistent_l == 1) | (consistent_l == 2), :]
+            consistent_l = consistent_l[(consistent_l == 1) | (consistent_l == 2)]
 
-        # Decode block identity
-        aucroc_it = np.empty(ITERATIONS)
-        f1_it = np.empty(ITERATIONS)
-        for it in range(ITERATIONS):
-            _, f1_it[it], aucroc_it[it], _ = decoding(resp, trial_consistent, clf, NUM_SPLITS)
-        aucroc = np.mean(aucroc_it)
-        f1 = np.mean(f1_it)
+            # Decode inconsistent trials in left prob high block
+            f1_l_all = np.empty(ITERATIONS)
+            for i in range(ITERATIONS):
+                # Subselect the same number of consistent trials as inconsistent trials
+                trials_inds = np.random.choice(np.arange(consistent_l.shape[0])[consistent_l == 1],
+                                               size=np.sum(consistent_l == 2), replace=False)
+                cons_trials = np.isin(np.arange(consistent_l.shape[0]), trials_inds)
+                f1_l_all[i], _, _ = decoding(resp_l[(cons_trials == 1) | (consistent_l == 2), :],
+                                             consistent_l[(cons_trials == 1)
+                                                          | (consistent_l == 2)],
+                                             clf, NUM_SPLITS)
+            f1_l = np.mean(f1_l_all)
 
-        # Add to dataframe
-        nickname = ses_info[i]['subject']
-        ses_date = ses_info[i]['start_time'][:10]
-        results = results.append(pd.DataFrame(
-            index=[0], data={'subject': nickname, 'date': ses_date, 'eid': eid,
-                             'f1': f1, 'aucroc': aucroc,
-                             'ML': probes.trajectory[p]['x'],
-                             'AP': probes.trajectory[p]['y'],
-                             'DV': probes.trajectory[p]['z'],
-                             'phi': probes.trajectory[p]['phi'],
-                             'theta': probes.trajectory[p]['theta'],
-                             'depth': probes.trajectory[p]['depth']}))
+            # Get trial indices of inconsistent trials during right high blocks
+            incon_r_block = ((trials.probabilityLeft < 0.45)
+                             & (trials.contrastLeft > MIN_CONTRAST))
+            cons_r_block = ((trials.probabilityLeft < 0.45)
+                            & (trials.contrastRight > MIN_CONTRAST))
+            right_times = trials.stimOn_times[(cons_r_block == 1) | (incon_r_block == 1)]
+            consistent_r = np.zeros(cons_r_block.shape[0])
+            consistent_r[cons_r_block == 1] = 1
+            consistent_r[incon_r_block == 1] = 2
+            resp_r = resp[(consistent_r == 1) | (consistent_r == 2), :]
+            consistent_r = consistent_r[(consistent_r == 1) | (consistent_r == 2)]
 
-results.to_csv(join(DATA_PATH, 'decode_contrastim_all_recordings'))
+            # Decode inconsistent trials in left prob high block
+            f1_r_all = np.empty(ITERATIONS)
+            for i in range(ITERATIONS):
+                # Subselect the same number of consistent trials as inconsistent trials
+                trials_inds = np.random.choice(np.arange(consistent_r.shape[0])[consistent_r == 1],
+                                               size=np.sum(consistent_r == 2), replace=False)
+                cons_trials = np.isin(np.arange(consistent_r.shape[0]), trials_inds)
+                f1_r_all[i], _, _ = decoding(resp_r[(cons_trials == 1) | (consistent_r == 2), :],
+                                             consistent_r[(cons_trials == 1)
+                                                          | (consistent_r == 2)],
+                                             clf, NUM_SPLITS)
+            f1_r = np.mean(f1_r_all)
+
+            # Add to dataframe
+            nickname = ses_info[i]['subject']
+            ses_date = ses_info[i]['start_time'][:10]
+            results = results.append(pd.DataFrame(
+                index=[0], data={'subject': nickname, 'date': ses_date, 'eid': eid,
+                                 'f1_l': f1_l,
+                                 'f1_r': f1_r,
+                                 'ML': probes.trajectory[p]['x'],
+                                 'AP': probes.trajectory[p]['y'],
+                                 'DV': probes.trajectory[p]['z'],
+                                 'phi': probes.trajectory[p]['phi'],
+                                 'theta': probes.trajectory[p]['theta'],
+                                 'depth': probes.trajectory[p]['depth']}))
+
+results.to_csv(join(SAVE_PATH, 'decode_contrastim_all_recordings.csv'))
 
 # Plot
 Y_LIM = [-6000, 4000]
@@ -138,17 +168,11 @@ ax1.plot([X_LIM[0], 0], [-6000, -4200], color='k')
 ax1.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax1.plot([X_LIM[0], 0], [2000, 0], color='k')
 ax1.plot([0, X_LIM[1]], [-0, 2000], color='k')
-plot_h = sns.scatterplot(x='ML', y='AP', data=results, hue='aucroc', palette='YlOrRd',
-                         hue_norm=(0.5, 0.6), s=100, ax=ax1)
+plot_h = sns.scatterplot(x='ML', y='AP', data=results, hue='f1_r', palette='YlOrRd', s=100, ax=ax1)
 
 # Fix legend
-leg = plot_h.legend(loc=(1.05, 0.5))
-leg.texts[0].set_text('auROC')
-leg.texts[1].set_text('0.5')
-leg.texts[2].set_text('0.54')
-leg.texts[3].set_text('0.57')
-leg.texts[4].set_text('0.6')
-
+leg = plot_h.legend(loc=(0.8, 0.5))
+leg.texts[0].set_text('Decoding perf.')
 
 plot_settings()
 plt.savefig(join(FIG_PATH, 'decode_contrastim_all_recordings'))

@@ -16,7 +16,8 @@ from functions_5HT import download_data, paths, sessions
 
 download = False
 overwrite = True
-frontal_control = 'Frontal'
+frontal_control = 'Control'
+significance = 'blocks'
 
 if frontal_control == 'Frontal':
     sessions, _ = sessions()
@@ -51,6 +52,18 @@ for i in range(sessions.shape[0]):
     spikes.clusters = spikes.clusters[np.isin(
             spikes.clusters, clusters.metrics.cluster_id[clusters.metrics.ks2_label == 'good'])]
 
+    # Calculate whether neuron discriminates blocks
+    trial_times = trials.goCue_times[
+                        ((trials.probabilityLeft > 0.55)
+                         | (trials.probabilityLeft < 0.45))]
+    trial_blocks = (trials.probabilityLeft[
+            (((trials.probabilityLeft > 0.55)
+              | (trials.probabilityLeft < 0.45)))] > 0.55).astype(int)
+
+    diff_units = bb.task.differentiate_units(spikes.times, spikes.clusters,
+                                             trial_times, trial_blocks,
+                                             pre_time=1, post_time=0, alpha=0.01)[0]
+
     # Get trial indices
     r_in_l_block = trials.stimOn_times[((trials.probabilityLeft > 0.55)
                                         & (trials.contrastRight > 0.1))]
@@ -80,7 +93,11 @@ for i in range(sessions.shape[0]):
                                                           np.ones(len(r_in_r_block))),
                                                 pre_time=0, post_time=0.5,
                                                 test='ranksums', alpha=0.05)[0]
-        for n, cluster in enumerate(sig_units):
+        if significance == 'blocks':
+            plot_units = diff_units
+        elif significance == 'contrastim':
+            plot_units = sig_units
+        for n, cluster in enumerate(plot_units):
             fig, ax = plt.subplots(1, 1)
             bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters, r_in_r_block,
                                               cluster, t_before=1, t_after=2,
@@ -95,9 +112,10 @@ for i in range(sessions.shape[0]):
                 ax.set(ylim=y_lim_1)
             plt.legend(['Consistent', 'Inconsistent'])
             plt.title('Stimulus Onset (right side)')
+            plt.tight_layout()
             plt.savefig(join(FIG_PATH, frontal_control, '%s_%s' % (sessions.loc[i, 'subject'],
                                                                    sessions.loc[i, 'date']),
-                             'p%s_d%s_n%s' % (sessions.loc[i, 'probe'], int(clusters.depths[
+                             'p%s_d%s_n%s_right' % (sessions.loc[i, 'probe'], int(clusters.depths[
                                  clusters.metrics.cluster_id == cluster][0]),
                                              cluster)))
             plt.close(fig)
@@ -110,7 +128,11 @@ for i in range(sessions.shape[0]):
                                                           np.ones(len(l_in_l_block))),
                                                 pre_time=0, post_time=0.5,
                                                 test='ranksums', alpha=0.05)[0]
-        for n, cluster in enumerate(sig_units):
+        if significance == 'blocks':
+            plot_units = diff_units
+        elif significance == 'contrastim':
+            plot_units = sig_units
+        for n, cluster in enumerate(plot_units):
             fig, ax = plt.subplots(1, 1)
             bb.plot.peri_event_time_histogram(spikes.times, spikes.clusters, l_in_l_block,
                                               cluster, t_before=1, t_after=2,
@@ -125,9 +147,10 @@ for i in range(sessions.shape[0]):
                 ax.set(ylim=y_lim_1)
             plt.legend(['Consistent', 'Inconsistent'])
             plt.title('Stimulus Onset (left side)')
+            plt.tight_layout()
             plt.savefig(join(FIG_PATH, frontal_control, '%s_%s' % (sessions.loc[i, 'subject'],
                                                                    sessions.loc[i, 'date']),
-                             'p%s_d%s_n%s' % (sessions.loc[i, 'probe'], int(clusters.depths[
+                             'p%s_d%s_n%s_left' % (sessions.loc[i, 'probe'], int(clusters.depths[
                                  clusters.metrics.cluster_id == cluster][0]),
                                              cluster)))
             plt.close(fig)

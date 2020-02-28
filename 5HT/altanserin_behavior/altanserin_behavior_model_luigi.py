@@ -14,32 +14,90 @@ import seaborn as sns
 import numpy as np
 
 # Settings
-FIG_PATH = join(expanduser('~'), 'Figures', '5HT')
+FIG_PATH = join(expanduser('~'), 'Figures', '5HT', 'altanserin_behavior')
 
 # Load in data
-data = loadmat(join(expanduser('~'), 'Data', '5HT', 'guido_analysis_14feb2020.mat'))
-runlength = data['X'][0]
+data = loadmat(join(expanduser('~'), 'Data', '5HT', 'guido_analysis_25feb2020.mat'))
+X = data['X'][0]
 parameters = data['pnames'][0]
 
-# Get maximum probability density of fitted run length parameter
-max_prob = np.zeros(np.size(runlength))
-for i in range(np.size(runlength)):
-    max_prob[i] = stats.mode(runlength[i][:, parameters == 'runlength-tau'])[0][0][0]
+results = pd.DataFrame(columns=['subject', 'condition', 'week', 'window_length', 'iqr'])
+for i in range(len(X)):
+    for j in range(X[i].shape[1]):
+        max_prob = np.median(X[i][0][j][:, parameters[i][0] == 'runlength-tau'])
+        iqr = stats.iqr(X[i][0][j][:, parameters[i][0] == 'runlength-tau'])
+        results.loc[results.shape[0]+1] = ([i] + [np.mod(j, 3)]
+                                           + [np.floor(j/3)] + [max_prob] + [iqr])
 
-results = pd.DataFrame({'max_prob': max_prob,
-                        'condition': [0, 1, 2]*int(np.size(runlength)/3),
-                        'subject': np.repeat(np.arange(np.size(runlength)/3), 3)})
+# Get bias normalized to pre-vehicle
+results.loc[results['condition'] == 0, 'window_length_rel'] = (
+                        results.loc[results['condition'] == 0, 'window_length'].values
+                        / results.loc[results['condition'] == 0, 'window_length'].values)
+results.loc[results['condition'] == 1, 'window_length_rel'] = (
+                        results.loc[results['condition'] == 1, 'window_length'].values
+                        / results.loc[results['condition'] == 0, 'window_length'].values)
+results.loc[results['condition'] == 2, 'window_length_rel'] = (
+                        results.loc[results['condition'] == 2, 'window_length'].values
+                        / results.loc[results['condition'] == 0, 'window_length'].values)
 
-f, ax1 = plt.subplots(1, 1, figsize=(5, 5))
-sns.lineplot(x='condition', y='max_prob', hue='subject', data=results, legend=False,
-             ax=ax1, lw=3)
+# Plot results
+f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 12))
+sns.set(context='paper', font_scale=1.5, style='ticks')
+
+sns.lineplot(x='condition', y='window_length', units='subject', estimator=None, hue='subject',
+             sort=False, data=results[(results['week'] == 0)], ax=ax1)
 ax1.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
-        xlabel='', ylabel='Lenght of integration window (tau)',
-        title='Fitted running average model', ylim=[1, 4])
+        ylabel='Length integration window (tau)', title='Week 1')
 plt.setp(ax1.xaxis.get_majorticklabels(), rotation=40)
+ax1.get_legend().remove()
+
+sns.lineplot(x='condition', y='window_length', units='subject', estimator=None, hue='subject',
+             sort=False, data=results[(results['week'] == 1)], ax=ax2)
+ax2.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
+        ylabel='Length integration window (tau)', title='Week 2')
+plt.setp(ax2.xaxis.get_majorticklabels(), rotation=40)
+ax2.get_legend().remove()
+
+sns.lineplot(x='condition', y='window_length', units='subject', estimator=None, hue='subject',
+             sort=False, data=results[(results['week'] == 2)], ax=ax3)
+ax3.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
+        ylabel='Length integration window (tau)', title='Week 3')
+plt.setp(ax3.xaxis.get_majorticklabels(), rotation=40)
+ax3.get_legend().remove()
+
+plt.tight_layout(pad=2)
+
+plt.savefig(join(FIG_PATH, '5HT2a_block_integration_length_per_week'), dpi=300)
+
+f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 12), sharex=True)
+sns.set(context='paper', font_scale=1.5, style='ticks')
+
+sns.lineplot(x='condition', y='window_length', hue='subject', style='week', data=results,
+             legend=False, ax=ax1, lw=3)
+ax1.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
+        xlabel='', ylabel='Length of integration window (\u03C4 trials)')
+plt.setp(ax1.xaxis.get_majorticklabels(), rotation=40)
+
+sns.lineplot(x='condition', y='window_length_rel', hue='subject', style='week', data=results,
+             legend=False, ax=ax2, lw=3)
+ax2.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
+        xlabel='', ylabel='Length of integration window (\u03C4 trials)')
+plt.setp(ax2.xaxis.get_majorticklabels(), rotation=40)
+
+sns.lineplot(x='condition', y='window_length', data=results,
+             legend=False, ax=ax3, lw=3, ci=68)
+ax3.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
+        xlabel='', ylabel='Length of integration window (\u03C4 trials)')
+plt.setp(ax3.xaxis.get_majorticklabels(), rotation=40)
+
+sns.lineplot(x='condition', y='window_length_rel', data=results,
+             legend=False, ax=ax4, lw=3, ci=68)
+ax4.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
+        xlabel='', ylabel='Length of integration window (\u03C4 trials)')
+plt.setp(ax4.xaxis.get_majorticklabels(), rotation=40)
+
 sns.set(context='paper', font_scale=1.5, style='ticks')
 sns.despine(trim=True)
 plt.tight_layout(pad=2)
 
-plt.savefig(join(FIG_PATH, '5HT2a_block_integration_lenght.pdf'), dpi=300)
-plt.savefig(join(FIG_PATH, '5HT2a_block_integration_lenght.png'), dpi=300)
+plt.savefig(join(FIG_PATH, '5HT2a_block_integration_length'), dpi=300)

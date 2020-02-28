@@ -32,7 +32,8 @@ DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Decoding', 'Blocks')
 
 # Get list of recordings
-eids, ses_info = one.search(dataset_types='spikes.times', details=True)
+eids, ses_info = one.search(dataset_types='spikes.times',
+                            task_protocol='_iblrig_tasks_ephysChoiceWorld', details=True)
 
 decode_results = pd.DataFrame()
 for i, eid in enumerate(eids):

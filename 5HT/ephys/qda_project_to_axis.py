@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import brainbox as bb
 import seaborn as sns
 import numpy as np
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis as QDA
 from sklearn.model_selection import LeaveOneOut
 from functions_5HT import download_data, paths, sessions
 
@@ -30,7 +30,7 @@ elif FRONTAL_CONTROL == 'Control':
     _, sessions = sessions()
 
 DATA_PATH, FIG_PATH, _ = paths()
-FIG_PATH = join(FIG_PATH, 'Population', 'LDA')
+FIG_PATH = join(FIG_PATH, 'Population', 'QDA')
 for i in range(sessions.shape[0]):
     # Download data if required
     if DOWNLOAD is True:
@@ -72,19 +72,18 @@ for i in range(sessions.shape[0]):
                                                                         i+1, sessions.shape[0]))
     resp = np.rot90(spike_counts)
     loo = LeaveOneOut()
-    lda_transform = np.zeros(resp.shape[0])
+    qda_transform = np.zeros(resp.shape[0])
     for train_index, test_index in loo.split(resp):
-        lda = LDA(n_components=1)
-        lda.fit(resp[train_index], trial_blocks[train_index])
-        lda_transform[test_index] = np.rot90(lda.transform(resp[test_index]))[0]
-
-    lda_convolve = np.convolve(lda_transform, np.ones((10,))/10, mode='same')
+        qda = QDA()
+        qda.fit(resp[train_index], trial_blocks[train_index])
+        qda_transform[test_index] = np.rot90(qda.transform(resp[test_index]))[0]
+    qda_convolve = np.convolve(qda_transform, np.ones((10,))/10, mode='same')
 
     # Plot
     fig, ax1 = plt.subplots(1, 1, figsize=(12, 8))
     sns.set(style="ticks", context="paper", font_scale=2)
-    ax1.plot(np.arange(1, trial_times.shape[0]+1), lda_transform, color=[0.6, 0.6, 0.6])
-    ax1.plot(np.arange(1, trial_times.shape[0]+1), lda_convolve, 'k', lw=3)
+    ax1.plot(np.arange(1, trial_times.shape[0]+1), qda_transform, color=[0.6, 0.6, 0.6])
+    ax1.plot(np.arange(1, trial_times.shape[0]+1), qda_convolve, 'k', lw=3)
     ax1.set_ylabel('Position along LDA axis')
     ax1.set(ylim=[-6, 6])
     ax2 = ax1.twinx()
