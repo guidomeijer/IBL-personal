@@ -13,23 +13,27 @@ from os.path import join
 import alf.io as ioalf
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.linear_model import LogisticRegression
-from functions_5HT import paths, sessions, decoding, plot_settings, get_spike_counts_in_bins
+from functions_5HT import paths, decoding, plot_settings, get_spike_counts_in_bins
 
-# Settings
+# Session
 LAB = 'danlab'
 SUBJECT = 'DY_011'
 DATE = '2020-01-30'
 PROBE = '00'
-DEPTH_BIN_CENTERS = np.arange(200, 4000, 200)
-DEPTH_BIN_SIZE = 300
+
+# Settings
+DEPTH_BIN_CENTERS = np.arange(250, 4000, 300)
+DEPTH_BIN_SIZE = 500
 PRE_TIME = 0
 POST_TIME = 0.3
 MIN_CONTRAST = 0.1
-DECODER = 'forest'  # bayes, regression or forest
-NUM_SPLITS = 3
+MIN_NEURONS = 5
+DECODER = 'bayes'  # bayes, regression or forest
+NUM_SPLITS = 1
 
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Decoding', 'ContraStim')
@@ -94,7 +98,7 @@ for j, depth in enumerate(DEPTH_BIN_CENTERS):
     print('Decoding block identity from depth %d..' % depth)
     depth_clusters = cluster_ids[((clusters.depths > depth-(DEPTH_BIN_SIZE/2))
                                   & (clusters.depths < depth+(DEPTH_BIN_SIZE/2)))]
-    if len(depth_clusters) <= 2:
+    if len(depth_clusters) <= MIN_NEURONS:
         n_clusters[j] = len(depth_clusters)
         f1_score[j] = np.nan
         auroc[j] = np.nan
@@ -103,23 +107,20 @@ for j, depth in enumerate(DEPTH_BIN_CENTERS):
                                         trial_consistent, clf, NUM_SPLITS)
     n_clusters[j] = len(depth_clusters)
 
+# Put data in dataframe and save
+results = pd.DataFrame(data={'subject': SUBJECT, 'date': DATE, 'probe': PROBE,
+                             'f1_score': f1_score, 'auroc': auroc})
+
+# %%
 # Plot decoding versus depth
 f, (ax1, ax2) = plt.subplots(1, 2, sharey=True, figsize=(8, 6))
-ax1.plot(f1_score, DEPTH_BIN_CENTERS, lw=2)
+ax1.plot(auroc, DEPTH_BIN_CENTERS, lw=2)
 ax1.set(ylabel='Depth (um)', xlabel='Decoding performance (AUROC)',
         title='Decoding whether stimulus side is consistent with block probability',
-        xlim=[-0.1, 0.4])
+        xlim=[0.4, 0.6])
 
 ax2.plot(n_clusters, DEPTH_BIN_CENTERS, lw=2)
 ax2.set(xlabel='Number of neurons')
 ax2.invert_yaxis()
 plot_settings()
-plt.savefig(join(FIG_PATH, '%s_%s_%s' % (DECODER,
-                                            sessions.loc[i, 'subject'],
-                                            sessions.loc[i, 'date'])))
-plt.close(f)
-
-# Save decoding performance
-np.save(join(SAVE_PATH, 'Decoding', 'ContraStim',
-             '%s_%s_%s' % (DECODER, sessions.loc[i, 'subject'],
-                              sessions.loc[i, 'date'])), f1_over_shuffled)
+plt.savefig(join(FIG_PATH, '%s_%s_%s' % (DECODER, SUBJECT, DATE)))

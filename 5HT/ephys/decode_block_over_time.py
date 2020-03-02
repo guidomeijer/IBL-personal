@@ -7,7 +7,7 @@ Created on Mon Mar  2 10:48:48 2020
 """
 
 from os import listdir
-from os.path import join, isfile
+from os.path import join
 import alf.io as ioalf
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -25,7 +25,7 @@ FRONTAL_CONTROL = 'Frontal'
 WIN_CENTERS = np.arange(-1, 2, 0.1)
 WIN_SIZE = 0.15
 DECODER = 'forest'  # bayes, regression or forest
-NUM_SPLITS = 3
+NUM_SPLITS = 5
 
 # Get all sessions
 frontal_sessions, control_sessions = sessions()
@@ -44,7 +44,7 @@ else:
     raise Exception('DECODER must be forest, bayes or regression')
 
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
-FIG_PATH = join(FIG_PATH, 'Decoding', 'BlocksOverTime')
+FIG_PATH = join(FIG_PATH, 'Decoding', 'OverTime')
 results = pd.DataFrame()
 for i in range(all_ses.shape[0]):
     print('Starting subject %s, session %s' % (all_ses.loc[i, 'subject'],

@@ -11,7 +11,6 @@ import pandas as pd
 import matplotlib
 import numpy as np
 import seaborn as sns
-import matplotlib.pyplot as plt
 import pathlib
 from pathlib import Path
 from sklearn.model_selection import KFold, LeaveOneOut

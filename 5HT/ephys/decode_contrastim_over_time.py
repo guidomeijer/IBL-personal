@@ -7,7 +7,7 @@ Created on Mon Mar  2 10:48:48 2020
 """
 
 from os import listdir
-from os.path import join, isfile
+from os.path import join
 import alf.io as ioalf
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -21,11 +21,11 @@ from functions_5HT import (download_data, paths, sessions, decoding, plot_settin
 
 # Settings
 DOWNLOAD = False
-FRONTAL_CONTROL = 'Frontal'
-WIN_CENTERS = np.arange(-1, 2, 0.08)
-WIN_SIZE = 0.1
-DECODER = 'forest'  # bayes, regression or forest
-NUM_SPLITS = 1
+SAVE = False
+WIN_CENTERS = np.arange(-1, 1, 0.2)
+WIN_SIZE = 0.25
+DECODER = 'bayes'  # bayes, regression or forest
+NUM_SPLITS = 3
 MIN_CONTRAST = 0.1
 
 # Get all sessions
@@ -45,7 +45,7 @@ else:
     raise Exception('DECODER must be forest, bayes or regression')
 
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
-FIG_PATH = join(FIG_PATH, 'Decoding', 'BlocksOverTime')
+FIG_PATH = join(FIG_PATH, 'Decoding', 'OverTime')
 results = pd.DataFrame()
 for i in range(all_ses.shape[0]):
     print('Starting subject %s, session %s' % (all_ses.loc[i, 'subject'],
@@ -81,15 +81,11 @@ for i in range(all_ses.shape[0]):
     clusters.depths = clusters.depths[clusters.metrics.ks2_label == 'good']
     cluster_ids = clusters.metrics.cluster_id[clusters.metrics.ks2_label == 'good']
 
-    # Get trial indices
+    # Get trial indices, only use stimuli on the right
     inconsistent = (((trials.probabilityLeft > 0.55)
-                     & (trials.contrastRight > MIN_CONTRAST))
-                    | ((trials.probabilityLeft < 0.45)
-                       & (trials.contrastLeft > MIN_CONTRAST)))
-    consistent = (((trials.probabilityLeft > 0.55)
-                   & (trials.contrastLeft > MIN_CONTRAST))
-                  | ((trials.probabilityLeft < 0.45)
                      & (trials.contrastRight > MIN_CONTRAST)))
+    consistent = (((trials.probabilityLeft > 0.55)
+                   & (trials.contrastLeft > MIN_CONTRAST)))
     trial_times = trials.stimOn_times[(consistent == 1) | (inconsistent == 1)]
     trial_consistent = np.zeros(consistent.shape[0])
     trial_consistent[consistent == 1] = 1
@@ -116,7 +112,8 @@ for i in range(all_ses.shape[0]):
                 'date': all_ses.loc[i, 'date'], 'recording': all_ses.loc[i, 'recording']}))
 
 results['session'] = results['subject'] + '_' + results['date']
-results.to_csv(join(SAVE_PATH, 'Decoding', 'decoding_contrastim_over_time.csv'))
+if SAVE is True:
+    results.to_csv(join(SAVE_PATH, 'Decoding', 'decoding_contrastim_over_time.csv'))
 
 # %% Plot
 
@@ -145,4 +142,5 @@ ax3.set(ylabel='Classification performance (AUROC)', xlabel='Time (s)', ylim=[0.
 
 plt.tight_layout(pad=2)
 sns.despine(trim=True)
-plt.savefig(join(FIG_PATH, 'decoding_contrastim_over_time'), dpi=300)
+if SAVE is True:
+    plt.savefig(join(FIG_PATH, 'decoding_contrastim_over_time'), dpi=300)
