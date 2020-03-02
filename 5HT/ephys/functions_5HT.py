@@ -12,8 +12,9 @@ import matplotlib
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+import pathlib
 from pathlib import Path
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, LeaveOneOut
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import f1_score, confusion_matrix
 
@@ -29,8 +30,6 @@ def paths():
 
 
 def plot_settings():
-    plt.tight_layout()
-    sns.despine(trim=True)
     sns.set(style="ticks", context="paper", font_scale=1.4)
     matplotlib.rcParams['pdf.fonttype'] = 42
     matplotlib.rcParams['ps.fonttype'] = 42
@@ -62,54 +61,9 @@ def download_data(nickname, date):
 
 
 def sessions():
-    frontal_sessions = pd.DataFrame(data={'lab': ['mainenlab',
-                                                  'hoferlab',
-                                                  'mainenlab',
-                                                  'danlab',
-                                                  'mainenlab'],
-                                          'subject': ['ZM_2240',
-                                                      'SWC_015',
-                                                      'ZM_2240',
-                                                      'DY_011',
-                                                      'ZM_2241'],
-                                          'date': ['2020-01-22',
-                                                   '2020-01-21',
-                                                   '2020-01-21',
-                                                   '2020-01-30',
-                                                   '2020-01-27'],
-                                          'probe': ['00',
-                                                    '01',
-                                                    '00',
-                                                    '00',
-                                                    '00']})
-    control_sessions = pd.DataFrame(data={'lab': ['danlab',
-                                                  'danlab',
-                                                  'churchlandlab',
-                                                  'mainenlab',
-                                                  'mainenlab',
-                                                  'mainenlab',
-                                                  'mainenlab'],
-                                          'subject': ['DY_010',
-                                                      'DY_010',
-                                                      'CSHL049',
-                                                      'ZM_1897',
-                                                      'ZM_2240',
-                                                      'ZM_2240',
-                                                      'ZM_2241'],
-                                          'date': ['2020-01-23',
-                                                   '2020-02-04',
-                                                   '2020-01-13',
-                                                   '2019-12-06',
-                                                   '2020-01-22',
-                                                   '2020-01-24',
-                                                   '2020-01-28'],
-                                          'probe': ['00',
-                                                    '00',
-                                                    '00',
-                                                    '00',
-                                                    '01',
-                                                    '00',
-                                                    '00']})
+    ses_path = join(pathlib.Path(__file__).parent.absolute(), 'sessions')
+    frontal_sessions = pd.read_csv(join(ses_path, 'frontal_sessions.csv'), dtype=str)
+    control_sessions = pd.read_csv(join(ses_path, 'control_sessions.csv'), dtype=str)
     return frontal_sessions, control_sessions
 
 
@@ -132,7 +86,7 @@ def decoding(resp, labels, clf, num_splits):
         sklearn decoder object
     NUM_SPLITS : int
         The n in n-fold cross validation
-        input '1' for leave-one-out cross-validation
+        input 1 for leave-one-out cross-validation
 
     Returns
     -------
@@ -144,23 +98,32 @@ def decoding(resp, labels, clf, num_splits):
     """
     assert resp.shape[0] == labels.shape[0]
 
-    cv = KFold(n_splits=num_splits, shuffle=True)
-    y_pred = np.array([])
-    y_true = np.array([])
-    y_auroc = np.array([])
+    # Initialize cross-validation
+    if num_splits == 1:
+        cv = LeaveOneOut()
+    else:
+        cv = KFold(n_splits=num_splits, shuffle=True)
+
+    # Loop over splits into training and testing
+    y_pred = np.zeros(labels.shape)
+    y_probs = np.zeros(labels.shape)
     for train_index, test_index in cv.split(resp):
-        train_resp = resp[train_index]
-        test_resp = resp[test_index]
-        clf.fit(train_resp, [labels[j] for j in train_index])
-        y_pred = np.append(y_pred, clf.predict(test_resp))
-        y_true = np.append(y_true, [labels[j] for j in test_index])
-        probs = clf.predict_proba(test_resp)
-        probs = probs[:, 1]  # keep positive only
-        y_auroc = np.append(y_auroc, roc_auc_score([labels[j] for j in test_index], probs))
-    f1 = f1_score(y_true, y_pred)
-    auroc = np.mean(y_auroc)
-    unique_labels, label_counts = np.unique(labels, return_counts=True)
-    cm = confusion_matrix(y_true, y_pred, labels=unique_labels)
+
+        # Fit the model to the training data
+        clf.fit(resp[train_index], [labels[j] for j in train_index])
+
+        # Predict the test data
+        y_pred[test_index] = clf.predict(resp[test_index])
+
+        # Get the probability of the prediction for ROC analysis
+        probs = clf.predict_proba(resp[test_index])
+        y_probs[test_index] = probs[:, 1]  # keep positive only
+
+    # Calculate performance metrics and confusion matrix
+    f1 = f1_score(labels, y_pred)
+    auroc = roc_auc_score(labels, y_probs)
+    cm = confusion_matrix(labels, y_pred)
+
     return f1, auroc, cm
 
 

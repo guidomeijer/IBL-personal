@@ -90,8 +90,8 @@ for i, eid in enumerate(eids):
             lda_convolve = np.convolve(lda_transform, np.ones((10,))/10, mode='same')
 
             # Get LDA distance between class means
-            lda_dist = (np.abs(np.mean(lda_transform[trial_blocks == 0]))
-                        + np.abs(np.mean(lda_transform[trial_blocks == 1])))
+            lda_dist = (np.abs(np.median(lda_transform[trial_blocks == 0]))
+                        + np.abs(np.median(lda_transform[trial_blocks == 1])))
 
             # Correlate probability left with lda score
             r = stats.pearsonr(lda_convolve, trials.probabilityLeft[
@@ -136,3 +136,19 @@ leg.texts[4].set_text('1')
 
 plot_settings()
 plt.savefig(join(FIG_PATH, 'LDA_corr_all_cortex'))
+
+fig, ax1 = plt.subplots(1, 1, figsize=(8, 6))
+ax1.plot([0, 0], [-4200, 0], color='k')
+ax1.plot([X_LIM[0], 0], [-6000, -4200], color='k')
+ax1.plot([0, X_LIM[1]], [-4200, -6000], color='k')
+ax1.plot([X_LIM[0], 0], [2000, 0], color='k')
+ax1.plot([0, X_LIM[1]], [-0, 2000], color='k')
+plot_h = sns.scatterplot(x='ML', y='AP', data=lda_result, hue='lda_dist', palette='YlOrRd',
+                         s=100, hue_norm=(0, 3), ax=ax1)
+
+# Fix legend
+leg = plot_h.legend(loc=(0.75, 0.5))
+leg.texts[0].set_text('LDA distance')
+
+plot_settings()
+plt.savefig(join(FIG_PATH, 'LDA_dist_all_cortex'))

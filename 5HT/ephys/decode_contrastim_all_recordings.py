@@ -28,8 +28,7 @@ POST_TIME = 0.3
 MIN_CONTRAST = 0.1
 MIN_TRIALS = 500
 MIN_NEURONS = 20
-NUM_SPLITS = 3
-ITERATIONS = 100
+NUM_SPLITS = 1
 
 DECODER = 'forest'
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
@@ -39,11 +38,21 @@ FIG_PATH = join(FIG_PATH, 'WholeBrain')
 eids, ses_info = one.search(dataset_types='spikes.times',
                             task_protocol='_iblrig_tasks_ephysChoiceWorld', details=True)
 
+# Initialize decoder
+if DECODER == 'forest':
+    clf = RandomForestClassifier(n_estimators=100)
+elif DECODER == 'bayes':
+    clf = GaussianNB()
+elif DECODER == 'regression':
+    clf = LogisticRegression(solver='liblinear', multi_class='auto')
+else:
+    raise Exception('DECODER must be forest, bayes or regression')
+
 results = pd.DataFrame()
-for i, eid in enumerate(eids):
+for s, eid in enumerate(eids):
 
     # Load in data
-    print('Processing session %d of %d' % (i+1, len(eids)))
+    print('Processing session %d of %d' % (s+1, len(eids)))
     session_path = one_session_path(eid)
     trials = one.load_object(eid, 'trials')
     probes = one.load_object(eid, 'probes', download_only=False)
@@ -83,16 +92,6 @@ for i, eid in enumerate(eids):
                                                                   times)
             resp = np.rot90(resp)
 
-            # Initialize decoder
-            if DECODER == 'forest':
-                clf = RandomForestClassifier(n_estimators=100)
-            elif DECODER == 'bayes':
-                clf = GaussianNB()
-            elif DECODER == 'regression':
-                clf = LogisticRegression(solver='liblinear', multi_class='auto')
-            else:
-                raise Exception('DECODER must be forest, bayes or regression')
-
             # Get trial indices of inconsistent trials during left high blocks
             incon_l_block = ((trials.probabilityLeft > 0.55)
                              & (trials.contrastRight > MIN_CONTRAST))
@@ -104,18 +103,12 @@ for i, eid in enumerate(eids):
             resp_l = resp[(consistent_l == 1) | (consistent_l == 2), :]
             consistent_l = consistent_l[(consistent_l == 1) | (consistent_l == 2)]
 
-            # Decode inconsistent trials in left prob high block
-            f1_l_all = np.empty(ITERATIONS)
-            for i in range(ITERATIONS):
-                # Subselect the same number of consistent trials as inconsistent trials
-                trials_inds = np.random.choice(np.arange(consistent_l.shape[0])[consistent_l == 1],
-                                               size=np.sum(consistent_l == 2), replace=False)
-                cons_trials = np.isin(np.arange(consistent_l.shape[0]), trials_inds)
-                f1_l_all[i], _, _ = decoding(resp_l[(cons_trials == 1) | (consistent_l == 2), :],
-                                             consistent_l[(cons_trials == 1)
-                                                          | (consistent_l == 2)],
-                                             clf, NUM_SPLITS)
-            f1_l = np.mean(f1_l_all)
+            # Abort if there are more inconsisten than consistent trials (something is wrong)
+            if np.sum(consistent_l == 2) > np.sum(consistent_l == 1):
+                continue
+
+            # Decode whether stimulus on the left is consistent or inconsistent with block prob.
+            f1_l, auroc_l, _ = decoding(resp_l, consistent_l, clf, NUM_SPLITS)
 
             # Get trial indices of inconsistent trials during right high blocks
             incon_r_block = ((trials.probabilityLeft < 0.45)
@@ -129,26 +122,20 @@ for i, eid in enumerate(eids):
             resp_r = resp[(consistent_r == 1) | (consistent_r == 2), :]
             consistent_r = consistent_r[(consistent_r == 1) | (consistent_r == 2)]
 
-            # Decode inconsistent trials in left prob high block
-            f1_r_all = np.empty(ITERATIONS)
-            for i in range(ITERATIONS):
-                # Subselect the same number of consistent trials as inconsistent trials
-                trials_inds = np.random.choice(np.arange(consistent_r.shape[0])[consistent_r == 1],
-                                               size=np.sum(consistent_r == 2), replace=False)
-                cons_trials = np.isin(np.arange(consistent_r.shape[0]), trials_inds)
-                f1_r_all[i], _, _ = decoding(resp_r[(cons_trials == 1) | (consistent_r == 2), :],
-                                             consistent_r[(cons_trials == 1)
-                                                          | (consistent_r == 2)],
-                                             clf, NUM_SPLITS)
-            f1_r = np.mean(f1_r_all)
+            # Abort if there are more inconsisten than consistent trials (something is wrong)
+            if np.sum(consistent_r == 2) > np.sum(consistent_r == 1):
+                continue
+
+            # Decode whether stimulus on the left is consistent or inconsistent with block prob.
+            f1_r, auroc_r, _ = decoding(resp_r, consistent_r, clf, NUM_SPLITS)
 
             # Add to dataframe
-            nickname = ses_info[i]['subject']
-            ses_date = ses_info[i]['start_time'][:10]
+            nickname = ses_info[s]['subject']
+            ses_date = ses_info[s]['start_time'][:10]
             results = results.append(pd.DataFrame(
                 index=[0], data={'subject': nickname, 'date': ses_date, 'eid': eid,
-                                 'f1_l': f1_l,
-                                 'f1_r': f1_r,
+                                 'f1_l': f1_l, 'f1_r': f1_r,
+                                 'auroc_l': auroc_l, 'auroc_r': auroc_r,
                                  'ML': probes.trajectory[p]['x'],
                                  'AP': probes.trajectory[p]['y'],
                                  'DV': probes.trajectory[p]['z'],
@@ -168,7 +155,8 @@ ax1.plot([X_LIM[0], 0], [-6000, -4200], color='k')
 ax1.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax1.plot([X_LIM[0], 0], [2000, 0], color='k')
 ax1.plot([0, X_LIM[1]], [-0, 2000], color='k')
-plot_h = sns.scatterplot(x='ML', y='AP', data=results, hue='f1_r', palette='YlOrRd', s=100, ax=ax1)
+plot_h = sns.scatterplot(x='ML', y='AP', data=results, hue='auroc_r',
+                         palette='YlOrRd', s=100, ax=ax1)
 
 # Fix legend
 leg = plot_h.legend(loc=(0.8, 0.5))
