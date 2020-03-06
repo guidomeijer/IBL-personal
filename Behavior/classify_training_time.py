@@ -42,8 +42,8 @@ def decoding(resp, labels, clf, NUM_SPLITS):
 
 # Settings
 Q = 4
-DAYS = np.arange(1, 9)
-DECODER = 'bayes'           # bayes, forest, or regression
+DAYS = np.arange(1, 11)
+DECODER = 'forest'           # bayes, forest, or regression
 NUM_SPLITS = 1              # n in n-fold cross validation (1 for leave one out)
 METRICS = ['performance', 'mean_rt', 'n_trials_date']
 FIG_PATH = '/home/guido/Figures/Behavior/LearningSpeedPrediction'
@@ -63,9 +63,7 @@ subj_crit_day = ((dj.U('subject_uuid', 'day_of_crit')
 # Query reaction times
 rt = behavior_analysis.ReactionTime.proj('reaction_time', session_date='DATE(session_start_time)')
 
-
 # Initialize decoders
-print('Decoding of learning speed from day %d' % day)
 if DECODER == 'forest':
     clf = RandomForestClassifier(n_estimators=100)
 elif DECODER == 'bayes':
@@ -75,8 +73,10 @@ elif DECODER == 'regression':
 else:
     raise Exception('DECODER must be forest, bayes or regression')
 
-F1_score = np.empty(DAYS.shape[0])
+results = pd.DataFrame(columns=['day', 'F1'] + METRICS)
 for i, day in enumerate(DAYS):
+    print('Decoding of learning speed from day %d' % day)
+
     # Get dataframe with behavioral data
     behav = (subj_crit_day * behavior_analysis.BehavioralSummaryByDate * rt
              & 'training_day="%d"' % day).fetch(format='frame')
@@ -105,10 +105,15 @@ for i, day in enumerate(DAYS):
         clf.fit(train_resp, [labels[j] for j in train_index])
         y_pred = np.append(y_pred, clf.predict(test_resp))
         y_true = np.append(y_true, [labels[j] for j in test_index])
+        feature_imp = feature_imp + clf.feature_importances_
+    if NUM_SPLITS == 1:
+        feature_imp = feature_imp / [decoding_set.shape[0]]*decoding_set.shape[1]
+    else:
+        feature_imp = feature_imp / [NUM_SPLITS]*decoding_set.shape[1]
     f1 = f1_score(y_true, y_pred, labels=np.unique(labels), average='micro')
     cm = confusion_matrix(y_true, y_pred)
     behav['learning_pred'] = y_pred
-    F1_score[i] = f1
+    results.loc[i] = np.append([day, f1], feature_imp)
 
     f, ax1 = plt.subplots(1, 1, figsize=(5.5, 5))
     # sns.heatmap(cm / cm.sum(axis=1)[:, np.newaxis], vmin=0.15, vmax=0.5, ax=ax1)
@@ -120,9 +125,19 @@ for i, day in enumerate(DAYS):
     plt.savefig(join(FIG_PATH, 'confusion_matrix_day%d' % day), dpi=300)
     plt.close(f)
 
-f, ax1 = plt.subplots(1, 1, figsize=(5, 5))
-ax1.plot(DAYS, F1_score)
+# %%
+
+f, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+ax1.plot(results['day'], results['F1'])
 ax1.plot([DAYS[0], DAYS[-1]], [1/Q, 1/Q], color=[0.6, 0.6, 0.6], linestyle='--')
 ax1.set(ylabel='Classification performance (F1 score)',
         xlabel='Classifier trained on behavior from day')
+
+ax2.plot(results['day'], results['performance'])
+ax2.plot(results['day'], results['mean_rt'])
+ax2.plot(results['day'], results['n_trials_date'])
+ax2.legend(['Performance', 'RT', '# trials'])
+ax2.set(ylabel='Importance of predictor',
+        xlabel='Classifier trained on behavior from day')
+
 plt.savefig(join(FIG_PATH, 'learning_speed_classification'), dpi=300)

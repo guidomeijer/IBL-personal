@@ -9,7 +9,7 @@ Created on Thu Nov 21 12:34:22 2019
 from oneibl.one import ONE
 one = ONE()
 
-mouse_id = 'ZM_2406'
+mouse_id = 'ZM_1897'
 
 dtypes = ['_iblrig_taskSettings.raw', 'probes.trajectory', 'trials.feedback_times']
 eids, ses_info = one.search(subject=mouse_id, dataset_types=dtypes, details=True)
@@ -26,7 +26,8 @@ for i, eid in enumerate(eids):
     if trials is None:
         continue
 
-    print('\nSession date: %s\nSession eid: %s' % (ses_info[i]['start_time'][:10], eid))
+    print('\nSession date: %s\nSession eid: %s\nSession number: %d' % (
+                        ses_info[i]['start_time'][:10], eid, ses_info[i]['number']))
     print('%d trials' % len(trials))
     for p in range(len(traj)):
         print('\n%s\nAP: %s\nML: %s\nDepth: %s\nPhi: %s\nTheta: %s' % (traj[p]['label'],

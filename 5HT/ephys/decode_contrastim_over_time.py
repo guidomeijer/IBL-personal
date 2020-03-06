@@ -21,12 +21,12 @@ from functions_5HT import (download_data, paths, sessions, decoding, plot_settin
 
 # Settings
 DOWNLOAD = False
-SAVE = False
-WIN_CENTERS = np.arange(-1, 1, 0.2)
-WIN_SIZE = 0.25
-DECODER = 'bayes'  # bayes, regression or forest
+SAVE = True
+WIN_CENTERS = np.arange(-0.95, 1.95, 0.2)
+WIN_SIZE = 0.2
+DECODER = 'regression'  # bayes, regression or forest
 NUM_SPLITS = 3
-MIN_CONTRAST = 0.1
+MIN_CONTRAST = 0.05
 
 # Get all sessions
 frontal_sessions, control_sessions = sessions()
@@ -82,10 +82,17 @@ for i in range(all_ses.shape[0]):
     cluster_ids = clusters.metrics.cluster_id[clusters.metrics.ks2_label == 'good']
 
     # Get trial indices, only use stimuli on the right
+
     inconsistent = (((trials.probabilityLeft > 0.55)
                      & (trials.contrastRight > MIN_CONTRAST)))
+    consistent = (((trials.probabilityLeft < 0.45)
+                   & (trials.contrastRight > MIN_CONTRAST)))
+    """
+    inconsistent = (((trials.probabilityLeft < 0.45)
+                     & (trials.contrastLeft > MIN_CONTRAST)))
     consistent = (((trials.probabilityLeft > 0.55)
                    & (trials.contrastLeft > MIN_CONTRAST)))
+    """
     trial_times = trials.stimOn_times[(consistent == 1) | (inconsistent == 1)]
     trial_consistent = np.zeros(consistent.shape[0])
     trial_consistent[consistent == 1] = 1
@@ -126,7 +133,7 @@ sns.lineplot(x='win_centers', y='auroc', data=results[results['recording'] == 'f
              lw=2, ci=68, ax=ax1)
 ax1.plot([np.min(WIN_CENTERS), np.max(WIN_CENTERS)], [0.5, 0.5], linestyle='--', color='k')
 ax1.set(ylabel='Classification performance (AUROC)', xlabel='Time (s)',
-        title='Frontal recordings', ylim=[0.35, 0.65])
+        title='Frontal recordings', ylim=[0.3, 0.7])
 
 sns.lineplot(x='win_centers', y='auroc', data=results[results['recording'] == 'control'],
              units='session', estimator=None, color=[0.7, 0.7, 0.7], ax=ax2)
@@ -134,13 +141,13 @@ sns.lineplot(x='win_centers', y='auroc', data=results[results['recording'] == 'c
              lw=2, ci=68, ax=ax2)
 ax2.plot([np.min(WIN_CENTERS), np.max(WIN_CENTERS)], [0.5, 0.5], linestyle='--', color='k')
 ax2.set(ylabel='Classification performance (AUROC)', xlabel='Time (s)',
-        title='Non-frontal recordings', ylim=[0.35, 0.65])
+        title='Non-frontal recordings', ylim=[0.3, 0.7])
 
 sns.lineplot(x='win_centers', y='auroc', data=results, hue='recording', ci=68, lw=2, ax=ax3)
 ax3.plot([np.min(WIN_CENTERS), np.max(WIN_CENTERS)], [0.5, 0.5], linestyle='--', color='k')
 ax3.set(ylabel='Classification performance (AUROC)', xlabel='Time (s)', ylim=[0.4, 0.605])
 
 plt.tight_layout(pad=2)
-sns.despine(trim=True)
+# sns.despine(trim=True)
 if SAVE is True:
     plt.savefig(join(FIG_PATH, 'decoding_contrastim_over_time'), dpi=300)
