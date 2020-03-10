@@ -116,7 +116,7 @@ for i, day in enumerate(DAYS):
     results.loc[i] = np.append([day, f1], feature_imp)
 
     f, ax1 = plt.subplots(1, 1, figsize=(5.5, 5))
-    # sns.heatmap(cm / cm.sum(axis=1)[:, np.newaxis], vmin=0.15, vmax=0.5, ax=ax1)
+    # sns.heatmap(cm / cm.sum(axis=1)[:, np.newaxis], vmin=0, vmax=0.65, ax=ax1)
     sns.heatmap(cm / cm.sum(axis=1)[:, np.newaxis], ax=ax1)
     ax1.plot([0, Q], [0, Q], '--w')
     ax1.set(xticklabels=np.arange(1, Q+1), yticklabels=np.arange(1, Q+1), ylim=[0, Q], xlim=[0, Q],
