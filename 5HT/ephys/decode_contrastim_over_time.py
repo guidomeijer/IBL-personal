@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import seaborn as sns
+import brainbox as bb
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.linear_model import LogisticRegression
@@ -78,7 +79,6 @@ for i in range(all_ses.shape[0]):
             spikes.clusters, clusters.metrics.cluster_id[
                                 clusters.metrics.ks2_label == 'good'])]
     clusters.channels = clusters.channels[clusters.metrics.ks2_label == 'good']
-    clusters.depths = clusters.depths[clusters.metrics.ks2_label == 'good']
     cluster_ids = clusters.metrics.cluster_id[clusters.metrics.ks2_label == 'good']
 
     # Get trial indices, only use stimuli on the right
@@ -110,7 +110,8 @@ for i in range(all_ses.shape[0]):
         resp = np.rot90(resp)
 
         # Decode block identity for this time window
-        f1_scores[j], auroc[j], _ = decoding(resp, trial_consistent, clf, NUM_SPLITS)
+        # f1_scores[j], auroc[j], _ = decoding(resp, trial_consistent, clf, NUM_SPLITS)
+        decoding_result = bb.population.decode(spikes.times, spikes.clusters, trial_times, trial_consistent)
 
     # Add results to dataframe
     results = results.append(pd.DataFrame(data={
