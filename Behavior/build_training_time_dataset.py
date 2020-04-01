@@ -31,22 +31,23 @@ subj_crit_day = ((dj.U('subject_uuid', 'day_of_crit')
                  * subject.Subject).proj('subject_nickname')
 
 # Query reaction times
-rt = behavior_analysis.ReactionTime.proj('reaction_time', session_date='DATE(session_start_time)')
+rt_query = behavior_analysis.ReactionTime.proj('reaction_time',
+                                               session_date='DATE(session_start_time)')
 
 for i, day in enumerate(DAYS):
     print('Building dataset for day %d of %d' % (day, DAYS[-1]))
 
     # Get dataframe with behavioral data
-    behav = (subj_crit_day * behavior_analysis.BehavioralSummaryByDate * rt
-             & 'training_day="%d"' % day).fetch(format='frame')
+    behav = (subj_crit_day * behavior_analysis.BehavioralSummaryByDate * rt_query
+             & 'training_day="%s"' % str(day)).fetch(format='frame')
     behav = behav.reset_index()
-    behav['mean_rt'] = [np.mean(i) for i in behav['reaction_time']]
+    behav['median_rt'] = [np.mean(i) for i in behav['reaction_time']]
 
     # Bin training time
     behav['learning_speed'] = pd.qcut(behav['day_of_crit'], q=Q, labels=np.arange(Q))
 
     # Drop nans in rt
-    behav = behav[behav['mean_rt'].notnull()]
+    behav = behav[behav['median_rt'].notnull()]
 
     # Get behavioral metrics per session
     for j, ses in enumerate(behav['session_start_time']):
@@ -57,11 +58,11 @@ for i, day in enumerate(DAYS):
 
         # Get fast and slow median reaction times
         rt = trials['trial_response_time'] - trials['trial_stim_on_time']
-        behav.loc[i, 'rt_fast'] = np.median(rt[rt < 1])
-        behav.loc[i, 'rt_slow'] = np.median(rt[rt > 1])
+        behav.loc[j, 'rt_fast'] = np.median(rt[rt < 1])
+        behav.loc[j, 'rt_slow'] = np.median(rt[rt > 1])
 
         # Get quiescent period
-        behav.loc[i, 'quiescent_period'] = np.median(trials['trial_stim_on_time']
+        behav.loc[j, 'quiescent_period'] = np.median(trials['trial_stim_on_time']
                                                      - trials['trial_start_time'])
 
         # Get repeated errors
@@ -71,6 +72,7 @@ for i, day in enumerate(DAYS):
                     and (trials.loc[t-1, 'trial_feedback_type'] == -1)
                     and (trials.loc[t, 'stim_side'] == trials.loc[t-1, 'stim_side'])):
                 rep_errors = rep_errors + 1
+        behav.loc[j, 'rep_errors'] = rep_errors
 
         # Get bias
         trials = trials[trials['trial_response_choice'] != 'No Go']
@@ -78,7 +80,7 @@ for i, day in enumerate(DAYS):
                         / np.sum(trials['trial_response_choice'] == 'CCW'))
                        / (np.sum(trials['trial_stim_contrast_left'] != 0)
                           / np.sum(trials['trial_stim_contrast_right'] != 0))))
-        behav.loc[i, 'bias'] = bias
+        behav.loc[j, 'bias'] = bias
 
     # Save dataframe
     behav.to_csv(join(SAVE_PATH, 'training_day_%d.csv' % day))

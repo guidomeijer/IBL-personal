@@ -10,38 +10,23 @@ from os import listdir
 from os.path import join
 import alf.io as ioalf
 import matplotlib.pyplot as plt
+import brainbox as bb
 import pandas as pd
 import numpy as np
 import seaborn as sns
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.linear_model import LogisticRegression
-from functions_5HT import (download_data, paths, sessions, decoding, plot_settings,
-                           get_spike_counts_in_bins)
+from functions_5HT import download_data, paths, sessions, plot_settings
 
 # Settings
 DOWNLOAD = False
-FRONTAL_CONTROL = 'Frontal'
-WIN_CENTERS = np.arange(-1, 2, 0.1)
-WIN_SIZE = 0.15
-DECODER = 'forest'  # bayes, regression or forest
-NUM_SPLITS = 5
+WIN_CENTERS = np.arange(-1, 2, 0.15)
+WIN_SIZE = 0.2
+DECODER = 'bayes'  # bayes, regression or forest
 
 # Get all sessions
 frontal_sessions, control_sessions = sessions()
 all_ses = pd.concat((frontal_sessions, control_sessions), axis=0, ignore_index=True)
 all_ses['recording'] = (['frontal']*frontal_sessions.shape[0]
                         + ['control']*control_sessions.shape[0])
-
-# Initialize decoder
-if DECODER == 'forest':
-    clf = RandomForestClassifier(n_estimators=100)
-elif DECODER == 'bayes':
-    clf = GaussianNB()
-elif DECODER == 'regression':
-    clf = LogisticRegression(solver='liblinear', multi_class='auto')
-else:
-    raise Exception('DECODER must be forest, bayes or regression')
 
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Decoding', 'OverTime')
@@ -81,24 +66,25 @@ for i in range(all_ses.shape[0]):
     cluster_ids = clusters.metrics.cluster_id[clusters.metrics.ks2_label == 'good']
 
     # Get trial vectors
-    trial_times = trials.goCue_times[((trials.probabilityLeft > 0.55)
-                                      | (trials.probabilityLeft < 0.55))]
-    trial_blocks = (trials.probabilityLeft[((trials.probabilityLeft > 0.55)
-                                            | (trials.probabilityLeft < 0.55))] > 0.55).astype(
-                                                                                        int)
+    incl_trials = (trials.probabilityLeft > 0.55) | (trials.probabilityLeft < 0.45)
+    trial_times = trials.goCue_times[incl_trials]
+    probability_left = trials.probabilityLeft[incl_trials]
+    trial_blocks = (trials.probabilityLeft[incl_trials] > 0.55).astype(int)
 
     f1_scores = np.empty(WIN_CENTERS.shape)
     auroc = np.empty(WIN_CENTERS.shape)
     for j, win_center in enumerate(WIN_CENTERS):
 
-        # Get matrix of neuronal responses
-        times = np.column_stack(((trial_times + (win_center-(WIN_SIZE/2))),
-                                 (trial_times + (win_center+(WIN_SIZE/2)))))
-        resp, cluster_ids = get_spike_counts_in_bins(spikes.times, spikes.clusters, times)
-        resp = np.rot90(resp)
-
         # Decode block identity for this time window
-        f1_scores[j], auroc[j], _ = decoding(resp, trial_blocks, clf, NUM_SPLITS)
+        decode_result = bb.population.decode(spikes.times, spikes.clusters,
+                                             trial_times, trial_blocks,
+                                             pre_time=-win_center+(WIN_SIZE/2),
+                                             post_time=win_center+(WIN_SIZE/2),
+                                             classifier=DECODER,
+                                             cross_validation='block',
+                                             prob_left=probability_left)
+        f1_scores[j] = decode_result['f1']
+        auroc[j] = decode_result['auroc']
 
     # Add results to dataframe
     results = results.append(pd.DataFrame(data={
@@ -134,14 +120,14 @@ sns.lineplot(x='win_centers', y='auroc', data=results[results['recording'] == 'f
 sns.lineplot(x='win_centers', y='auroc', data=results[results['recording'] == 'frontal'],
              lw=2, ci=68, ax=ax3)
 ax3.set(ylabel='Classification performance (AUROC)', xlabel='Time (s)',
-        title='Frontal recordings', ylim=[0.5, 1])
+        title='Frontal recordings', ylim=[0.2, 1])
 
 sns.lineplot(x='win_centers', y='auroc', data=results[results['recording'] == 'control'],
              units='session', estimator=None, color=[0.7, 0.7, 0.7], ax=ax4)
 sns.lineplot(x='win_centers', y='auroc', data=results[results['recording'] == 'control'],
              lw=2, ci=68, ax=ax4)
 ax4.set(ylabel='Classification performance (AUROC)', xlabel='Time (s)',
-        title='Non-frontal recordings', ylim=[0.5, 1])
+        title='Non-frontal recordings', ylim=[0.2, 1])
 
 plt.tight_layout(pad=2)
 sns.despine(trim=True)

@@ -89,10 +89,10 @@ for i, eid in enumerate(eids):
         cluster_ids = clusters.metrics.cluster_id[clusters.metrics.ks2_label == 'good']
 
         # Get trial vectors
-        trial_times = trials.goCue_times[((trials.probabilityLeft > 0.55)
-                                          | (trials.probabilityLeft < 0.55))]
+        trial_times = trials.goCue_times[((trials.probabilityLeft > 0.45)
+                                          | (trials.probabilityLeft < 0.45))]
         trial_blocks = (trials.probabilityLeft[((trials.probabilityLeft > 0.55)
-                                                | (trials.probabilityLeft < 0.55))] > 0.55).astype(
+                                                | (trials.probabilityLeft < 0.45))] > 0.55).astype(
                                                                                             int)
         trial_blocks_shuffle = trial_blocks.copy()
 

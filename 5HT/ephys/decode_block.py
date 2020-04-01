@@ -21,7 +21,7 @@ from functions_5HT import (download_data, paths, sessions, decoding, plot_settin
 
 # Settings
 DOWNLOAD = False
-OVERWRITE = False
+OVERWRITE = True
 FRONTAL_CONTROL = 'Frontal'
 DEPTH_BIN_CENTERS = np.arange(200, 4000, 200)
 DEPTH_BIN_SIZE = 300
@@ -79,9 +79,9 @@ for i in range(sessions.shape[0]):
 
         # Get trial vectors
         trial_times = trials.goCue_times[((trials.probabilityLeft > 0.55)
-                                          | (trials.probabilityLeft < 0.55))]
+                                          | (trials.probabilityLeft < 0.45))]
         trial_blocks = (trials.probabilityLeft[((trials.probabilityLeft > 0.55)
-                                                | (trials.probabilityLeft < 0.55))] > 0.55).astype(
+                                                | (trials.probabilityLeft < 0.45))] > 0.55).astype(
                                                                                             int)
         trial_blocks_shuffle = trial_blocks.copy()
 

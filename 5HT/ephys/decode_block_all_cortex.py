@@ -13,7 +13,9 @@ from os.path import join, isfile
 import alf.io as ioalf
 import matplotlib.pyplot as plt
 import numpy as np
+from brainbox.population import decode
 import pandas as pd
+import seaborn as sns
 import alf.io
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
@@ -26,10 +28,10 @@ one = ONE()
 # Settings
 DOWNLOAD = False
 OVERWRITE = False
-PRE_TIME = 1
+PRE_TIME = 0.5
 POST_TIME = 0
-DECODER = 'bayes'  # bayes, regression or forest
-ITERATIONS = 100
+DECODER = 'forest'  # bayes, regression or forest
+ITERATIONS = 1
 NUM_SPLITS = 5
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Decoding', 'Blocks')
@@ -44,11 +46,11 @@ for i, eid in enumerate(eids):
     # Load in data
     session_path = one_session_path(eid)
     trials = one.load_object(eid, 'trials')
-    if (not hasattr(trials, 'stimOn_times')
-            or (trials.stimOn_times.shape[0] != trials.probabilityLeft.shape[0])):
-        continue
-
     probes = one.load_object(eid, 'probes', download_only=False)
+    if (not hasattr(trials, 'stimOn_times')
+            or (trials.stimOn_times.shape[0] != trials.probabilityLeft.shape[0])
+            or (not hasattr(probes, 'trajectory'))):
+        continue
     for p in range(len(probes['trajectory'])):
         # Select shallow penetrations
         if (probes['trajectory'][p]['theta'] == 15) and (probes['trajectory'][p]['depth'] < 4500):
@@ -71,44 +73,31 @@ for i, eid in enumerate(eids):
             cluster_ids = clusters.metrics.cluster_id[clusters_to_use]
 
             # Get trial vectors
-            trial_times = trials.stimOn_times[((trials.probabilityLeft > 0.55)
-                                               | (trials.probabilityLeft < 0.45))]
-            trial_blocks = (trials.probabilityLeft[
-                                ((trials.probabilityLeft > 0.55)
-                                 | (trials.probabilityLeft < 0.55))] > 0.45).astype(int)
-            trial_blocks_shuffle = trial_blocks.copy()
+            incl_trials = (trials.probabilityLeft > 0.55) | (trials.probabilityLeft < 0.45)
+            trial_times = trials.goCue_times[incl_trials]
+            if trial_times.shape[0] < 400:
+                continue
+            probability_left = trials.probabilityLeft[incl_trials]
+            trial_blocks = (trials.probabilityLeft[incl_trials] > 0.55).astype(int)
 
             # Get matrix of all neuronal responses
             times = np.column_stack(((trial_times - PRE_TIME), (trial_times + POST_TIME)))
             resp, cluster_ids = get_spike_counts_in_bins(spikes.times, spikes.clusters, times)
             resp = np.rot90(resp)
 
-            # Initialize decoder
-            if DECODER == 'forest':
-                clf = RandomForestClassifier(n_estimators=100)
-            elif DECODER == 'bayes':
-                clf = GaussianNB()
-            elif DECODER == 'regression':
-                clf = LogisticRegression(solver='liblinear', multi_class='auto')
-            else:
-                raise Exception('DECODER must be forest, bayes or regression')
-
-            # Decode block identity
-            f1_scores = np.empty(ITERATIONS)
-            f1_scores_shuffle = np.empty(ITERATIONS)
-            for it in range(ITERATIONS):
-                f1_scores[it], _ = decoding(resp, trial_blocks, clf, NUM_SPLITS)
-                np.random.shuffle(trial_blocks_shuffle)
-                f1_scores_shuffle[it], _ = decoding(resp, trial_blocks_shuffle,
-                                                    clf, NUM_SPLITS)
-            f1_over_shuffled = np.mean(f1_scores) - np.mean(f1_scores_shuffle)
+            # Decode block identity for this time window
+            decode_result = decode(spikes.times, spikes.clusters, trial_times, trial_blocks,
+                                   pre_time=PRE_TIME, post_time=POST_TIME,
+                                   classifier=DECODER, cross_validation='block',
+                                   num_splits=NUM_SPLITS, iterations=ITERATIONS)
 
             # Add to dataframe
             nickname = ses_info[i]['subject']
             ses_date = ses_info[i]['start_time'][:10]
             decoding_result = decoding_result.append(pd.DataFrame(
                 index=[0], data={'subject': nickname, 'date': ses_date, 'eid': eid,
-                                 'f1_over_shuffled': f1_over_shuffled,
+                                 'f1': decode_result['f1'],
+                                 'auroc': decode_result['auroc'],
                                  'ML': probes.trajectory[p]['x'],
                                  'AP': probes.trajectory[p]['y'],
                                  'DV': probes.trajectory[p]['z'],
@@ -118,7 +107,22 @@ for i, eid in enumerate(eids):
 
 decoding_result.to_csv(join(DATA_PATH, 'decoding_block_all_cortex'))
 
-fig, ax = plt.subplots(1, 1)
-sns.scatterplot(x='ML', y='AP', data=decoding_result, size='f1_over_shuffled',
-                hue='f1_over_shuffled',
-                palette='YlOrRd')
+# Plot
+Y_LIM = [-6000, 4000]
+X_LIM = [-5000, 5000]
+
+fig, ax1 = plt.subplots(1, 1, figsize=(8, 6))
+ax1.plot([0, 0], [-4200, 0], color='k')
+ax1.plot([X_LIM[0], 0], [-6000, -4200], color='k')
+ax1.plot([0, X_LIM[1]], [-4200, -6000], color='k')
+ax1.plot([X_LIM[0], 0], [2000, 0], color='k')
+ax1.plot([0, X_LIM[1]], [-0, 2000], color='k')
+plot_h = sns.scatterplot(x='ML', y='AP', data=decoding_result, hue='f1', palette='YlOrRd',
+                         s=100, hue_norm=(0, 0.8), ax=ax1)
+
+# Fix legend
+leg = plot_h.legend(loc=(0.75, 0.5))
+leg.texts[0].set_text('F1')
+
+plot_settings()
+plt.savefig(join(FIG_PATH, 'block_decode_all_cortex'))

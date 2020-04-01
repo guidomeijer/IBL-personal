@@ -17,7 +17,7 @@ import numpy as np
 FIG_PATH = join(expanduser('~'), 'Figures', '5HT', 'altanserin_behavior')
 
 # Load in data
-data = loadmat(join(expanduser('~'), 'Data', '5HT', 'guido_analysis_25feb2020.mat'))
+data = loadmat(join(expanduser('~'), 'Data', '5HT', 'guido_analysis_18mar2020.mat'))
 X = data['X'][0]
 parameters = data['pnames'][0]
 
@@ -27,7 +27,7 @@ for i in range(len(X)):
         max_prob = np.median(X[i][0][j][:, parameters[i][0] == 'runlength-tau'])
         iqr = stats.iqr(X[i][0][j][:, parameters[i][0] == 'runlength-tau'])
         results.loc[results.shape[0]+1] = ([i] + [np.mod(j, 3)]
-                                           + [np.floor(j/3)] + [max_prob] + [iqr])
+                                           + [np.floor(j/3)+1] + [max_prob] + [iqr])
 
 # Get bias normalized to pre-vehicle
 results.loc[results['condition'] == 0, 'window_length_rel'] = (
@@ -40,7 +40,7 @@ results.loc[results['condition'] == 2, 'window_length_rel'] = (
                         results.loc[results['condition'] == 2, 'window_length'].values
                         / results.loc[results['condition'] == 0, 'window_length'].values)
 
-# Plot results
+# %% Plot results
 f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 12))
 sns.set(context='paper', font_scale=1.5, style='ticks')
 
@@ -72,8 +72,20 @@ plt.savefig(join(FIG_PATH, '5HT2a_block_integration_length_per_week'), dpi=300)
 f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 12), sharex=True)
 sns.set(context='paper', font_scale=1.5, style='ticks')
 
-sns.lineplot(x='condition', y='window_length', hue='subject', style='week', data=results,
-             legend=False, ax=ax1, lw=3)
+h_plot = sns.lineplot(x='condition', y='window_length', hue='week', units='subject',
+                      estimator=None, data=results, legend='brief', ax=ax1, lw=3,
+                      palette=sns.cubehelix_palette(results['week'].unique().shape[0],
+                                                    reverse=True))
+leg = h_plot.legend_
+for t in leg.texts[1:]:
+    # truncate label text to 4 characters
+    t.set_text(t.get_text()[:1])
+"""
+sns.lineplot(x='condition', y='window_length', hue='week', style='week', units='subject',
+             estimator=None, data=results, legend=False, ax=ax1, lw=3,
+             palette=sns.cubehelix_palette(results['week'].unique().shape[0], reverse=True),
+             markers=['o']*results['week'].unique().shape[0], markersize=8, dashes=False)
+"""
 ax1.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
         xlabel='', ylabel='Length of integration window (\u03C4 trials)')
 plt.setp(ax1.xaxis.get_majorticklabels(), rotation=40)
@@ -84,6 +96,7 @@ ax2.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehic
         xlabel='', ylabel='Length of integration window (\u03C4 trials)')
 plt.setp(ax2.xaxis.get_majorticklabels(), rotation=40)
 
+# sns.boxplot(x='condition', y='window_length', data=results, ax=ax3)
 sns.lineplot(x='condition', y='window_length', data=results,
              legend=False, ax=ax3, lw=3, ci=68)
 ax3.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
@@ -98,6 +111,6 @@ plt.setp(ax4.xaxis.get_majorticklabels(), rotation=40)
 
 sns.set(context='paper', font_scale=1.5, style='ticks')
 sns.despine(trim=True)
-plt.tight_layout(pad=2)
+plt.tight_layout(pad=3)
 
 plt.savefig(join(FIG_PATH, '5HT2a_block_integration_length'), dpi=300)

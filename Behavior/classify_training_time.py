@@ -8,7 +8,7 @@ Created on Mon Dec 16 14:28:14 2019
 
 import numpy as np
 import pandas as pd
-from os.path import join
+from os.path import join, realpath, dirname
 import matplotlib.pyplot as plt
 import seaborn as sns
 import datajoint as dj
@@ -46,7 +46,12 @@ DAYS = np.arange(1, 11)
 DECODER = 'forest'           # bayes, forest, or regression
 NUM_SPLITS = 1              # n in n-fold cross validation (1 for leave one out)
 METRICS = ['performance', 'mean_rt', 'n_trials_date']
+DATA_PATH = join(dirname(realpath(__file__)), 'data')
 FIG_PATH = '/home/guido/Figures/Behavior/LearningSpeedPrediction'
+
+
+behav = pd.read_csv(join(DATA_PATH, 'training_day_%d.csv' % day))
+
 
 # Query all subjects with project ibl_neuropixel_brainwide_01 and get trained date
 subj_crit = subject.Subject.aggr(

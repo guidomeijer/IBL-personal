@@ -67,23 +67,32 @@ for i, eid in enumerate(eids):
             clusters.depths = clusters.depths[clusters_to_use]
             cluster_ids = clusters.metrics.cluster_id[clusters_to_use]
 
-            # Get spike counts for all trials
-            trial_times = trials.stimOn_times[(trials.probabilityLeft > 0.55)
-                                              | (trials.probabilityLeft < 0.45)]
+            # Get spike counts for all trials from biased blocks
+            trial_incl = (trials.probabilityLeft > 0.55) | (trials.probabilityLeft < 0.45)
+            trial_times = trials.stimOn_times[trial_incl]
             if trial_times.shape[0] < MIN_TRIALS:
                 continue
             times = np.column_stack(((trial_times - PRE_TIME), (trial_times + POST_TIME)))
             spike_counts, cluster_ids = bb.task._get_spike_counts_in_bins(spikes.times,
                                                                           spikes.clusters, times)
-            trial_blocks = (trials.probabilityLeft[
-                                    (((trials.probabilityLeft > 0.55)
-                                      | (trials.probabilityLeft < 0.45)))] > 0.55).astype(int)
-
-            # Transform to LDA
+            prob_left = trials.probabilityLeft[trial_incl]
+            trial_blocks = (prob_left > 0.55).astype(int)
             resp = np.rot90(spike_counts)
-            loo = LeaveOneOut()
+
+            # Leave-one-block-out cross-validation
+            block_switch = np.concatenate(([-1],
+                                           [i for i, x in enumerate(np.diff(prob_left) != 0) if x],
+                                           [prob_left.shape[0] - 1]))
+            cv_list = list()
+            for j, ind in enumerate(block_switch[:-1]):
+                cv_list.append((np.append(np.arange(ind + 1),
+                                          np.arange(block_switch[j + 1] + 1, block_switch[-1])),
+                                np.arange(ind + 1, block_switch[j + 1] + 1)))
+                cv = (n for n in cv_list)  # convert into generator
+
+            # LDA projection
             lda_transform = np.zeros(resp.shape[0])
-            for train_index, test_index in loo.split(resp):
+            for train_index, test_index in cv:
                 lda = LDA(n_components=1)
                 lda.fit(resp[train_index], trial_blocks[train_index])
                 lda_transform[test_index] = np.rot90(lda.transform(resp[test_index]))[0]
