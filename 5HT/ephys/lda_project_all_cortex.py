@@ -17,7 +17,7 @@ import seaborn as sns
 import brainbox as bb
 from scipy import stats
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
-from sklearn.model_selection import LeaveOneOut
+from sklearn.model_selection import LeaveOneOut, KFold
 from functions_5HT import paths, plot_settings, one_session_path
 from oneibl.one import ONE
 one = ONE()
@@ -79,20 +79,9 @@ for i, eid in enumerate(eids):
             trial_blocks = (prob_left > 0.55).astype(int)
             resp = np.rot90(spike_counts)
 
-            # Leave-one-block-out cross-validation
-            block_switch = np.concatenate(([-1],
-                                           [i for i, x in enumerate(np.diff(prob_left) != 0) if x],
-                                           [prob_left.shape[0] - 1]))
-            cv_list = list()
-            for j, ind in enumerate(block_switch[:-1]):
-                cv_list.append((np.append(np.arange(ind + 1),
-                                          np.arange(block_switch[j + 1] + 1, block_switch[-1])),
-                                np.arange(ind + 1, block_switch[j + 1] + 1)))
-                cv = (n for n in cv_list)  # convert into generator
-
             # LDA projection
             lda_transform = np.zeros(resp.shape[0])
-            for train_index, test_index in cv:
+            for train_index, test_index in KFold().split(resp):
                 lda = LDA(n_components=1)
                 lda.fit(resp[train_index], trial_blocks[train_index])
                 lda_transform[test_index] = np.rot90(lda.transform(resp[test_index]))[0]

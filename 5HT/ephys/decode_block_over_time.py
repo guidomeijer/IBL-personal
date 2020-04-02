@@ -21,6 +21,7 @@ DOWNLOAD = False
 WIN_CENTERS = np.arange(-1, 2, 0.15)
 WIN_SIZE = 0.2
 DECODER = 'bayes'  # bayes, regression or forest
+VALIDATION = 'kfold'
 
 # Get all sessions
 frontal_sessions, control_sessions = sessions()
@@ -81,7 +82,7 @@ for i in range(all_ses.shape[0]):
                                              pre_time=-win_center+(WIN_SIZE/2),
                                              post_time=win_center+(WIN_SIZE/2),
                                              classifier=DECODER,
-                                             cross_validation='block',
+                                             cross_validation=VALIDATION,
                                              prob_left=probability_left)
         f1_scores[j] = decode_result['f1']
         auroc[j] = decode_result['auroc']

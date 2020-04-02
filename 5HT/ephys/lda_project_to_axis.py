@@ -12,7 +12,9 @@ from os.path import join
 from itertools import groupby
 import alf.io as ioalf
 import matplotlib.pyplot as plt
+import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.naive_bayes import GaussianNB
 import brainbox as bb
 import seaborn as sns
 import numpy as np
@@ -22,33 +24,33 @@ from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, roc_auc_
 from functions_5HT import download_data, paths, sessions
 
 DOWNLOAD = False
-FRONTAL_CONTROL = 'Control'
 PRE_TIME = 0.5
 POST_TIME = 0
 
-if FRONTAL_CONTROL == 'Frontal':
-    sessions, _ = sessions()
-elif FRONTAL_CONTROL == 'Control':
-    _, sessions = sessions()
+# Get all sessions
+frontal_sessions, control_sessions = sessions()
+all_ses = pd.concat((frontal_sessions, control_sessions), axis=0, ignore_index=True)
+all_ses['recording'] = (['frontal']*frontal_sessions.shape[0]
+                        + ['control']*control_sessions.shape[0])
 
 DATA_PATH, FIG_PATH, _ = paths()
 FIG_PATH = join(FIG_PATH, 'Population', 'LDA')
-for i in range(sessions.shape[0]):
-    print('Performing LDA analysis [%d of %d]' % (i+1, sessions.shape[0]))
+for i in range(all_ses.shape[0]):
+    print('Performing LDA analysis [%d of %d]' % (i+1, all_ses.shape[0]))
 
     # Download data if required
     if DOWNLOAD is True:
-        download_data(sessions.loc[i, 'subject'], sessions.loc[i, 'date'])
+        download_data(all_ses.loc[i, 'subject'], all_ses.loc[i, 'date'])
 
     # Get paths
-    ses_nr = listdir(join(DATA_PATH, sessions.loc[i, 'lab'], 'Subjects',
-                          sessions.loc[i, 'subject'], sessions.loc[i, 'date']))[0]
-    session_path = join(DATA_PATH, sessions.loc[i, 'lab'], 'Subjects',
-                        sessions.loc[i, 'subject'], sessions.loc[i, 'date'], ses_nr)
-    alf_path = join(DATA_PATH, sessions.loc[i, 'lab'], 'Subjects', sessions.loc[i, 'subject'],
-                    sessions.loc[i, 'date'], ses_nr, 'alf')
-    probe_path = join(DATA_PATH, sessions.loc[i, 'lab'], 'Subjects', sessions.loc[i, 'subject'],
-                      sessions.loc[i, 'date'], ses_nr, 'alf', 'probe%s' % sessions.loc[i, 'probe'])
+    ses_nr = listdir(join(DATA_PATH, all_ses.loc[i, 'lab'], 'Subjects',
+                          all_ses.loc[i, 'subject'], all_ses.loc[i, 'date']))[0]
+    session_path = join(DATA_PATH, all_ses.loc[i, 'lab'], 'Subjects',
+                        all_ses.loc[i, 'subject'], all_ses.loc[i, 'date'], ses_nr)
+    alf_path = join(DATA_PATH, all_ses.loc[i, 'lab'], 'Subjects', all_ses.loc[i, 'subject'],
+                    all_ses.loc[i, 'date'], ses_nr, 'alf')
+    probe_path = join(DATA_PATH, all_ses.loc[i, 'lab'], 'Subjects', all_ses.loc[i, 'subject'],
+                      all_ses.loc[i, 'date'], ses_nr, 'alf', 'probe%s' % all_ses.loc[i, 'probe'])
 
     # Load in data
     spikes = ioalf.load_object(probe_path, 'spikes')
@@ -81,30 +83,13 @@ for i in range(sessions.shape[0]):
 
     lda = LDA(n_components=1)
     cv = LeaveOneGroupOut().split(pop_vector, groups=blocks)
+    # cv = KFold().split(pop_vector)
+    # cv = LeaveOneOut().split(pop_vector)
     for train_index, test_index in cv:
         lda.fit(pop_vector[train_index], trial_blocks[train_index])
-        # lda_transform[test_index] = np.rot90(lda.transform(pop_vector[test_index]))[0]
+        lda_transform[test_index] = np.rot90(lda.transform(pop_vector[test_index]))[0]
         lda_class[test_index] = lda.predict(pop_vector[test_index])
-    f1_score(trial_blocks, lda_class)
-
-    clf = RandomForestClassifier()
-    cv = LeaveOneGroupOut().split(pop_vector, groups=blocks)
-    NB_class = np.zeros(pop_vector.shape[0])
-    for train_index, test_index in cv:
-        clf.fit(pop_vector[train_index], trial_blocks[train_index])
-        NB_class[test_index] = lda.predict(pop_vector[test_index])
-    f1_score(trial_blocks, NB_class)
-
-
-    decode_result = bb.population.decode(spikes.times, spikes.clusters,
-                                         trial_times, trial_blocks,
-                                         pre_time=0.5,
-                                         post_time=0,
-                                         classifier='forest',
-                                         cross_validation='block',
-                                         prob_left=prob_left)
-
-    asd
+    print('f1 score: %f' % np.round(f1_score(trial_blocks, lda_class), 2))
 
     # Convolve LDA projection with a 10 trial window
     lda_convolve = np.convolve(lda_transform, np.ones((10,))/10, mode='same')
@@ -125,6 +110,6 @@ for i in range(sessions.shape[0]):
     ax12.set(xlabel='Trials', ylim=[0, 1])
 
     plt.tight_layout()
-    plt.savefig(join(FIG_PATH, '%s_%s_%s' % (FRONTAL_CONTROL, sessions.loc[i, 'subject'],
-                                             sessions.loc[i, 'date'])))
+    plt.savefig(join(FIG_PATH, '%s_%s' % (all_ses.loc[i, 'subject'],
+                                          all_ses.loc[i, 'date'])))
     plt.close(fig)

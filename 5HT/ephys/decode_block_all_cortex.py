@@ -30,8 +30,8 @@ DOWNLOAD = False
 OVERWRITE = False
 PRE_TIME = 0.5
 POST_TIME = 0
-DECODER = 'forest'  # bayes, regression or forest
-ITERATIONS = 1
+DECODER = 'bayes'  # bayes, regression or forest
+VALIDATION = 'kfold'
 NUM_SPLITS = 5
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Decoding', 'Blocks')
@@ -44,6 +44,7 @@ decoding_result = pd.DataFrame()
 for i, eid in enumerate(eids):
 
     # Load in data
+    print('Processing session %d of %d' % (i+1, len(eids)))
     session_path = one_session_path(eid)
     trials = one.load_object(eid, 'trials')
     probes = one.load_object(eid, 'probes', download_only=False)
@@ -88,8 +89,8 @@ for i, eid in enumerate(eids):
             # Decode block identity for this time window
             decode_result = decode(spikes.times, spikes.clusters, trial_times, trial_blocks,
                                    pre_time=PRE_TIME, post_time=POST_TIME,
-                                   classifier=DECODER, cross_validation='block',
-                                   num_splits=NUM_SPLITS, iterations=ITERATIONS)
+                                   classifier=DECODER, cross_validation=VALIDATION,
+                                   num_splits=NUM_SPLITS)
 
             # Add to dataframe
             nickname = ses_info[i]['subject']
@@ -107,7 +108,7 @@ for i, eid in enumerate(eids):
 
 decoding_result.to_csv(join(DATA_PATH, 'decoding_block_all_cortex'))
 
-# Plot
+# %% Plot
 Y_LIM = [-6000, 4000]
 X_LIM = [-5000, 5000]
 
@@ -117,8 +118,8 @@ ax1.plot([X_LIM[0], 0], [-6000, -4200], color='k')
 ax1.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax1.plot([X_LIM[0], 0], [2000, 0], color='k')
 ax1.plot([0, X_LIM[1]], [-0, 2000], color='k')
-plot_h = sns.scatterplot(x='ML', y='AP', data=decoding_result, hue='f1', palette='YlOrRd',
-                         s=100, hue_norm=(0, 0.8), ax=ax1)
+plot_h = sns.scatterplot(x='ML', y='AP', data=decoding_result.sort_values(by='f1'), hue='f1',
+                         palette='RdBu_r', s=100, hue_norm=(0.3, 0.7), ax=ax1)
 
 # Fix legend
 leg = plot_h.legend(loc=(0.75, 0.5))
