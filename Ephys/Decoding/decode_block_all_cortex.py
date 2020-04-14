@@ -28,8 +28,8 @@ one = ONE()
 # Settings
 DOWNLOAD = False
 OVERWRITE = False
-PRE_TIME = 0.5
-POST_TIME = 0
+PRE_TIME = 0.6
+POST_TIME = -0.2
 DECODER = 'bayes'  # bayes, regression or forest
 VALIDATION = 'kfold'
 NUM_SPLITS = 5
@@ -54,7 +54,7 @@ for i, eid in enumerate(eids):
         continue
     for p in range(len(probes['trajectory'])):
         # Select shallow penetrations
-        if (probes['trajectory'][p]['theta'] == 15) and (probes['trajectory'][p]['depth'] < 4500):
+        if probes['trajectory'][p]['phi'] == 180:
             probe_path = session_path.joinpath('alf', probes['description'][p]['label'])
             try:
                 spikes = alf.io.load_object(probe_path, object='spikes')
@@ -80,11 +80,6 @@ for i, eid in enumerate(eids):
                 continue
             probability_left = trials.probabilityLeft[incl_trials]
             trial_blocks = (trials.probabilityLeft[incl_trials] > 0.55).astype(int)
-
-            # Get matrix of all neuronal responses
-            times = np.column_stack(((trial_times - PRE_TIME), (trial_times + POST_TIME)))
-            resp, cluster_ids = get_spike_counts_in_bins(spikes.times, spikes.clusters, times)
-            resp = np.rot90(resp)
 
             # Decode block identity for this time window
             decode_result = decode(spikes.times, spikes.clusters, trial_times, trial_blocks,

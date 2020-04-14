@@ -8,6 +8,7 @@ Created on Wed Jan 22 16:16:30 2020
 from os import listdir, mkdir
 from os.path import join, isdir
 import alf.io as ioalf
+from scipy.stats import zscore
 import matplotlib.pyplot as plt
 import shutil
 import brainbox as bb
@@ -19,8 +20,8 @@ from functions_5HT import download_data, paths, sessions
 DOWNLOAD = False
 OVERWRITE = True
 FRONTAL_CONTROL = 'Frontal'
-PRE_TIME = 0.5
-POST_TIME = 0
+PRE_TIME = 0.6
+POST_TIME = -0.1
 TRIAL_WIN_SIZE = 10
 
 if FRONTAL_CONTROL == 'Frontal':
@@ -96,12 +97,15 @@ for i in range(sessions.shape[0]):
 
             fig, ax1 = plt.subplots(1, 1)
             ax1.plot(np.arange(1, trials.stimOn_times.shape[0]+1), trials.probabilityLeft,
-                     color=[0.6, 0.6, 0.6])
-            ax1.set_ylabel('Probability of left trial', color='tab:gray')
-            ax1.set(xlabel='Trials relative to block switch')
+                     color=[0.5, 0.5, 0.5])
+            ax1.set(ylabel='Probability of left trial', xlabel='Trials')
+
             ax2 = ax1.twinx()
-            ax2.plot(trial_win_centers, avg_rate, 'r')
-            ax2.set_ylabel('Mean spike rate (spk/s)', color='tab:red')
+            ax2.plot(trial_win_centers, avg_rate, 'r', lw=2)
+            ax2.set_ylabel('Spike rate (spk/s)', color='tab:red')
+            ax2.set(xlabel='Trials')
+            ax2.tick_params(axis='y', colors='red')
+
             plt.tight_layout()
             plt.savefig(join(FIG_PATH, FRONTAL_CONTROL,
                              '%s_%s' % (sessions.loc[i, 'subject'], sessions.loc[i, 'date']),

@@ -2,21 +2,16 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Feb  5 12:28:36 2020
-
 @author: guido
 """
 
-from os import mkdir
-from os.path import join, isdir
-from glob import glob
+from os.path import join
 import matplotlib.pyplot as plt
 from pathlib import Path
 import alf.io
 import pandas as pd
 import brainbox as bb
 import seaborn as sns
-import shutil
-from scipy import stats
 import numpy as np
 from ephys_functions import paths
 from oneibl.one import ONE
@@ -24,7 +19,8 @@ one = ONE()
 
 # Settings
 MIN_CONTRAST = 0.1
-ALPHA = 0.01
+ALPHA = 0.05
+
 
 def one_session_path(eid):
     ses = one.alyx.rest('sessions', 'read', id=eid)
@@ -54,9 +50,6 @@ for i, eid in enumerate(eids):
             or (not hasattr(probes, 'trajectory'))):
         continue
     for p in range(len(probes['trajectory'])):
-        # Select shallow penetrations
-        if (probes['trajectory'][p]['depth'] > 4100) and (probes['trajectory'][p]['theta'] != 15):
-            continue
         probe_path = session_path.joinpath('alf', probes['description'][p]['label'])
         try:
             spikes = alf.io.load_object(probe_path, object='spikes')
@@ -91,11 +84,12 @@ for i, eid in enumerate(eids):
                                             alpha=ALPHA)[0]
 
         # Get choice neurons
-        event_times = trials.stimOn_times[(trials.choice == -1) | (trials.choice == 1)]
+        event_times = trials.response_times[(trials.choice == -1) | (trials.choice == 1)]
         event_choices = (trials.choice[
                             (trials.choice == -1) | (trials.choice == 1)] == 1).astype(int)
         sig_choice = bb.task.differentiate_units(spikes.times, spikes.clusters,
                                                  event_times, event_choices,
+                                                 pre_time=0.3, post_time=0,
                                                  alpha=ALPHA)[0]
 
         # Get visual side neurons
@@ -106,6 +100,7 @@ for i, eid in enumerate(eids):
                             | (trials.contrastLeft > MIN_CONTRAST)]).astype(int)
         sig_side = bb.task.differentiate_units(spikes.times, spikes.clusters,
                                                event_times, event_sides,
+                                               pre_time=0, post_time=0.3,
                                                alpha=ALPHA)[0]
 
         # Get block neurons
@@ -114,7 +109,7 @@ for i, eid in enumerate(eids):
         trial_blocks = (trials.probabilityLeft[incl_trials] > 0.55).astype(int)
         sig_block = bb.task.differentiate_units(spikes.times, spikes.clusters,
                                                 trial_times, trial_blocks,
-                                                alpha=ALPHA)[0]
+                                                pre_time=0.5, post_time=-0.2, alpha=ALPHA)[0]
 
         resp = resp.append(pd.DataFrame(index=[0],
                                         data={'subject': nickname,
@@ -140,11 +135,35 @@ for i, eid in enumerate(eids):
                                               'theta': probes.trajectory[p]['theta'],
                                               'depth': probes.trajectory[p]['depth']}))
 
-resp.to_csv(join(SAVE_PATH, 'responsive_units_map_shallow.csv'))
+resp = resp[resp['n_neurons'] > 20]
+resp.to_csv(join(SAVE_PATH, 'all_responsive_units.csv'))
 
-# %% Plot
+# %% Plots
 
-resp = resp[resp['ML'] < 0]
+# resp = pd.read_csv(join(SAVE_PATH, 'all_responsive_units.csv'))
+
+# Plot histograms
+f, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8))
+sns.set(style="ticks", context="paper", font_scale=2)
+BINS = 30
+sns.distplot(resp['stim'], kde=False, bins=BINS, label='Stimulus', ax=ax1)
+sns.distplot(resp['reward'], kde=False, bins=BINS, label='Reward', ax=ax1)
+sns.distplot(resp['omit'], kde=False, bins=BINS, label='Omission', ax=ax1)
+sns.distplot(resp['choice'], kde=False, bins=20, label='Left vs Right', ax=ax1)
+ax1.legend(frameon=False)
+ax1.set(ylabel='Count', xlabel='Proportion of responsive neurons')
+
+sns.distplot(resp['choice'], kde=False, bins=BINS, label='Choice', ax=ax2)
+sns.distplot(resp['block'], kde=False, bins=BINS, label='Stimulus prior', ax=ax2)
+ax2.legend(frameon=False)
+ax2.set(ylabel='Count', xlabel='Proportion of responsive neurons', xlim=[0, 0.36])
+
+sns.despine(trim=True)
+plt.tight_layout()
+plt.savefig(join(FIG_PATH, 'hist_all_resp_units'))
+
+# Plot map of shallow recordings
+shallow = resp[(resp['ML'] < 0) & (resp['phi'] == 180)]
 
 Y_LIM = [-6000, 4000]
 X_LIM = [-5000, 5000]
@@ -156,10 +175,10 @@ ax1.plot([X_LIM[0], 0], [-6000, -4200], color='k')
 ax1.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax1.plot([X_LIM[0], 0], [2000, 0], color='k')
 ax1.plot([0, X_LIM[1]], [-0, 2000], color='k')
-sns.scatterplot(x='ML', y='AP', data=resp.sort_values(by='stim'), size='n_neurons', hue='stim',
+sns.scatterplot(x='ML', y='AP', data=shallow.sort_values(by='stim'), size='n_neurons', hue='stim',
                 palette='YlOrRd', size_norm=(50, 600), sizes=(50, 200), hue_norm=(0, 1), ax=ax1)
 ax1.set(xlim=X_LIM, ylim=Y_LIM, ylabel='AP coordinates (um)',
-        xlabel='ML coordinates (um)', title='Stimulus')
+        xlabel='ML coordinates (um)', title='Stimulus', facecolor=[0.8, 0.8, 0.8])
 ax1.get_legend().remove()
 
 ax2.plot([0, 0], [-4200, 0], color='k')
@@ -167,10 +186,11 @@ ax2.plot([X_LIM[0], 0], [-6000, -4200], color='k')
 ax2.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax2.plot([X_LIM[0], 0], [2000, 0], color='k')
 ax2.plot([0, X_LIM[1]], [-0, 2000], color='k')
-sns.scatterplot(x='ML', y='AP', data=resp.sort_values(by='reward'), size='n_neurons', hue='reward',
-                palette='YlOrRd', size_norm=(50, 600), sizes=(50, 200), hue_norm=(0, 1), ax=ax2)
+sns.scatterplot(x='ML', y='AP', data=shallow.sort_values(by='reward'), size='n_neurons',
+                hue='reward', palette='YlOrRd', size_norm=(50, 600), sizes=(50, 200),
+                hue_norm=(0, 1), ax=ax2)
 ax2.set(xlim=X_LIM, ylim=Y_LIM, ylabel='AP coordinates (um)',
-        xlabel='ML coordinates (um)', title='Reward')
+        xlabel='ML coordinates (um)', title='Reward', facecolor=[0.8, 0.8, 0.8])
 ax2.get_legend().remove()
 
 ax3.plot([0, 0], [-4200, 0], color='k')
@@ -178,24 +198,23 @@ ax3.plot([X_LIM[0], 0], [-6000, -4200], color='k')
 ax3.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax3.plot([X_LIM[0], 0], [2000, 0], color='k')
 ax3.plot([0, X_LIM[1]], [-0, 2000], color='k')
-plot_h = sns.scatterplot(x='ML', y='AP', data=resp.sort_values(by='omit'),
+plot_h = sns.scatterplot(x='ML', y='AP', data=shallow.sort_values(by='omit'),
                          size='n_neurons', hue='omit',
                          palette='YlOrRd', size_norm=(50, 600), sizes=(50, 200), hue_norm=(0, 1),
                          ax=ax3)
 ax3.set(xlim=X_LIM, ylim=Y_LIM, ylabel='AP coordinates (um)',
-        xlabel='ML coordinates (um)', title='Reward omission')
+        xlabel='ML coordinates (um)', title='Reward omission', facecolor=[0.8, 0.8, 0.8])
 
 # Fix legend
-leg = plot_h.legend(loc=(1, 0.5))
+leg = plot_h.legend(loc=(0.57, 0.3), facecolor=[0.8, 0.8, 0.8], framealpha=1)
 leg.texts[0].set_text('% cells')
-leg.texts[1].set_text('0.25')
-leg.texts[2].set_text('0.5')
-leg.texts[3].set_text('0.75')
-leg.texts[4].set_text('1')
+leg.texts[1].set_text('25')
+leg.texts[2].set_text('50')
+leg.texts[3].set_text('75')
+leg.texts[4].set_text('100')
 leg.texts[5].set_text('# cells')
 
-plt.savefig(join(FIG_PATH, 'all_responsive_unit_map'))
-
+plt.savefig(join(FIG_PATH, 'responsive_unit_map_shallow'))
 
 fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True, figsize=(12, 7))
 sns.set(style="ticks", context="paper", font_scale=2)
@@ -205,34 +224,44 @@ ax1.plot([X_LIM[0], 0], [-6000, -4200], color='k')
 ax1.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax1.plot([X_LIM[0], 0], [2000, 0], color='k')
 ax1.plot([0, X_LIM[1]], [-0, 2000], color='k')
-plot_h = sns.scatterplot(x='ML', y='AP', data=resp.sort_values(by='choice'),
+plot_h = sns.scatterplot(x='ML', y='AP', data=shallow.sort_values(by='choice'),
                          size='n_neurons', hue='choice',
                          palette='YlOrRd', size_norm=(50, 600), sizes=(50, 200),
-                         hue_norm=(0, 0.35), ax=ax1)
+                         hue_norm=(0, 0.4), ax=ax1)
 ax1.set(xlim=X_LIM, ylim=Y_LIM, ylabel='AP coordinates (um)',
-        xlabel='ML coordinates (um)', title='Choice')
-ax1.get_legend().remove()
+        xlabel='ML coordinates (um)', title='Left vs. Right trials', facecolor=[0.8, 0.8, 0.8])
+
+# Fix legend
+leg = plot_h.legend(loc=(0.65, 0.3), facecolor=[0.8, 0.8, 0.8], framealpha=1)
+
+leg.texts[0].set_text('% cells')
+leg.texts[1].set_text('10')
+leg.texts[2].set_text('20')
+leg.texts[3].set_text('30')
+leg.texts[4].set_text('40')
+leg.texts[5].set_text('# cells')
 
 ax2.plot([0, 0], [-4200, 0], color='k')
 ax2.plot([X_LIM[0], 0], [-6000, -4200], color='k')
 ax2.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax2.plot([X_LIM[0], 0], [2000, 0], color='k')
 ax2.plot([0, X_LIM[1]], [-0, 2000], color='k')
-plot_h = sns.scatterplot(x='ML', y='AP', data=resp.sort_values(by='choice'),
-                         size='n_neurons', hue='side',
+plot_h = sns.scatterplot(x='ML', y='AP', data=shallow.sort_values(by='block'),
+                         size='n_neurons', hue='block',
                          palette='YlOrRd', size_norm=(50, 600), sizes=(50, 200),
-                         hue_norm=(0, 0.35), ax=ax2)
+                         hue_norm=(0, 0.1), ax=ax2)
 ax2.set(xlim=X_LIM, ylim=Y_LIM, ylabel='AP coordinates (um)',
-        xlabel='ML coordinates (um)', title='Stimulus side')
+        xlabel='ML coordinates (um)', title='Stimulus prior', facecolor=[0.8, 0.8, 0.8])
 
 # Fix legend
-leg = plot_h.legend(loc=(1.05, 0.5))
+leg = plot_h.legend(loc=(0.65, 0.3), facecolor=[0.8, 0.8, 0.8], framealpha=1)
+
 leg.texts[0].set_text('% cells')
-leg.texts[1].set_text('0.05')
-leg.texts[2].set_text('0.15')
-leg.texts[3].set_text('0.30')
-leg.texts[4].set_text('0.45')
+leg.texts[1].set_text('0')
+leg.texts[2].set_text('4')
+leg.texts[3].set_text('8')
+leg.texts[4].set_text('12')
 leg.texts[5].set_text('# cels')
 
 plt.tight_layout()
-plt.savefig(join(FIG_PATH, 'choice_responsive_unit_map'))
+plt.savefig(join(FIG_PATH, 'choice_prior_responsive_unit_map_shallow'))

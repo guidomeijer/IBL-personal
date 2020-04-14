@@ -21,8 +21,8 @@ OVERWRITE = True
 FRONTAL_CONTROL = 'Frontal'
 TRIAL_CENTERS = np.arange(-10, 21, 3)
 TRIAL_WIN = 5
-PRE_TIME = 0.5
-POST_TIME = 0
+PRE_TIME = 0.6
+POST_TIME = -0.1
 BASELINE_TRIAL_WIN = 10
 
 if FRONTAL_CONTROL == 'Frontal':
@@ -108,16 +108,19 @@ for i in range(sessions.shape[0]):
                                                          sessions.loc[i, 'date'])))
 
         for n, cluster in enumerate(diff_units):
-            fig, ax = plt.subplots(1, 1, figsize=(9, 7))
+            fig, ax = plt.subplots(1, 1, figsize=(10, 7))
             sns.lineplot(x='trial_center', y='sub_spike_count', hue='switch_side',
-                         data=block_switch.loc[block_switch['cluster_id'] == cluster], ci=68)
+                         data=block_switch.loc[block_switch['cluster_id'] == cluster], ci=68,
+                         palette='dark', lw=2)
             y_lim = ax.get_ylim()
             ax.plot([0, 0], y_lim, color=[0.6, 0.6, 0.6], linestyle='dashed')
             ax.set(ylabel='Baseline subtracted spike rate (spk/s)',
                    xlabel='Trials relative to block switch')
-            legend = ax.legend()
+            legend = ax.legend(bbox_to_anchor=(1, 0.9), frameon=False)
             legend.texts[0].set_text('Block switch to')
             plt.tight_layout()
+            sns.set(context='paper', font_scale=1.5, style='ticks')
+            sns.despine()
             plt.savefig(join(FIG_PATH, FRONTAL_CONTROL,
                              '%s_%s' % (sessions.loc[i, 'subject'], sessions.loc[i, 'date']),
                              'p%s_d%s_n%s_sub' % (sessions.loc[i, 'probe'],
@@ -126,16 +129,19 @@ for i in range(sessions.shape[0]):
                                                   cluster)))
             plt.close(fig)
 
-            fig, ax = plt.subplots(1, 1, figsize=(9, 7))
+            fig, ax = plt.subplots(1, 1, figsize=(10, 7))
             sns.lineplot(x='trial_center', y='spike_count', hue='switch_side',
-                         data=block_switch.loc[block_switch['cluster_id'] == cluster], ci=68)
+                         data=block_switch.loc[block_switch['cluster_id'] == cluster], ci=68,
+                         palette='dark', lw=2)
             y_lim = ax.get_ylim()
             ax.plot([0, 0], y_lim, color=[0.6, 0.6, 0.6], linestyle='dashed')
             ax.set(ylabel='Spike rate (spk/s)',
                    xlabel='Trials relative to block switch')
-            legend = ax.legend()
+            legend = ax.legend(bbox_to_anchor=(1, 0.9), frameon=False)
             legend.texts[0].set_text('Block switch to')
             plt.tight_layout()
+            sns.set(context='paper', font_scale=1.5, style='ticks')
+            sns.despine()
             plt.savefig(join(FIG_PATH, FRONTAL_CONTROL,
                              '%s_%s' % (sessions.loc[i, 'subject'], sessions.loc[i, 'date']),
                              'p%s_d%s_n%s' % (sessions.loc[i, 'probe'],
