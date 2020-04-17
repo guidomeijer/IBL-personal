@@ -6,8 +6,8 @@ Created on Wed Jan 22 16:22:01 2020
 """
 
 from oneibl.one import ONE
-from os.path import expanduser, join
-from pathlib import Path
+from os.path import expanduser, join, dirname
+import pandas as pd
 
 
 def paths():
@@ -20,11 +20,9 @@ def paths():
     return data_path, fig_path, save_path
 
 
-def one_session_path(eid):
-    one = ONE()
-    ses = one.alyx.rest('sessions', 'read', id=eid)
-    return Path(one._par.CACHE_DIR, ses['lab'], 'Subjects', ses['subject'],
-                ses['start_time'][:10], str(ses['number']).zfill(3))
+def sessions():
+    ses = pd.read_csv(join(dirname(__file__), 'sessions.csv'), dtype='str')
+    return ses
 
 
 def download_data(nickname, date):

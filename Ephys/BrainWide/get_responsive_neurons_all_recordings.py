@@ -135,12 +135,12 @@ for i, eid in enumerate(eids):
                                               'theta': probes.trajectory[p]['theta'],
                                               'depth': probes.trajectory[p]['depth']}))
 
-resp = resp[resp['n_neurons'] > 20]
+
 resp.to_csv(join(SAVE_PATH, 'all_responsive_units.csv'))
 
 # %% Plots
 
-# resp = pd.read_csv(join(SAVE_PATH, 'all_responsive_units.csv'))
+resp = pd.read_csv(join(SAVE_PATH, 'all_responsive_units.csv'))
 
 # Plot histograms
 f, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8))
@@ -170,22 +170,32 @@ X_LIM = [-5000, 5000]
 
 fig, (ax1, ax2, ax3) = plt.subplots(1, 3, sharey=True, figsize=(18, 7))
 sns.set(style="ticks", context="paper", font_scale=2)
+"""
 ax1.plot([0, 0], [-4200, 0], color='k')
 ax1.plot([X_LIM[0], 0], [-6000, -4200], color='k')
 ax1.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax1.plot([X_LIM[0], 0], [2000, 0], color='k')
 ax1.plot([0, X_LIM[1]], [-0, 2000], color='k')
+"""
+ax1.scatter([0, 0], [-4200, 0], s=50, color='black')
+ax1.text(250, 0, 'Bregma', va='center')
+ax1.text(250, -4200, 'Lambda', va='center')
 sns.scatterplot(x='ML', y='AP', data=shallow.sort_values(by='stim'), size='n_neurons', hue='stim',
                 palette='YlOrRd', size_norm=(50, 600), sizes=(50, 200), hue_norm=(0, 1), ax=ax1)
 ax1.set(xlim=X_LIM, ylim=Y_LIM, ylabel='AP coordinates (um)',
         xlabel='ML coordinates (um)', title='Stimulus', facecolor=[0.8, 0.8, 0.8])
 ax1.get_legend().remove()
 
+"""
 ax2.plot([0, 0], [-4200, 0], color='k')
 ax2.plot([X_LIM[0], 0], [-6000, -4200], color='k')
 ax2.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax2.plot([X_LIM[0], 0], [2000, 0], color='k')
 ax2.plot([0, X_LIM[1]], [-0, 2000], color='k')
+"""
+ax2.scatter([0, 0], [-4200, 0], s=50, color='black')
+ax2.text(250, 0, 'Bregma', va='center')
+ax2.text(250, -4200, 'Lambda', va='center')
 sns.scatterplot(x='ML', y='AP', data=shallow.sort_values(by='reward'), size='n_neurons',
                 hue='reward', palette='YlOrRd', size_norm=(50, 600), sizes=(50, 200),
                 hue_norm=(0, 1), ax=ax2)
@@ -193,11 +203,16 @@ ax2.set(xlim=X_LIM, ylim=Y_LIM, ylabel='AP coordinates (um)',
         xlabel='ML coordinates (um)', title='Reward', facecolor=[0.8, 0.8, 0.8])
 ax2.get_legend().remove()
 
+"""
 ax3.plot([0, 0], [-4200, 0], color='k')
 ax3.plot([X_LIM[0], 0], [-6000, -4200], color='k')
 ax3.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax3.plot([X_LIM[0], 0], [2000, 0], color='k')
 ax3.plot([0, X_LIM[1]], [-0, 2000], color='k')
+"""
+# ax3.scatter([0, 0], [-4200, 0], s=50, color='black')
+# ax3.text(250, 0, 'Bregma', va='center')
+# ax3.text(250, -4200, 'Lambda', va='center')
 plot_h = sns.scatterplot(x='ML', y='AP', data=shallow.sort_values(by='omit'),
                          size='n_neurons', hue='omit',
                          palette='YlOrRd', size_norm=(50, 600), sizes=(50, 200), hue_norm=(0, 1),
@@ -218,12 +233,14 @@ plt.savefig(join(FIG_PATH, 'responsive_unit_map_shallow'))
 
 fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True, figsize=(12, 7))
 sns.set(style="ticks", context="paper", font_scale=2)
+"""
 ax1.plot([0, 0], [-4200, 0], color='k')
 ax1.scatter(0, 0, color='k')
 ax1.plot([X_LIM[0], 0], [-6000, -4200], color='k')
 ax1.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax1.plot([X_LIM[0], 0], [2000, 0], color='k')
 ax1.plot([0, X_LIM[1]], [-0, 2000], color='k')
+"""
 plot_h = sns.scatterplot(x='ML', y='AP', data=shallow.sort_values(by='choice'),
                          size='n_neurons', hue='choice',
                          palette='YlOrRd', size_norm=(50, 600), sizes=(50, 200),
@@ -241,11 +258,13 @@ leg.texts[3].set_text('30')
 leg.texts[4].set_text('40')
 leg.texts[5].set_text('# cells')
 
+"""
 ax2.plot([0, 0], [-4200, 0], color='k')
 ax2.plot([X_LIM[0], 0], [-6000, -4200], color='k')
 ax2.plot([0, X_LIM[1]], [-4200, -6000], color='k')
 ax2.plot([X_LIM[0], 0], [2000, 0], color='k')
 ax2.plot([0, X_LIM[1]], [-0, 2000], color='k')
+"""
 plot_h = sns.scatterplot(x='ML', y='AP', data=shallow.sort_values(by='block'),
                          size='n_neurons', hue='block',
                          palette='YlOrRd', size_norm=(50, 600), sizes=(50, 200),

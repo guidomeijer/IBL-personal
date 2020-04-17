@@ -1,0 +1,12 @@
+lab,subject,date,probe,frontal
+mainenlab,ZM_2240,2020-01-22,00,1
+mainenlab,ZM_2240,2020-01-21,00,1
+danlab,DY_011,2020-01-30,00,1
+mainenlab,ZM_2241,2020-01-27,00,1
+danlab,DY_010,2020-01-23,00,0
+danlab,DY_010,2020-02-04,00,0
+churchlandlab,CSHL049,2020-01-13,00,0
+mainenlab,ZM_1897,2019-12-06,00,0
+mainenlab,ZM_2240,2020-01-22,01,0
+mainenlab,ZM_2240,2020-01-24,00,0
+mainenlab,ZM_2241,2020-01-28,00,0

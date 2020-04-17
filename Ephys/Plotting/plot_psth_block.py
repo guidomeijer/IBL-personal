@@ -13,16 +13,11 @@ import shutil
 import brainbox as bb
 import numpy as np
 from scipy import stats
-from functions_5HT import download_data, paths, sessions
+from ephys_functions import download_data, paths, sessions
 
 download = True
 overwrite = False
-frontal_control = 'Control'
-
-if frontal_control == 'Frontal':
-    sessions, _ = sessions()
-elif frontal_control == 'Control':
-    _, sessions = sessions()
+sessions = sessions()
 
 DATA_PATH, FIG_PATH, _ = paths()
 FIG_PATH = join(FIG_PATH, 'PSTH', 'Blocks')
