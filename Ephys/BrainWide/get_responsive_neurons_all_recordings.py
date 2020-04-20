@@ -169,7 +169,6 @@ Y_LIM = [-6000, 4000]
 X_LIM = [-5000, 5000]
 
 fig, (ax1, ax2, ax3) = plt.subplots(1, 3, sharey=True, figsize=(18, 7))
-sns.set(style="ticks", context="paper", font_scale=2)
 """
 ax1.plot([0, 0], [-4200, 0], color='k')
 ax1.plot([X_LIM[0], 0], [-6000, -4200], color='k')
@@ -229,10 +228,11 @@ leg.texts[3].set_text('75')
 leg.texts[4].set_text('100')
 leg.texts[5].set_text('# cells')
 
-plt.savefig(join(FIG_PATH, 'responsive_unit_map_shallow'))
+figure_style(despine=False)
+plt.savefig(join(FIG_PATH, 'responsive_unit_map_shallow.pdf'), dpi=300)
+plt.savefig(join(FIG_PATH, 'responsive_unit_map_shallow.png'), dpi=300)
 
 fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True, figsize=(12, 7))
-sns.set(style="ticks", context="paper", font_scale=2)
 """
 ax1.plot([0, 0], [-4200, 0], color='k')
 ax1.scatter(0, 0, color='k')
@@ -282,5 +282,6 @@ leg.texts[3].set_text('8')
 leg.texts[4].set_text('12')
 leg.texts[5].set_text('# cels')
 
-plt.tight_layout()
-plt.savefig(join(FIG_PATH, 'choice_prior_responsive_unit_map_shallow'))
+figure_style(despine=False)
+plt.savefig(join(FIG_PATH, 'choice_prior_responsive_unit_map_shallow.pdf'), dpi=300)
+plt.savefig(join(FIG_PATH, 'choice_prior_responsive_unit_map_shallow.png'), dpi=300)

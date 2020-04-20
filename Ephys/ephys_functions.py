@@ -8,6 +8,7 @@ Created on Wed Jan 22 16:22:01 2020
 from oneibl.one import ONE
 import seaborn as sns
 import matplotlib
+import matplotlib.pyplot as plt
 from os.path import expanduser, join, dirname
 import pandas as pd
 
@@ -22,14 +23,16 @@ def paths():
     return data_path, fig_path, save_path
 
 
-def figure_style():
+def figure_style(despine=True):
     """
     Set style for plotting figures
     """
-    sns.set(style="ticks", context="paper", font_scale=1.4)
-    sns.despine(trim=True)
+    sns.set(style="ticks", context="paper", font_scale=2)
+    if despine is True:
+        sns.despine(trim=True)
     matplotlib.rcParams['pdf.fonttype'] = 42
     matplotlib.rcParams['ps.fonttype'] = 42
+    plt.tight_layout()
 
 
 def sessions():
