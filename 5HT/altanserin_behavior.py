@@ -14,7 +14,7 @@ from oneibl.one import ONE
 one = ONE()
 
 # Settings
-FIRST_TRIALS = 15
+FIRST_TRIALS = 10
 FIG_PATH = join(expanduser('~'), 'Figures', '5HT')
 d_types = ['_iblrig_taskSettings.raw',
            'trials.probabilityLeft',
@@ -24,22 +24,19 @@ d_types = ['_iblrig_taskSettings.raw',
            'trials.choice']
 
 # Load in session dates
-sessions = pd.read_csv('altanserin_sessions.csv', header=1, index_col=0)
+sessions = pd.read_csv('altanserin_sessions.csv', header=1)
 
 # Load data
 results = pd.DataFrame(columns=['subject', 'condition', 'bias', 'first_bias', 'n_trials',
                                 'perf_easy'])
-for i, nickname in enumerate(sessions.index.values):
-    eids = one.search(subject=nickname,
-                      date_range=[sessions.loc[nickname, 'Pre-vehicle'],
-                                  sessions.loc[nickname, 'Post-vehicle']])
-
-    if len(eids) > 3:
-        eids = eids[0:3]
-
-    for j, eid in enumerate(eids):
-        d, prob_l, contrast_l, contrast_r, feedback_type, choice = one.load(
-                    eid, d_types, dclass_output=False)
+for i in range(sessions.shape[0]):
+    for j, day in enumerate(['Pre-vehicle', 'Drug', 'Post-vehicle']):
+        eid = one.search(subject=sessions.loc[i, 'Nickname'],
+                         date_range=[sessions.loc[i, day], sessions.loc[i, day]],
+                         task_protocol='_iblrig_tasks_biasedChoiceWorld')
+        assert len(eid) == 1
+        d, prob_l, contrast_l, contrast_r, feedback_type, choice = one.load(eid[0], d_types,
+                                                                            dclass_output=False)
 
         # Calculate bias
         left = (np.sum(choice[((contrast_l == 0) | (contrast_r == 0)) & (prob_l == 0.2)] == -1)
@@ -64,9 +61,9 @@ for i, nickname in enumerate(sessions.index.values):
 
         # Calculate bias per contrast for first trials
         first_left = (np.sum(first_choice_l[first_contrast_l == 0] == -1)
-                / np.size(first_choice_l[first_contrast_l == 0]))
+                      / np.size(first_choice_l[first_contrast_l == 0]))
         first_right = (np.sum(first_choice_r[first_contrast_r == 0] == -1)
-                 / np.size(first_choice_r[first_contrast_r == 0]))
+                       / np.size(first_choice_r[first_contrast_r == 0]))
         first_bias = first_right-first_left
 
         # Calculate performance
@@ -74,16 +71,18 @@ for i, nickname in enumerate(sessions.index.values):
                      / np.size(feedback_type[((contrast_l >= 0.5) | (contrast_r >= 0.5))]))*100
 
         # Add to dataframe
-        results.loc[results.shape[0]+1, 'subject'] = nickname
+        results.loc[results.shape[0]+1, 'subject'] = sessions.loc[i, 'Nickname']
         results.loc[results.shape[0], 'bias'] = left-right
         results.loc[results.shape[0], 'first_bias'] = first_bias
         results.loc[results.shape[0], 'n_trials'] = np.size(choice)
         results.loc[results.shape[0], 'perf_easy'] = perf_easy
-        results.loc[results.shape[0], 'condition'] = j
+        results.loc[results.shape[0], 'condition'] = day
 
 results[['bias', 'first_bias', 'n_trials', 'perf_easy']] = results[
             ['bias', 'first_bias', 'n_trials', 'perf_easy']].astype(float)
 results['subject'] = results['subject'].astype(str)
+
+# %% Plot
 
 f, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
 sns.lineplot(x='condition', y='bias', hue='subject', data=results, lw=3, ax=ax1)
@@ -93,8 +92,7 @@ ax1.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehic
 plt.setp(ax1.xaxis.get_majorticklabels(), rotation=40)
 handles, labels = ax1.get_legend_handles_labels()
 ax1.legend(fontsize=10, frameon=False, handles=handles[1:], labels=labels[1:])
-sns.lineplot(x='condition', y='first_bias', hue='subject', data=results,
-             legend=False, lw=3, ax=ax2)
+sns.lineplot(x='condition', y='first_bias', data=results, lw=3, ci=68, ax=ax2)
 ax2.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
         xlabel='', ylabel='Bias', title='Bias in first %d trials after switch' % FIRST_TRIALS,
         ylim=[-0.1, 0.5])

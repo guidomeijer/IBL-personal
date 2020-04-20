@@ -67,23 +67,29 @@ results.loc[results['condition'] == 'Post-vehicle', 'bias_rel'] = (
                         results.loc[results['condition'] == 'Post-vehicle', 'bias'].values
                         / results.loc[results['condition'] == 'Pre-vehicle', 'bias'].values)
 
-# Plot results
+# %% Plot results
 f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 12))
+sns.set(context='paper', font_scale=1.5, style='ticks')
 
 sns.lineplot(x='condition', y='bias', units='subject', estimator=None, hue='subject', sort=False,
              data=results[results['week'] == 1], ax=ax1)
-ax1.set(xlabel='', ylabel='Bias', ylim=[-0.1, 0.6])
+ax1.set(xlabel='', ylabel='Bias', ylim=[0, 0.6], title='week 1')
 plt.setp(ax1.xaxis.get_majorticklabels(), rotation=40)
 
 sns.lineplot(x='condition', y='bias', units='subject', estimator=None, hue='subject', sort=False,
              data=results[results['week'] == 2], ax=ax2)
-ax2.set(xlabel='', ylabel='Bias', ylim=[-0.1, 0.6])
+ax2.set(xlabel='', ylabel='Bias', ylim=[0, 0.6], title='week 2')
 plt.setp(ax2.xaxis.get_majorticklabels(), rotation=40)
 
 sns.lineplot(x='condition', y='bias', units='subject', estimator=None, hue='subject', sort=False,
              data=results[results['week'] == 3], ax=ax3)
-ax3.set(xlabel='', ylabel='Bias', ylim=[-0.1, 0.6])
+ax3.set(xlabel='', ylabel='Bias', ylim=[0, 0.6], title='week 3')
 plt.setp(ax3.xaxis.get_majorticklabels(), rotation=40)
 
-sns.set(context='paper', font_scale=1.5, style='ticks')
+sns.lineplot(x='condition', y='bias', data=results, ci=68, ax=ax4)
+ax4.set(xlabel='', ylabel='Bias', ylim=[0, 0.6])
+plt.setp(ax3.xaxis.get_majorticklabels(), rotation=40)
+
+sns.despine()
 plt.tight_layout(pad=2)
+plt.savefig(join(FIG_PATH, 'bias'))

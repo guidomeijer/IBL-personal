@@ -6,6 +6,8 @@ Created on Wed Jan 22 16:22:01 2020
 """
 
 from oneibl.one import ONE
+import seaborn as sns
+import matplotlib
 from os.path import expanduser, join, dirname
 import pandas as pd
 
@@ -18,6 +20,16 @@ def paths():
     fig_path = join(expanduser('~'), 'Figures', 'Ephys')
     save_path = join(expanduser('~'), 'Data', 'Ephys')
     return data_path, fig_path, save_path
+
+
+def figure_style():
+    """
+    Set style for plotting figures
+    """
+    sns.set(style="ticks", context="paper", font_scale=1.4)
+    sns.despine(trim=True)
+    matplotlib.rcParams['pdf.fonttype'] = 42
+    matplotlib.rcParams['ps.fonttype'] = 42
 
 
 def sessions():

@@ -13,7 +13,7 @@ import pandas as pd
 import brainbox as bb
 import seaborn as sns
 import numpy as np
-from ephys_functions import paths
+from ephys_functions import paths, figure_style
 from oneibl.one import ONE
 one = ONE()
 
@@ -158,9 +158,9 @@ sns.distplot(resp['block'], kde=False, bins=BINS, label='Stimulus prior', ax=ax2
 ax2.legend(frameon=False)
 ax2.set(ylabel='Count', xlabel='Proportion of responsive neurons', xlim=[0, 0.36])
 
-sns.despine(trim=True)
-plt.tight_layout()
-plt.savefig(join(FIG_PATH, 'hist_all_resp_units'))
+figure_style()
+plt.savefig(join(FIG_PATH, 'hist_all_resp_units.pdf'), dpi=300)
+plt.savefig(join(FIG_PATH, 'hist_all_resp_units.png'), dpi=300)
 
 # Plot map of shallow recordings
 shallow = resp[(resp['ML'] < 0) & (resp['phi'] == 180)]
