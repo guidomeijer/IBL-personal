@@ -17,7 +17,7 @@ TRIAL_WIN = [0, 10]
 FIG_PATH = join(expanduser('~'), 'Figures', '5HT')
 
 # Load in session dates
-sessions = pd.read_csv('altanserin_sessions.csv', header=1, index_col=0)
+sessions = pd.read_csv('altanserin_sessions.csv', header=1)
 
 # Load data
 results = pd.DataFrame(columns=['subject', 'condition', 'slope'])

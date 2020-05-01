@@ -16,21 +16,30 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from brainbox.population import decode
-from functions_5HT import paths
+from ephys_functions import paths
 from sklearn.utils import shuffle
+from oneibl.one import ONE
 
-# Session
-LAB = 'danlab'
-SUBJECT = 'DY_011'
-DATE = '2020-01-30'
-PROBE = '00'
+method = 'path'  # eid or path
+
+if method == 'path':
+    LAB = 'danlab'
+    SUBJECT = 'DY_011'
+    DATE = '2020-02-01'
+    PROBE = '00'
+elif method == 'eid':
+    EID = 'd2f5a130-b981-4546-8858-c94ae1da75ff'
+    one = ONE()
+    prob_des = one.load(EID, dataset_types=['probes.description'])
+    prob_traj = one.load(EID, dataset_types=['probes.trajectory'])
+    PATH = one.path_from_eid(EID)
 
 # Settings
 WIN_CENTERS = np.arange(-1.2, 1.7, 0.18)
 WIN_SIZE = 0.2
 PLOT_X = [-1, 1.5]
 DECODER = 'bayes'  # bayes, regression or forest
-N_NEURONS = 150
+N_NEURONS = 100
 NEURON_GROUPS = np.arange(10, 180, 10)
 PRE_TIME = 0.6
 POST_TIME = -0.1
@@ -178,7 +187,7 @@ ax1.plot([-5, 5], [0, 0], linestyle='dashed', color=[0.6, 0.6, 0.6])
 sns.lineplot(x='win_center', y='accuracy', data=over_chance[over_chance['event'] == 'go cue'],
              ax=ax1, lw=2)
 ax1.set(ylabel='Decoding performance\n(% correct over chance)', xlabel='Time (s)',
-        title='Stimulus onset', xlim=PLOT_X, ylim=[-5, 12])
+        title='Stimulus onset', xlim=PLOT_X)
 
 ax2.plot([-5, 5], [0, 0], linestyle='dashed', color=[0.6, 0.6, 0.6])
 # ax2.plot([0, 0], [0, 100], linestyle='dashed', color=[0.6, 0.6, 0.6])

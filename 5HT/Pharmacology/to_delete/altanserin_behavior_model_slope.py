@@ -8,25 +8,26 @@ Created on Tue Dec  3 12:10:23 2019
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from os.path import join, expanduser
+from os.path import join
 import seaborn as sns
-from fit_psytrack import fit_model, plot_psytrack
+from functions_pharmacology import paths, fit_psytrack, plot_psytrack
 
 # Settings
 TRIAL_WIN = [0, 10]
-FIG_PATH = join(expanduser('~'), 'Figures', '5HT')
+FIG_PATH = paths()
 
 # Load in session dates
-sessions = pd.read_csv('altanserin_sessions.csv', header=1, index_col=0)
+sessions = pd.read_csv('pharmacology_sessions.csv', header=1)
 
 # Load data
-results = pd.DataFrame(columns=['subject', 'condition', 'slope_left', 'slope_right', 'slope_abs'])
-for i, nickname in enumerate(sessions.index.values):
-    for j, condition in enumerate(sessions.columns.values):
+results = pd.DataFrame(columns=['subject', 'condition', 'week',
+                                'slope_left', 'slope_right', 'slope_abs'])
+for i, nickname in enumerate(sessions['Nickname']):
+    for j, condition in enumerate(['Pre-vehicle', 'Drug', 'Post-vehicle']):
 
         # Fit model
-        model, prob_l, _ = fit_model(nickname, [sessions.loc[nickname, condition],
-                                                sessions.loc[nickname, condition]])
+        model, prob_l, hyp = fit_psytrack(nickname, [sessions.loc[i, condition],
+                                                     sessions.loc[i, condition]])
 
         # Fit slopes
         ax = plot_psytrack(model, prob_l, False)
@@ -49,12 +50,15 @@ for i, nickname in enumerate(sessions.index.values):
                     np.polyval(poly, trial_vec), 'g', lw=3)
         results = results.append(pd.DataFrame(
                                     index=[0], data={'subject': nickname, 'condition': j,
+                                                     'week': sessions.loc[i, 'Week'],
                                                      'slope_left': np.mean(left_slope),
                                                      'slope_right': np.mean(right_slope),
                                                      'slope_abs': np.mean(np.abs(np.append(
                                                                      left_slope, right_slope)))}))
-        plt.savefig(join(FIG_PATH, 'psytrack_fit_%s_%s.png' % (nickname, condition)), dpi=300)
-        plt.savefig(join(FIG_PATH, 'psytrack_fit_%s_%s.pdf' % (nickname, condition)), dpi=300)
+        plt.savefig(join(FIG_PATH, 'psytrack_fit_%s_%s_%s.png' % (
+                                        nickname, condition, sessions.loc[i, 'Week'])), dpi=300)
+        plt.savefig(join(FIG_PATH, 'psytrack_fit_%s_%s_%s.pdf' % (
+                                        nickname, condition, sessions.loc[i, 'Week'])), dpi=300)
 
 f, ax1 = plt.subplots(1, 1, figsize=(5, 5))
 sns.lineplot(x='condition', y='slope_abs', data=results, style='subject',

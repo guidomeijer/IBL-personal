@@ -7,7 +7,6 @@ Created on Tue Dec  3 12:10:23 2019
 
 import numpy as np
 from psytrack.hyperOpt import hyperOpt
-from psytrack.plot.analysisFunctions import makeWeightPlot
 from oneibl.one import ONE
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -108,10 +107,7 @@ def fit_model(nickname, date_range, previous_trials=0):
     print('Fitting model..')
     hyp, evd, wMode, hess = hyperOpt(D, hyper, weights, optList)
 
-    if np.size(n_trials) == 1:
-        return wMode, prob_l
-    else:
-        return wMode, prob_l, hyp, n_trials
+    return wMode, prob_l, hyp, n_trials
 
 
 

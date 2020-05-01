@@ -12,9 +12,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import numpy as np
+from functions_pharmacology import paths
 
 # Settings
-FIG_PATH = join(expanduser('~'), 'Figures', '5HT', 'altanserin_behavior')
+FIG_PATH = paths()
 
 # Load in data
 data = loadmat(join(expanduser('~'), 'Data', '5HT', 'guido_analysis_18mar2020.mat'))
@@ -24,7 +25,7 @@ parameters = data['pnames'][0]
 results = pd.DataFrame(columns=['subject', 'condition', 'week', 'window_length', 'iqr'])
 for i in range(len(X)):
     for j in range(X[i].shape[1]):
-        max_prob = np.median(X[i][0][j][:, parameters[i][0] == 'runlength-tau'])
+        max_prob = np.median(X[i][0][j][:, parameters[i][0] == 'contrast-sigma'])
         iqr = stats.iqr(X[i][0][j][:, parameters[i][0] == 'runlength-tau'])
         results.loc[results.shape[0]+1] = ([i] + [np.mod(j, 3)]
                                            + [np.floor(j/3)+1] + [max_prob] + [iqr])
@@ -44,27 +45,28 @@ results.loc[results['condition'] == 2, 'window_length_rel'] = (
 f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 12))
 sns.set(context='paper', font_scale=1.5, style='ticks')
 
-sns.lineplot(x='condition', y='window_length', units='subject', estimator=None, hue='subject',
-             sort=False, data=results[(results['week'] == 0)], ax=ax1)
+sns.lineplot(x='condition', y='window_length', units='subject', estimator=None, color='black',
+             sort=False, data=results[(results['week'] == 1)], lw=2, ax=ax1)
 ax1.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
-        ylabel='Length integration window (tau)', title='Week 1')
+        ylabel='Length integration window (\u03C4 trials)', title='Week 1', ylim=[2, 8])
 plt.setp(ax1.xaxis.get_majorticklabels(), rotation=40)
-ax1.get_legend().remove()
+# ax1.get_legend().remove()
 
 sns.lineplot(x='condition', y='window_length', units='subject', estimator=None, hue='subject',
-             sort=False, data=results[(results['week'] == 1)], ax=ax2)
+             sort=False, data=results[(results['week'] == 2)], ax=ax2)
 ax2.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
-        ylabel='Length integration window (tau)', title='Week 2')
+        ylabel='Length integration window (\u03C4 trials)', title='Week 2')
 plt.setp(ax2.xaxis.get_majorticklabels(), rotation=40)
 ax2.get_legend().remove()
 
 sns.lineplot(x='condition', y='window_length', units='subject', estimator=None, hue='subject',
-             sort=False, data=results[(results['week'] == 2)], ax=ax3)
+             sort=False, data=results[(results['week'] == 3)], ax=ax3)
 ax3.set(xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a block', 'Post-vehicle'],
-        ylabel='Length integration window (tau)', title='Week 3')
+        ylabel='Length integration window (\u03C4 trials)', title='Week 3')
 plt.setp(ax3.xaxis.get_majorticklabels(), rotation=40)
 ax3.get_legend().remove()
 
+sns.despine(trim=True)
 plt.tight_layout(pad=2)
 
 plt.savefig(join(FIG_PATH, '5HT2a_block_integration_length_per_week'), dpi=300)
