@@ -22,5 +22,6 @@ for i in range(sessions.shape[0]):
                                            + [hyp['sigma'][0]])
 
 f, ax1 = plt.subplots(1, 1, figsize=(6, 6))
-sns.lineplot(x='Condition', y='Bias', data=results, hue='Nickname', units='i', estimator=None)
+sns.lineplot(x='Condition', y='Bias', data=results, hue='Nickname', units='i', estimator=None,
+             sort=False)
 # sns.lineplot(x='Condition', y='Bias', data=results, ci=68)

@@ -26,5 +26,6 @@ for i, nickname in enumerate(sessions['Nickname'].unique()):
         results.loc[results.shape[0]+1] = ([nickname] + [condition] + [hyp['sigma'][0]])
 
 f, ax1 = plt.subplots(1, 1, figsize=(6, 6))
-sns.lineplot(x='Condition', y='Bias', data=results, hue='Nickname', units='i', estimator=None)
+sns.lineplot(x='Condition', y='Bias', data=results, hue='Nickname', units='Nickname',
+             estimator=None, sort=False)
 # sns.lineplot(x='Condition', y='Bias', data=results, ci=68)
