@@ -10,12 +10,11 @@ import pandas as pd
 import seaborn as sns
 import numpy as np
 import matplotlib.pyplot as plt
-from dj_tools import dj2pandas, fit_psychfunc, plot_psychometric
-from psychometric_functions import plot_psychometric_data
+from functions_pharmacology import plot_psychometric
 from ibl_pipeline import subject, acquisition, reference, behavior
 
 # Load in session dates
-sessions = pd.read_csv('altanserin_sessions.csv', header=1)
+sessions = pd.read_csv('pharmacology_sessions.csv', header=1)
 sessions = sessions.loc[sessions['Week'] == 1]
 
 colors = sns.color_palette(n_colors=3)
@@ -33,25 +32,24 @@ for j, condition in enumerate(['Pre-vehicle', 'Drug', 'Post-vehicle']):
                      & 'date(session_start_time) = "%s"' % sessions.loc[i, condition]
                      & 'task_protocol LIKE "%biased%"')
         assert len(ses_query) == 1
-        trials = (ses_query * behavior.TrialSet.Trial).fetch(format='frame')
-        trials = trials.reset_index()
+        trials = (ses_query * behavior.TrialSet.Trial).fetch(format='frame').reset_index()
 
-        # Fit psychometric data
-        fit_df = dj2pandas(trials)
-        result = fit_psychfunc(fit_df)
-        result['condition'] = condition
-        result['subject'] = sessions.loc[i, 'Nickname']
-        fit_results = fit_results.append(result)
-        plot_psychometric(fit_df['signed_contrast'], fit_df['choice_right'],
-                          fit_df['subject_nickname'], ax=ax[i], color=colors[j])
+        # Restructure into input for psychometric function plotting
+        trials['signed_contrast'] = (trials['trial_stim_contrast_right']
+                                     - trials['trial_stim_contrast_left']) * 100
+        trials.loc[trials['trial_response_choice'] == 'CW', 'right_choice'] = 0
+        trials.loc[trials['trial_response_choice'] == 'CCW', 'right_choice'] = 1
+        stim_levels = trials.groupby('signed_contrast').size().index.values
+        n_trials = trials.groupby('signed_contrast').size().values
+        prop_right = trials.groupby('signed_contrast').mean()['right_choice'].values
+
+        plot_psychometric(stim_levels, n_trials, prop_right, ax=ax[i], color=colors[j])
+
         ax[i].set(xlabel='Signed contrast (%)', ylabel='Rightward responses')
 
         # Add to dataframe
-        over_mice = over_mice.append(fit_df)
+        # over_mice = over_mice.append(fit_df)
 
-    plot_psychometric(over_mice['signed_contrast'], over_mice['choice_right'],
-                      over_mice['subject_nickname'], ax=ax[-1], color=colors[j],
-                      label=condition)
 ax[-1].legend(['Pre-vehicle', '_', '_', '_', 'Drug', '_', '_', '_', 'Post-vehicle'], frameon=False)
 sns.despine(trim=True)
 plt.tight_layout()

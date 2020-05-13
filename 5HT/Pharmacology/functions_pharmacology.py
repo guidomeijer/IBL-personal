@@ -8,9 +8,11 @@ Created on Tue Apr 28 10:22:07 2020
 
 from oneibl.one import ONE
 import numpy as np
+from scipy.stats import sem
 from psytrack.hyperOpt import hyperOpt
 import matplotlib.pyplot as plt
 import seaborn as sns
+from ibl_pipeline.utils import psychofit as psy
 
 
 def paths():
@@ -43,6 +45,60 @@ def load_session_one(nickname, date):
     choice = choice[choice != 0]
 
     return contrast_l, contrast_r, prob_l, correct, choice
+
+
+def fit_psychfunc(stim_levels, n_trials, proportion):
+    # Fit a psychometric function with two lapse rates
+    #
+    # Returns vector pars with [threshold, bias, lapselow, lapsehigh]
+
+    assert(stim_levels.shape == n_trials.shape == proportion.shape)
+
+    pars, _ = psy.mle_fit_psycho(np.vstack((stim_levels, n_trials, proportion)),
+                                 P_model='erf_psycho_2gammas',
+                                 parstart=np.array([0, 20, 0.05, 0.05]),
+                                 parmin=np.array([-100, 2, 0, 0]),
+                                 parmax=np.array([100, 100., 1, 1]))
+    return pars
+
+
+def plot_psychometric(stim_levels, n_trials, proportion, ax, **kwargs):
+    assert stim_levels.ndim == 1
+    assert(n_trials.shape == proportion.shape)
+
+    if proportion.ndim > 1:
+        pars = fit_psychfunc(stim_levels, np.mean(n_trials, axis=0), np.mean(proportion, axis=0))
+    else:
+        pars = fit_psychfunc(stim_levels, n_trials, proportion)
+
+    # plot psychfunc
+    g = sns.lineplot(np.arange(-29, 29),
+                     psy.erf_psycho_2gammas(pars, np.arange(-29, 29)),
+                     ax=ax, **kwargs)
+
+    # plot psychfunc: -100, +100
+    sns.lineplot(np.arange(-37, -32),
+                 psy.erf_psycho_2gammas(pars, np.arange(-103, -98)),
+                 ax=ax, **kwargs)
+    sns.lineplot(np.arange(32, 37),
+                 psy.erf_psycho_2gammas(pars, np.arange(98, 103)),
+                 ax=ax, **kwargs)
+
+    # now break the x-axis
+    stim_levels[stim_levels == -100] = -35
+    stim_levels[stim_levels == 100] = 35
+
+    # plot datapoints with errorbars on top
+    if proportion.ndim > 1:
+        ax.errorbar(stim_levels, np.mean(proportion, axis=0), yerr=sem(proportion), fmt='o')
+
+    g.set_xticks([-35, -25, -12.5, 0, 12.5, 25, 35])
+    g.set_xticklabels(['-100', '-25', '-12.5', '0', '12.5', '25', '100'],
+                      size='small', rotation=45)
+    g.set_xlim([-40, 40])
+    g.set_ylim([0, 1])
+    g.set_yticks([0, 0.25, 0.5, 0.75, 1])
+    g.set_yticklabels(['0', '25', '50', '75', '100'])
 
 
 def fit_psytrack(nickname, date, previous_trials=0):

@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Apr 21 10:36:23 2020
+
+@author: guido
+"""
+
+import pandas as pd
+import seaborn as sns
+import numpy as np
+from os.path import join
+import matplotlib.pyplot as plt
+from functions_pharmacology import paths, plot_psychometric
+from ibl_pipeline import subject, acquisition, behavior
+
+# Load in session dates
+sessions = pd.read_csv('pharmacology_sessions.csv', header=1)
+mice = sessions['Nickname'].unique()
+
+# Initialize plot
+f, ax = plt.subplots(1, sessions['Nickname'].unique().shape[0] + 1, figsize=(20, 5))
+sns.set(style="ticks", context="paper", font_scale=1.5)
+colors = sns.color_palette(n_colors=3)
+
+for j, condition in enumerate(['Pre-vehicle', 'Drug', 'Post-vehicle']):
+    for i, nickname in enumerate(sessions['Nickname'].unique()):
+        for k, date in enumerate(sessions.loc[sessions['Nickname'] == nickname, condition].values):
+
+            # Load in data
+            ses_query = (acquisition.Session * subject.Subject
+                         & 'subject_nickname = "%s"' % nickname
+                         & 'date(session_start_time) = "%s"' % date
+                         & 'task_protocol LIKE "%biased%"')
+            assert len(ses_query) == 1
+            trials = (ses_query * behavior.TrialSet.Trial).fetch(format='frame').reset_index()
+
+            # Restructure into input for psychometric function plotting
+            trials['signed_contrast'] = (trials['trial_stim_contrast_right']
+                                         - trials['trial_stim_contrast_left']) * 100
+            trials.loc[trials['trial_response_choice'] == 'CW', 'right_choice'] = 0
+            trials.loc[trials['trial_response_choice'] == 'CCW', 'right_choice'] = 1
+            stim_levels = trials.groupby('signed_contrast').size().index.values
+            if k == 0:
+                n_trials = trials.groupby('signed_contrast').size().values
+                prop_right = trials.groupby('signed_contrast').mean()['right_choice'].values
+            else:
+                n_trials = np.vstack((n_trials, trials.groupby('signed_contrast').size().values))
+                prop_right = np.vstack((prop_right,
+                                        trials.groupby(
+                                            'signed_contrast').mean()['right_choice'].values))
+
+        # Plot psychometric curve
+        plot_psychometric(stim_levels, n_trials, prop_right, ax=ax[i], color=colors[j])
+        ax[i].set(xlabel='Signed contrast (%)', ylabel='Rightward responses', title=nickname)
+        ax[i].legend(['Pre', '_', '_', 'Drug', '_', '_', 'Post'], frameon=False)
+
+        # Add to arrays
+        if n_trials.ndim > 1:
+            n_trials = np.mean(n_trials, axis=0)
+            prop_right = np.mean(prop_right, axis=0)
+        if i == 0:
+            all_trials = n_trials
+            all_prop = prop_right
+        else:
+            all_trials = np.vstack((all_trials, n_trials))
+            all_prop = np.vstack((all_prop, prop_right))
+
+    # Plot over animals curve
+    plot_psychometric(stim_levels, all_trials, all_prop, ax=ax[-1], color=colors[j])
+    ax[-1].set(xlabel='Signed contrast (%)', ylabel='Rightward responses', title='All mice')
+    ax[-1].legend(['Pre', '_', '_', 'Drug', '_', '_', 'Post'], frameon=False)
+
+sns.despine(trim=True)
+plt.tight_layout()
+plt.savefig(join(paths()[1], 'altanserin_psychometric_curves'))

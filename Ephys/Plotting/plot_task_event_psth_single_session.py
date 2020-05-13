@@ -19,8 +19,8 @@ one = ONE()
 
 # Settings
 ALPHA = 0.05
-SUBJECT = 'KS023'
-DATE = '2019-12-10'
+SUBJECT = 'ZM_1897'
+DATE = '2019-12-02'
 PROBE = '01'
 OVERWRITE = True
 
