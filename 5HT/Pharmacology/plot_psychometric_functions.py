@@ -25,6 +25,7 @@ colors = sns.color_palette(n_colors=3)
 
 for j, condition in enumerate(['Pre-vehicle', 'Drug', 'Post-vehicle']):
     for i, nickname in enumerate(sessions['Nickname'].unique()):
+        trials = pd.DataFrame()
         for k, date in enumerate(sessions.loc[sessions['Nickname'] == nickname, condition].values):
 
             # Load in data
@@ -33,22 +34,17 @@ for j, condition in enumerate(['Pre-vehicle', 'Drug', 'Post-vehicle']):
                          & 'date(session_start_time) = "%s"' % date
                          & 'task_protocol LIKE "%biased%"')
             assert len(ses_query) == 1
-            trials = (ses_query * behavior.TrialSet.Trial).fetch(format='frame').reset_index()
+            this_trials = (ses_query * behavior.TrialSet.Trial).fetch(format='frame').reset_index()
+            trials = trials.append(this_trials)
 
-            # Restructure into input for psychometric function plotting
-            trials['signed_contrast'] = (trials['trial_stim_contrast_right']
-                                         - trials['trial_stim_contrast_left']) * 100
-            trials.loc[trials['trial_response_choice'] == 'CW', 'right_choice'] = 0
-            trials.loc[trials['trial_response_choice'] == 'CCW', 'right_choice'] = 1
-            stim_levels = trials.groupby('signed_contrast').size().index.values
-            if k == 0:
-                n_trials = trials.groupby('signed_contrast').size().values
-                prop_right = trials.groupby('signed_contrast').mean()['right_choice'].values
-            else:
-                n_trials = np.vstack((n_trials, trials.groupby('signed_contrast').size().values))
-                prop_right = np.vstack((prop_right,
-                                        trials.groupby(
-                                            'signed_contrast').mean()['right_choice'].values))
+        # Restructure into input for psychometric function plotting
+        trials['signed_contrast'] = (trials['trial_stim_contrast_right']
+                                     - trials['trial_stim_contrast_left']) * 100
+        trials.loc[trials['trial_response_choice'] == 'CW', 'right_choice'] = 0
+        trials.loc[trials['trial_response_choice'] == 'CCW', 'right_choice'] = 1
+        stim_levels = trials.groupby('signed_contrast').size().index.values
+        n_trials = trials.groupby('signed_contrast').size().values
+        prop_right = trials.groupby('signed_contrast').mean()['right_choice'].values
 
         # Plot psychometric curve
         plot_psychometric(stim_levels, n_trials, prop_right, ax=ax[i], color=colors[j])
@@ -56,9 +52,6 @@ for j, condition in enumerate(['Pre-vehicle', 'Drug', 'Post-vehicle']):
         ax[i].legend(['Pre', '_', '_', 'Drug', '_', '_', 'Post'], frameon=False)
 
         # Add to arrays
-        if n_trials.ndim > 1:
-            n_trials = np.mean(n_trials, axis=0)
-            prop_right = np.mean(prop_right, axis=0)
         if i == 0:
             all_trials = n_trials
             all_prop = prop_right

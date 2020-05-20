@@ -74,12 +74,8 @@ results.loc[results['condition'] == 2, 'slope_abs_rel'] = (
 
 
 f, ax1 = plt.subplots(1, 1, figsize=(5, 5))
-sns.lineplot(x='condition', y='slope_abs', data=results, ci=68, ax=ax1)
-
-
-
-sns.lineplot(x='condition', y='slope_abs', data=results, style='subject',
-             legend=False, lw=3, markers=['o', 'o'], dashes=['', ''], ax=ax1)
+sns.lineplot(x='condition', y='slope_abs', data=results,
+             legend=False, lw=3, ax=ax1)
 ax1.set(ylabel='Speed of bias switch (absolute slope)',
         xticks=[0, 1, 2], xticklabels=['Pre-vehicle', '5HT2a antagonist', 'Post-vehicle'],
         ylim=[0, 12])

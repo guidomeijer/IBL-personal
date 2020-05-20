@@ -25,7 +25,7 @@ parameters = data['pnames'][0]
 results = pd.DataFrame(columns=['subject', 'condition', 'week', 'window_length', 'iqr'])
 for i in range(len(X)):
     for j in range(X[i].shape[1]):
-        max_prob = np.median(X[i][0][j][:, parameters[i][0] == 'contrast-sigma'])
+        max_prob = np.mean(X[i][0][j][:, parameters[i][0] == 'runlength-tau'])
         iqr = stats.iqr(X[i][0][j][:, parameters[i][0] == 'runlength-tau'])
         results.loc[results.shape[0]+1] = ([i] + [np.mod(j, 3)]
                                            + [np.floor(j/3)+1] + [max_prob] + [iqr])
