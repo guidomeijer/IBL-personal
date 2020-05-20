@@ -23,7 +23,7 @@ f, ax = plt.subplots(1, sessions['Nickname'].unique().shape[0] + 1, figsize=(20,
 sns.set(style="ticks", context="paper", font_scale=1.5)
 colors = sns.color_palette(n_colors=3)
 
-for j, condition in enumerate(['Pre-vehicle', 'Drug', 'Post-vehicle']):
+for j, condition in enumerate(['Pre-vehicle', 'Drug']):
     for i, nickname in enumerate(sessions['Nickname'].unique()):
         trials = pd.DataFrame()
         for k, date in enumerate(sessions.loc[sessions['Nickname'] == nickname, condition].values):
@@ -42,14 +42,19 @@ for j, condition in enumerate(['Pre-vehicle', 'Drug', 'Post-vehicle']):
                                      - trials['trial_stim_contrast_left']) * 100
         trials.loc[trials['trial_response_choice'] == 'CW', 'right_choice'] = 0
         trials.loc[trials['trial_response_choice'] == 'CCW', 'right_choice'] = 1
-        stim_levels = trials.groupby('signed_contrast').size().index.values
-        n_trials = trials.groupby('signed_contrast').size().values
-        prop_right = trials.groupby('signed_contrast').mean()['right_choice'].values
+
+        # Get data for 50/50 trials
+        stim_levels = trials[trials['trial_stim_prob_left'] == 0.5].groupby(
+                                                'signed_contrast').size().index.values
+        n_trials = trials[trials['trial_stim_prob_left'] == 0.5].groupby(
+                                                'signed_contrast').size().values
+        prop_right = trials[trials['trial_stim_prob_left'] == 0.5].groupby(
+                                                'signed_contrast').mean()['right_choice'].values
 
         # Plot psychometric curve
         plot_psychometric(stim_levels, n_trials, prop_right, ax=ax[i], color=colors[j])
         ax[i].set(xlabel='Signed contrast (%)', ylabel='Rightward responses', title=nickname)
-        ax[i].legend(['Pre', '_', '_', 'Drug', '_', '_', 'Post'], frameon=False)
+        ax[i].legend(['Vehicle', '_', '_', 'Drug'], frameon=False)
 
         # Add to arrays
         if i == 0:
@@ -62,7 +67,7 @@ for j, condition in enumerate(['Pre-vehicle', 'Drug', 'Post-vehicle']):
     # Plot over animals curve
     plot_psychometric(stim_levels, all_trials, all_prop, ax=ax[-1], color=colors[j])
     ax[-1].set(xlabel='Signed contrast (%)', ylabel='Rightward responses', title='All mice')
-    ax[-1].legend(['Pre', '_', '_', 'Drug', '_', '_', 'Post'], frameon=False)
+    ax[-1].legend(['Vehicle', '_', '_', 'Drug'], frameon=False)
 
 sns.despine(trim=True)
 plt.tight_layout()

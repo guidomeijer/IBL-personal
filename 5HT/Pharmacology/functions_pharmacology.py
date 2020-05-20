@@ -90,7 +90,8 @@ def plot_psychometric(stim_levels, n_trials, proportion, ax, **kwargs):
 
     # plot datapoints with errorbars on top
     if proportion.ndim > 1:
-        ax.errorbar(stim_levels, np.mean(proportion, axis=0), yerr=sem(proportion), fmt='o')
+        ax.errorbar(stim_levels, np.mean(proportion, axis=0), yerr=sem(proportion),
+                    fmt='o', **kwargs)
 
     g.set_xticks([-35, -25, -12.5, 0, 12.5, 25, 35])
     g.set_xticklabels(['-100', '-25', '-12.5', '0', '12.5', '25', '100'],
