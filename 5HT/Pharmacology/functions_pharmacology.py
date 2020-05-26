@@ -8,10 +8,12 @@ Created on Tue Apr 28 10:22:07 2020
 
 from oneibl.one import ONE
 import numpy as np
+import pandas as pd
 from scipy.stats import sem
 from psytrack.hyperOpt import hyperOpt
 import matplotlib.pyplot as plt
 import seaborn as sns
+import statsmodels.api as sm
 from ibl_pipeline.utils import psychofit as psy
 
 
@@ -240,3 +242,55 @@ def plot_psytrack(wMode, prob_l, plot_stim=True):
     sns.despine(trim=True)
     plt.tight_layout(pad=2)
     return ax1
+
+
+def fit_probabilistic_choice_model(nickname, date, previous_trials=6):
+
+    # Load data
+    contrast_l, contrast_r, prob_l, correct, choice = load_session_one(nickname, date)
+
+    # Make dataframe
+    signed_contrast = np.copy(contrast_l)
+    signed_contrast[np.isnan(signed_contrast)] = -contrast_r[~np.isnan(contrast_r)]
+    data = pd.DataFrame(data={'choice': choice, 'correct': correct,
+                              'signed_contrast': signed_contrast, 'prop_left': prob_l})
+
+    # Stimulus side
+    data.loc[data['signed_contrast'] < 0, 'side'] = -1
+    data.loc[data['signed_contrast'] > 0, 'side'] = 1
+    data.loc[data['signed_contrast'] == 0, 'side'] = 0
+
+    # Shift rewarded and unrewarded predictors by one
+    for i in range(previous_trials):
+        data.loc[:, 'side-%s' % str(i+1)] = data['side'].shift(
+                                                    periods=i+1, fill_value=0).to_numpy()
+
+    # Drop any nan trials
+    data.dropna(inplace=True)
+
+    # Make sensory predictors (no 0 predictor)
+    contrasts = [.25, 1, .125, .0625]
+    for i in contrasts:
+        data.loc[(data['signed_contrast'].abs() == i), i] = np.sign(
+                    data.loc[(data['signed_contrast'].abs() == i), 'signed_contrast'].to_numpy())
+        data[i].fillna(0,  inplace=True)
+
+    # Add block probability predictor
+    data.loc[(data['prop_left'] == 0.5), 'block'] = 0
+    data.loc[(data['prop_left'] == 0.2), 'block'] = -1
+    data.loc[(data['prop_left'] == 0.8), 'block'] = 1
+
+    # Make choice in between 0 and 1 -> 1 for right and 0 for left
+    data.loc[data['choice'] == -1, 'choice'] = 0
+
+    # Create predictor matrix
+    exog = data.copy()
+    exog.drop(columns=['correct', 'signed_contrast', 'choice', 'prop_left', 'side'],
+              inplace=True)
+    exog = sm.add_constant(exog)
+
+    # Fit model
+    logit_model = sm.Logit(data['choice'], exog)
+    result = logit_model.fit()
+    weights = result.params.rename(index=str)
+    return weights

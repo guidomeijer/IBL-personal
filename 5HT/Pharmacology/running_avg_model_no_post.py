@@ -66,7 +66,7 @@ for i, subject in enumerate(results['subject'].unique()):
                           'window_length']], 'o-', lw=2, color=colors[i], label=subject)
 ax1.set(ylabel='Length of integration window (\u03C4 trials)', xticks=[0, 1],
         xticklabels=['Pre-vehicle', '5HT2a block'], title='All weeks')
-ax1.legend()
+# ax1.legend()
 
 ax2.plot([pre, drug], 'o-', lw=2)
 ax2.set(ylabel='Length of integration window (\u03C4 trials)', xticks=[0, 1],
@@ -80,4 +80,5 @@ ax3.set(ylabel='Length of integration window (\u03C4 trials)', xticks=[0, 1],
 
 sns.despine(trim=True, offset=10)
 plt.tight_layout(pad=4)
+plt.savefig(join(FIG_PATH, '5HT2a_block_integration_length'))
 

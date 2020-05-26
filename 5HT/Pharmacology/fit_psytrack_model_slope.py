@@ -38,8 +38,8 @@ for i, nickname in enumerate(sessions['Nickname']):
         for l, ind in enumerate(left_blocks):
             poly = np.polyfit(trial_vec, model[0][ind-TRIAL_WIN[0]:ind+TRIAL_WIN[1]], 1)
             left_slope[l] = np.rad2deg(np.arctan(poly[0]))
-            ax.plot(np.arange(ind-TRIAL_WIN[0], ind+TRIAL_WIN[1]),
-                    np.polyval(poly, trial_vec), 'g', lw=3)
+            #ax.plot(np.arange(ind-TRIAL_WIN[0], ind+TRIAL_WIN[1]),
+            #        np.polyval(poly, trial_vec), 'g', lw=3)
 
         right_blocks = np.where(np.diff(prob_l) < -0.2)[0]
         right_blocks = right_blocks[right_blocks < prob_l.shape[0] - TRIAL_WIN[1]]
@@ -47,8 +47,8 @@ for i, nickname in enumerate(sessions['Nickname']):
         for l, ind in enumerate(right_blocks):
             poly = np.polyfit(trial_vec, model[0][ind-TRIAL_WIN[0]:ind+TRIAL_WIN[1]], 1)
             right_slope[l] = np.rad2deg(np.arctan(poly[0]))
-            ax.plot(np.arange(ind-TRIAL_WIN[0], ind+TRIAL_WIN[1]),
-                    np.polyval(poly, trial_vec), 'g', lw=3)
+            #ax.plot(np.arange(ind-TRIAL_WIN[0], ind+TRIAL_WIN[1]),
+             #       np.polyval(poly, trial_vec), 'g', lw=3)
         results = results.append(pd.DataFrame(
                                     index=[0], data={'subject': nickname, 'condition': j,
                                                      'week': sessions.loc[i, 'Week'],
