@@ -255,14 +255,27 @@ def fit_probabilistic_choice_model(nickname, date, previous_trials=6):
     data = pd.DataFrame(data={'choice': choice, 'correct': correct,
                               'signed_contrast': signed_contrast, 'prop_left': prob_l})
 
-    # Stimulus side
-    data.loc[data['signed_contrast'] < 0, 'side'] = -1
-    data.loc[data['signed_contrast'] > 0, 'side'] = 1
-    data.loc[data['signed_contrast'] == 0, 'side'] = 0
+    # Rewardeded choices:
+    data.loc[(data['choice'] == 0) & (data['correct'].isnull()), 'rchoice'] = 0  # NoGo trials
+    data.loc[(data['choice'] == -1) & (data['correct'] == -1), 'rchoice'] = 0
+    data.loc[(data['choice'] == -1) & (data['correct'] == 1), 'rchoice'] = -1
+    data.loc[(data['choice'] == 1) & (data['correct'] == 1), 'rchoice'] = 1
+    data.loc[(data['choice'] == 0) & (data['correct'].isnull()), 'rchoice'] = 0  # NoGo trials
+    data.loc[(data['choice'] == 1) & (data['correct'] == -1), 'rchoice'] = 0
+
+    # Unrewarded choices:
+    data.loc[(data['choice'] == 0) & (data['correct'].isnull()), 'uchoice'] = 0  # NoGo trials
+    data.loc[(data['choice'] == -1) & (data['correct'] == -1), 'uchoice'] = -1
+    data.loc[(data['choice'] == -1) & (data['correct'] == 1), 'uchoice'] = 0
+    data.loc[(data['choice'] == 1) & (data['correct'] == 1), 'uchoice'] = 0
+    data.loc[(data['choice'] == 0) & (data['correct'].isnull()), 'uchoice'] = 0  # NoGo trials
+    data.loc[(data['choice'] == 1) & (data['correct'] == -1), 'uchoice'] = 1
 
     # Shift rewarded and unrewarded predictors by one
     for i in range(previous_trials):
-        data.loc[:, 'side-%s' % str(i+1)] = data['side'].shift(
+        data.loc[:, 'rchoice-%s' % str(i+1)] = data['rchoice'].shift(
+                                                    periods=i+1, fill_value=0).to_numpy()
+        data.loc[:, 'uchoice-%s' % str(i+1)] = data['uchoice'].shift(
                                                     periods=i+1, fill_value=0).to_numpy()
 
     # Drop any nan trials
@@ -285,7 +298,7 @@ def fit_probabilistic_choice_model(nickname, date, previous_trials=6):
 
     # Create predictor matrix
     exog = data.copy()
-    exog.drop(columns=['correct', 'signed_contrast', 'choice', 'prop_left', 'side'],
+    exog.drop(columns=['correct', 'signed_contrast', 'choice', 'prop_left', 'rchoice', 'uchoice'],
               inplace=True)
     exog = sm.add_constant(exog)
 

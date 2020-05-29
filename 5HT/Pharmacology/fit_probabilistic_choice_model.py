@@ -29,37 +29,51 @@ for i, nickname in enumerate(sessions['Nickname']):
         # Fit model
         fit_result = fit_probabilistic_choice_model(nickname, sessions.loc[i, condition],
                                                     previous_trials=PREVIOUS_TRIALS)
-        weight = []
+        success = []
+        failure = []
         for t in range(PREVIOUS_TRIALS):
-            weight.append(fit_result['side-%s' % str(t + 1)])
+            success.append(fit_result['rchoice-%s' % str(t + 1)])
+            failure.append(fit_result['uchoice-%s' % str(t + 1)])
         side_weights = side_weights.append(pd.DataFrame(data={
                                                 'trial': np.arange(1, PREVIOUS_TRIALS+1),
                                                 'subject': nickname,
-                                                'weight': weight,
+                                                'success': success,
+                                                'failure': failure,
                                                 'week': sessions.loc[i, 'Week'],
                                                 'condition': condition}), ignore_index=True)
-        fit_results = fit_result[['1', '0.25', '0.125', '0.0625', 'block', 'const']]
+        fit_results = fit_result[['1', '0.25', '0.125', '0.0625', 'const', 'block']]
         fit_results['subject'] = nickname
         fit_results['week'] = sessions.loc[i, 'Week']
         fit_results['condition'] = condition
         other_weights = other_weights.append(fit_results, ignore_index=True)
 
+
 # %% Plot results
-f, ax = plt.subplots(1, side_weights['subject'].unique().shape[0] + 1,
-                     figsize=(20, 5), sharey=True)
+n_subjects = side_weights['subject'].unique().shape[0]
+f, ax = plt.subplots(2, n_subjects + 1, figsize=(18, 8))
 sns.set(context='paper', font_scale=1.5, style='ticks')
 
 for i, subject in enumerate(side_weights['subject'].unique()):
-    sns.lineplot(x='trial', y='weight', data=side_weights[side_weights['subject'] == subject],
-                 hue='condition', ci=68, palette='Dark2', ax=ax[i])
-    ax[i].set(ylim=[-0.1, 0.7], ylabel='Weight of stimulus side parameter', title=subject,
-              xlabel='Trials in the past')
+    sns.lineplot(x='trial', y='success', data=side_weights[side_weights['subject'] == subject],
+                 hue='condition', ci=68, palette='Dark2', ax=ax[0, i])
+    ax[0, i].set(ylim=[-0.1, 1], ylabel='Weight of success term', title=subject,
+                 xlabel='Trials in the past')
 
+sns.lineplot(x='trial', y='success', data=side_weights, hue='condition', ci=68, palette='Dark2',
+             ax=ax[0, -1])
+ax[0, -1].set(ylim=[-0.1, 1], ylabel='Weight of success term',
+              title='All mice', xlabel='Trials in the past')
 
-sns.lineplot(x='trial', y='weight', data=side_weights, hue='condition', ci=68, palette='Dark2',
-             ax=ax[len(ax)-1])
-ax[len(ax)-1].set(ylim=[-0.1, 0.7], ylabel='Weight of stimulus side parameter', title='All mice',
-                  xlabel='Trials in the past')
+for i, subject in enumerate(side_weights['subject'].unique()):
+    sns.lineplot(x='trial', y='failure', data=side_weights[side_weights['subject'] == subject],
+                 hue='condition', ci=68, palette='Dark2', ax=ax[1, i])
+    ax[1, i].set(ylim=[-0.3, 0.6], ylabel='Weight of failure term',
+                 title=subject, xlabel='Trials in the past')
+
+sns.lineplot(x='trial', y='failure', data=side_weights, hue='condition', ci=68, palette='Dark2',
+             ax=ax[1, -1])
+ax[1, -1].set(ylim=[-0.3, 0.6], ylabel='Weight of failure term',
+              title='All mice', xlabel='Trials in the past')
 
 plt.tight_layout()
 sns.despine(trim=True)
@@ -129,4 +143,3 @@ plt.tight_layout()
 sns.despine(trim=True)
 if PLOT:
     plt.savefig(join(FIG_PATH, 'probabilistic_choice_model_other_weights_diff'))
-
