@@ -16,6 +16,7 @@ import pandas as pd
 import seaborn as sns
 from sklearn.utils import shuffle
 from ephys_functions import paths, figure_style
+import brainbox as bb
 import brainbox.io.one as bbone
 from oneibl.one import ONE
 one = ONE()
@@ -23,15 +24,10 @@ one = ONE()
 # Settings
 DOWNLOAD = False
 OVERWRITE = False
-PRE_TIME = 0.6
-POST_TIME = -0.1
-MIN_NEURONS = 20  # min neurons per region
-N_NEURONS = 20  # number of neurons to use for decoding
-MIN_TRIALS = 300
-ITERATIONS = 1000
-DECODER = 'bayes'  # bayes, regression or forest
-VALIDATION = 'kfold'
-NUM_SPLITS = 5
+PRE_TIME = 0
+POST_TIME = 0.5
+MIN_NEURONS = 1
+ALPHA = 0.05
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
 
@@ -51,7 +47,7 @@ eids = one.search(dataset_types=['spikes.times', 'probes.trajectory'],
 recordings = recordings[recordings['eid'].isin(eids)]
 recordings = recordings.sort_values('eid').reset_index()
 
-decoding_result = pd.DataFrame()
+block_neurons = pd.DataFrame()
 for i, eid in enumerate(recordings['eid'].values):
 
     # Load in data (only when not already loaded from other probe)
@@ -86,10 +82,6 @@ for i, eid in enumerate(recordings['eid'].values):
     probability_left = trials.probabilityLeft[incl_trials]
     trial_blocks = (trials.probabilityLeft[incl_trials] > 0.55).astype(int)
 
-    # Check for number of trials
-    if trial_times.shape[0] < MIN_TRIALS:
-        continue
-
     # Decode per brain region
     for i, region in enumerate(np.unique(clusters[probe]['acronym'])):
 
@@ -105,50 +97,55 @@ for i, eid in enumerate(recordings['eid'].values):
         spks_region = spikes[probe].times[np.isin(spikes[probe].clusters, clusters_in_region)]
         clus_region = spikes[probe].clusters[np.isin(spikes[probe].clusters, clusters_in_region)]
 
-        # Decode block identity
-        decode_result = decode(spks_region, clus_region,
-                               trial_times, trial_blocks,
-                               pre_time=PRE_TIME, post_time=POST_TIME,
-                               classifier=DECODER, cross_validation=VALIDATION,
-                               num_splits=NUM_SPLITS, n_neurons=N_NEURONS,
-                               iterations=ITERATIONS)
+        # Get trial indices
+        r_in_l_block = trials.stimOn_times[((trials.probabilityLeft > 0.55)
+                                            & (trials.contrastRight > 0.1))]
+        r_in_r_block = trials.stimOn_times[((trials.probabilityLeft < 0.45)
+                                            & (trials.contrastRight > 0.1))]
+        l_in_r_block = trials.stimOn_times[((trials.probabilityLeft < 0.45)
+                                            & (trials.contrastLeft > 0.1))]
+        l_in_l_block = trials.stimOn_times[((trials.probabilityLeft > 0.55)
+                                            & (trials.contrastLeft > 0.1))]
 
-        # Shuffle
-        shuffle_result = decode(spikes[probe].times, spikes[probe].clusters,
-                                trial_times, shuffle(trial_blocks),
-                                pre_time=PRE_TIME, post_time=POST_TIME,
-                                classifier=DECODER, cross_validation=VALIDATION,
-                                num_splits=NUM_SPLITS, n_neurons=N_NEURONS,
-                                iterations=ITERATIONS, shuffle=True)
+        # Get significant units
+        r_units = bb.task.differentiate_units(spks_region, clus_region,
+                                              np.append(r_in_l_block,
+                                                        r_in_r_block),
+                                              np.append(np.zeros(len(r_in_l_block)),
+                                                        np.ones(len(r_in_r_block))),
+                                              pre_time=PRE_TIME, post_time=POST_TIME,
+                                              test='ranksums', alpha=0.05)[0]
+        l_units = bb.task.differentiate_units(spks_region, clus_region,
+                                              np.append(l_in_l_block,
+                                                        l_in_r_block),
+                                              np.append(np.zeros(len(l_in_l_block)),
+                                                        np.ones(len(l_in_r_block))),
+                                              pre_time=PRE_TIME, post_time=POST_TIME,
+                                              test='ranksums', alpha=0.05)[0]
+        sig_units = np.unique(np.concatenate((l_units, r_units)))
 
         # Add to dataframe
-        decoding_result = decoding_result.append(pd.DataFrame(
-            index=[0], data={'subject': recordings.loc[i, 'subject'],
-                             'date': recordings.loc[i, 'date'],
-                             'eid': recordings.loc[i, 'eid'],
-                             'probe': probe,
-                             'region': region,
-                             'f1': decode_result['f1'].mean() - shuffle_result['f1'].mean(),
-                             'accuracy': (decode_result['accuracy'].mean()
-                                          - shuffle_result['accuracy'].mean()),
-                             'auroc': (decode_result['auroc'].mean()
-                                       - shuffle_result['auroc'].mean())}))
-
-    decoding_result.to_csv(join(SAVE_PATH, 'decoding_block_all_regions_%d_neurons' % N_NEURONS))
+        block_neurons = block_neurons.append(pd.DataFrame(
+                                index=[0], data={'subject': recordings.loc[i, 'subject'],
+                                                 'date': recordings.loc[i, 'date'],
+                                                 'eid': recordings.loc[i, 'eid'],
+                                                 'probe': probe,
+                                                 'region': region,
+                                                 'n_neurons': len(np.unique(sig_units)),
+                                                 'n_sig_block': sig_units.shape[0]}))
+    block_neurons.to_csv(join(SAVE_PATH, 'n_surprise_neurons_regions'))
 
 # %% Plot
-decoding_result = pd.read_csv(join(SAVE_PATH, 'decoding_block_all_regions_10_neurons'))
+block_neurons = pd.read_csv(join(SAVE_PATH, 'n_surprise_neurons_regions'))
 
-decoding_regions = decoding_result.groupby('region').size()[
-                                    decoding_result.groupby('region').size() > 3].reset_index()
-decoding_result = decoding_result[decoding_result['region'].isin(decoding_regions['region'])]
-decoding_result = decoding_result.sort_values('accuracy', ascending=False)
-
-sort_regions = decoding_result.groupby('region').mean().sort_values(
-                                            'accuracy', ascending=False).reset_index()['region']
+block_summed = block_neurons.groupby('region').sum()
+block_summed = block_summed.reset_index()
+block_summed = block_summed[block_summed['n_neurons'] > 100]
+block_summed['perc'] = (block_summed['n_sig_block'] / block_summed['n_neurons']) * 100
+block_summed = block_summed.sort_values('perc', ascending=False)
 
 f, ax1 = plt.subplots(1, 1, figsize=(10, 10))
 
-sns.barplot(x='accuracy', y='region', data=decoding_result, order=sort_regions, ci=68, ax=ax1)
-ax1.set(xlabel='Decoding accuracy of stimulus prior (% over chance)', ylabel='')
-figure_style(font_scale=1.2)
+sns.barplot(x='perc', y='region', data=block_summed)
+ax1.set(xlabel='Stimulus prior neurons (%)', ylabel='')
+figure_style(font_scale=1.1)
