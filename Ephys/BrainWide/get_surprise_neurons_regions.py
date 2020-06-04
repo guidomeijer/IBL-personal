@@ -31,6 +31,7 @@ ALPHA = 0.05
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
 
+# %%
 # Get list of all recordings that have histology
 rec_with_hist = one.alyx.rest('trajectories', 'list', provenance='Histology track')
 recordings = pd.DataFrame(data={
@@ -47,7 +48,7 @@ eids = one.search(dataset_types=['spikes.times', 'probes.trajectory'],
 recordings = recordings[recordings['eid'].isin(eids)]
 recordings = recordings.sort_values('eid').reset_index()
 
-block_neurons = pd.DataFrame()
+surprise_neurons = pd.DataFrame()
 for i, eid in enumerate(recordings['eid'].values):
 
     # Load in data (only when not already loaded from other probe)
@@ -83,7 +84,7 @@ for i, eid in enumerate(recordings['eid'].values):
     trial_blocks = (trials.probabilityLeft[incl_trials] > 0.55).astype(int)
 
     # Decode per brain region
-    for i, region in enumerate(np.unique(clusters[probe]['acronym'])):
+    for j, region in enumerate(np.unique(clusters[probe]['acronym'])):
 
         # Get clusters in this brain region with KS2 label 'good'
         clusters_in_region = clusters[probe].metrics.cluster_id[
@@ -125,27 +126,27 @@ for i, eid in enumerate(recordings['eid'].values):
         sig_units = np.unique(np.concatenate((l_units, r_units)))
 
         # Add to dataframe
-        block_neurons = block_neurons.append(pd.DataFrame(
+        surprise_neurons = surprise_neurons.append(pd.DataFrame(
                                 index=[0], data={'subject': recordings.loc[i, 'subject'],
                                                  'date': recordings.loc[i, 'date'],
                                                  'eid': recordings.loc[i, 'eid'],
                                                  'probe': probe,
                                                  'region': region,
-                                                 'n_neurons': len(np.unique(sig_units)),
-                                                 'n_sig_block': sig_units.shape[0]}))
-    block_neurons.to_csv(join(SAVE_PATH, 'n_surprise_neurons_regions'))
+                                                 'n_neurons': len(np.unique(clus_region)),
+                                                 'n_sig_surprise': sig_units.shape[0]}))
+    surprise_neurons.to_csv(join(SAVE_PATH, 'n_surprise_neurons_regions.csv'))
 
 # %% Plot
-block_neurons = pd.read_csv(join(SAVE_PATH, 'n_surprise_neurons_regions'))
+# surprise_neurons = pd.read_csv(join(SAVE_PATH, 'n_surprise_neurons_regions.csv'))
 
-block_summed = block_neurons.groupby('region').sum()
-block_summed = block_summed.reset_index()
-block_summed = block_summed[block_summed['n_neurons'] > 100]
-block_summed['perc'] = (block_summed['n_sig_block'] / block_summed['n_neurons']) * 100
-block_summed = block_summed.sort_values('perc', ascending=False)
+surprise_summed = surprise_neurons.groupby('region').sum()
+surprise_summed = surprise_summed.reset_index()
+surprise_summed = surprise_summed[surprise_summed['n_neurons'] > 100]
+surprise_summed['perc'] = (surprise_summed['n_sig_surprise'] / surprise_summed['n_neurons']) * 100
+surprise_summed = surprise_summed.sort_values('perc', ascending=False)
 
 f, ax1 = plt.subplots(1, 1, figsize=(10, 10))
 
-sns.barplot(x='perc', y='region', data=block_summed)
-ax1.set(xlabel='Stimulus prior neurons (%)', ylabel='')
+sns.barplot(x='perc', y='region', data=surprise_summed)
+ax1.set(xlabel='Surprise neurons (%)', ylabel='')
 figure_style(font_scale=1.1)

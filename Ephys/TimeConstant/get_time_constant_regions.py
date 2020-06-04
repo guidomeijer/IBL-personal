@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Feb  6 10:56:57 2020
+
 Decode left/right block identity from all brain regions
+
 @author: Guido Meijer
 """
 
@@ -11,29 +13,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 from brainbox.population import decode
 import pandas as pd
+import math
 import seaborn as sns
 from sklearn.utils import shuffle
+from scipy.stats import pearsonr
 from ephys_functions import paths, figure_style
 import brainbox.io.one as bbone
 from oneibl.one import ONE
 one = ONE()
 
 # Settings
-DOWNLOAD = False
-OVERWRITE = False
-PRE_TIME = 0.6
-POST_TIME = -0.1
-MIN_NEURONS = 20  # min neurons per region
-N_NEURONS = 20  # number of neurons to use for decoding
-MIN_TRIALS = 300
-ITERATIONS = 1000
-DECODER = 'bayes'  # bayes, regression or forest
-VALIDATION = 'kfold'
-NUM_SPLITS = 5
+SAMPLING_RATE = 30000
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
 
-# %%
 # Get list of all recordings that have histology
 rec_with_hist = one.alyx.rest('trajectories', 'list', provenance='Histology track')
 recordings = pd.DataFrame(data={
@@ -73,52 +66,28 @@ for i, eid in enumerate(recordings['eid'].values):
     if probe not in spikes.keys():
         continue
 
-    # Check data integrity
-    if ((not hasattr(trials, 'stimOn_times'))
-            or (len(trials.feedback_times) != len(trials.feedbackType))
-            or (len(trials.stimOn_times) != len(trials.probabilityLeft))):
-        continue
-
-    # Get trial vectors
-    incl_trials = (trials.probabilityLeft > 0.55) | (trials.probabilityLeft < 0.45)
-    trial_times = trials.stimOn_times[incl_trials]
-    probability_left = trials.probabilityLeft[incl_trials]
-    trial_blocks = (trials.probabilityLeft[incl_trials] > 0.55).astype(int)
-
-    # Check for number of trials
-    if trial_times.shape[0] < MIN_TRIALS:
-        continue
-
     # Decode per brain region
-    for i, region in enumerate(np.unique(clusters[probe]['acronym'])):
+    for j, region in enumerate(np.unique(clusters[probe]['acronym'])):
 
         # Get clusters in this brain region with KS2 label 'good'
         clusters_in_region = clusters[probe].metrics.cluster_id[
             (clusters[probe]['acronym'] == region) & (clusters[probe].metrics.ks2_label == 'good')]
 
-        # Check if there are enough neurons in this brain region
-        if np.shape(clusters_in_region)[0] < MIN_NEURONS:
-            continue
-
         # Select spikes and clusters
         spks_region = spikes[probe].times[np.isin(spikes[probe].clusters, clusters_in_region)]
         clus_region = spikes[probe].clusters[np.isin(spikes[probe].clusters, clusters_in_region)]
 
-        # Decode block identity
-        decode_result = decode(spks_region, clus_region,
-                               trial_times, trial_blocks,
-                               pre_time=PRE_TIME, post_time=POST_TIME,
-                               classifier=DECODER, cross_validation=VALIDATION,
-                               num_splits=NUM_SPLITS, n_neurons=N_NEURONS,
-                               iterations=ITERATIONS)
+        # Calculate time constant per neuron
+        time_constant = []
+        for k, cluster in enumerate(np.unique(clus_region)):
 
-        # Shuffle
-        shuffle_result = decode(spikes[probe].times, spikes[probe].clusters,
-                                trial_times, shuffle(trial_blocks),
-                                pre_time=PRE_TIME, post_time=POST_TIME,
-                                classifier=DECODER, cross_validation=VALIDATION,
-                                num_splits=NUM_SPLITS, n_neurons=N_NEURONS,
-                                iterations=ITERATIONS, shuffle=True)
+
+
+            # The time constant is defined as the time it takes for the autocorrelation function
+            # to decay by a factor of e
+            auto_corr = acf(spks_region[clus_region == cluster], nlags=30000, fft=False)
+            tc = (np.argmin(np.abs(auto_corr - 1 / math.e)) / SAMPLING_RATE) * 1000
+            time_constant.append(tc)
 
         # Add to dataframe
         decoding_result = decoding_result.append(pd.DataFrame(
@@ -127,16 +96,12 @@ for i, eid in enumerate(recordings['eid'].values):
                              'eid': recordings.loc[i, 'eid'],
                              'probe': probe,
                              'region': region,
-                             'f1': decode_result['f1'].mean() - shuffle_result['f1'].mean(),
-                             'accuracy': (decode_result['accuracy'].mean()
-                                          - shuffle_result['accuracy'].mean()),
-                             'auroc': (decode_result['auroc'].mean()
-                                       - shuffle_result['auroc'].mean())}))
+                             'time_constant': time_constant}))
 
-    decoding_result.to_csv(join(SAVE_PATH, 'decoding_block_all_regions_%d_neurons' % N_NEURONS))
+    decoding_result.to_csv(join(SAVE_PATH, 'time_constant_regions'))
 
 # %% Plot
-decoding_result = pd.read_csv(join(SAVE_PATH, 'decoding_block_all_regions_20_neurons'))
+decoding_result = pd.read_csv(join(SAVE_PATH, 'time_constant_regions'))
 
 decoding_regions = decoding_result.groupby('region').size()[
                                     decoding_result.groupby('region').size() > 3].reset_index()
