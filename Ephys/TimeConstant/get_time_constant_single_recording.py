@@ -8,11 +8,12 @@ Created on Wed Jan 22 16:16:30 2020
 from os import mkdir
 from os.path import join, isdir
 import matplotlib.pyplot as plt
-from brainbox.population import _get_spike_counts_in_bins as spike_bins
 import brainbox.io.one as bbone
 import seaborn as sns
 import shutil
 import numpy as np
+import pandas as pd
+from scipy.optimize import curve_fit
 from scipy.stats import pearsonr
 from ephys_functions import paths
 from brainbox.io.one import load_spike_sorting, load_channel_locations
@@ -22,11 +23,63 @@ one = ONE()
 # Settings
 BIN_SIZE = 50  # in ms
 BIN_START = np.arange(-550, -50, 50)  # ms relative to go cue
+MIN_NEURONS = 10
 SUBJECT = 'ZM_2240'
 DATE = '2020-01-23'
 PROBE = '00'
 OVERWRITE = True
 
+
+def exponential_decay(x, A, tau, B):
+    y = (A * np.exp(-(x / tau))) + B
+    return y
+
+
+def _get_spike_counts_in_bins(spike_times, spike_clusters, intervals):
+    """
+    Return the number of spikes in a sequence of time intervals, for each neuron.
+
+    Parameters
+    ----------
+    spike_times : 1D array
+        spike times (in seconds)
+    spike_clusters : 1D array
+        cluster ids corresponding to each event in `spikes`
+    intervals : 2D array of shape (n_events, 2)
+        the start and end times of the events
+
+    Returns
+    ---------
+    counts : 2D array of shape (n_neurons, n_events)
+        the spike counts of all neurons ffrom scipy.stats import sem, tor all events
+        value (i, j) is the number of spikes of neuron `neurons[i]` in interval #j
+    cluster_ids : 1D array
+        list of cluster ids
+    """
+
+    # Check input
+    assert intervals.ndim == 2
+    assert intervals.shape[1] == 2
+    assert np.all(np.diff(spike_times) >= 0), "Spike times need to be sorted"
+
+    intervals_idx = np.searchsorted(spike_times, intervals)
+
+    # For each neuron and each interval, the number of spikes in the interval.
+    cluster_ids = np.unique(spike_clusters)
+    n_neurons = len(cluster_ids)
+    n_intervals = intervals.shape[0]
+    counts = np.zeros((n_neurons, n_intervals), dtype=np.uint32)
+    for j in range(n_intervals):
+        t0, t1 = intervals[j, :]
+        # Count the number of spikes in the window, for each neuron.
+        x = np.bincount(
+            spike_clusters[intervals_idx[j, 0]:intervals_idx[j, 1]],
+            minlength=cluster_ids.max() + 1)
+        counts[:, j] = x[cluster_ids]
+    return counts, cluster_ids
+
+
+# %%
 # Set path to save plots
 DATA_PATH, FIG_PATH, _ = paths()
 FIG_PATH = join(FIG_PATH, 'TimeConstant')
@@ -75,12 +128,14 @@ for i, bin1 in enumerate(BIN_START_S):
         # Get spike counts of all neurons during bin 1
         times1 = np.column_stack(((trials.goCue_times + bin1),
                                  (trials.goCue_times + (bin1 + BIN_SIZE_S))))
-        pop_vector1, cluster_ids = spike_bins(spikes[probe].times, spikes[probe].clusters, times1)
+        pop_vector1, cluster_ids = _get_spike_counts_in_bins(
+                                            spikes[probe].times, spikes[probe].clusters, times1)
 
         # Get spike counts of all neurons during bin 2
         times2 = np.column_stack(((trials.goCue_times + bin2),
                                  (trials.goCue_times + (bin2 + BIN_SIZE_S))))
-        pop_vector2, cluster_ids = spike_bins(spikes[probe].times, spikes[probe].clusters, times2)
+        pop_vector2, cluster_ids = _get_spike_counts_in_bins(
+                                            spikes[probe].times, spikes[probe].clusters, times2)
 
         # Correlate the two bins for each neuron
         for n, cluster in enumerate(cluster_ids):
@@ -88,10 +143,72 @@ for i, bin1 in enumerate(BIN_START_S):
             # Correlate time bins
             corr_matrix[i, j, n], _ = pearsonr(pop_vector1[n], pop_vector2[n])
 
+# Fill the diagonal with 0's instead of 1's
+for n in range(corr_matrix.shape[2]):
+    np.fill_diagonal(corr_matrix[:, :, n], 0)
+
 # Get the brain regions
 brain_region = []
-for n, cluster in enumerate(cluster_ids):
+for i, cluster in enumerate(cluster_ids):
     region = clusters[probe].acronym[clusters[probe].metrics.cluster_id == cluster][0]
     region = region.replace('/', '-')
     brain_region.append(region)
 
+# Exclude regions with too few neurons
+unique_regions, n_per_region = np.unique(brain_region, return_counts=True)
+excl_regions = unique_regions[n_per_region < MIN_NEURONS]
+incl_regions = [i for i, r in enumerate(brain_region) if r not in excl_regions]
+corr_matrix = corr_matrix[:, :, incl_regions]
+brain_region = np.array(brain_region)[incl_regions]
+cluster_ids = cluster_ids[incl_regions]
+
+# Average matrix over neurons in brain region and fit exponential decay at population level
+timescale = dict()
+auto_corr = pd.DataFrame()
+for i, region in enumerate(np.unique(brain_region)):
+    timescale[region] = dict()
+
+    # Get average matrix
+    mat = np.nanmean(corr_matrix[:, :, np.array(
+                                [j for j, r in enumerate(brain_region) if r == region])], axis=2)
+    timescale[region]['corr_matrix'] = mat
+
+    # Get flattened vector from matrix
+    corr_bin = []
+    for j in range(1, mat.shape[0]):
+        corr_bin.append(np.mean(np.diag(mat, j)))
+    timescale[region]['decay_points'] = corr_bin
+
+    # Fit exponential decay starting at the bin with maximum autocorrelation
+    delta_time = np.arange(BIN_SIZE, BIN_SIZE*corr_matrix.shape[0], BIN_SIZE)
+    fitted_params, _ = curve_fit(exponential_decay, delta_time[np.argmax(corr_bin):],
+                                 corr_bin[np.argmax(corr_bin):], [0.5, 200, 0])
+    timescale[region]['fit'] = fitted_params
+    timescale[region]['time_constant'] = fitted_params[1]
+
+# %% Plot
+
+ax_grid = int(np.ceil(np.sqrt(len(timescale.keys()))))
+f, ax = plt.subplots(ax_grid, ax_grid, sharex=True, sharey=True,
+                     figsize=(ax_grid*2.5, ax_grid*2.5))
+ax = np.reshape(ax, (1, ax_grid * ax_grid))[0]
+for i, region in enumerate(timescale.keys()):
+    sns.heatmap(timescale[region]['corr_matrix'], cbar=False, ax=ax[i])
+    ax[i].set(xticks=np.arange(0, BIN_START.shape[0], 2), xticklabels=BIN_START[0:-1:2],
+              yticks=np.arange(0, BIN_START.shape[0], 2),  yticklabels=BIN_START[0:-1:2],
+              title=region)
+
+colors = sns.color_palette('colorblind', len(timescale.keys()))
+f, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+x = np.arange(0, BIN_START.shape[0] * BIN_SIZE, 1)
+for i, region in enumerate(timescale.keys()):
+    ax1.plot(x, exponential_decay(x, timescale[region]['fit'][0], timescale[region]['fit'][1],
+                                  timescale[region]['fit'][2]), color=colors[i], label=region)
+    ax1.plot(delta_time, timescale[region]['decay_points'], 'o', color=colors[i])
+plt.legend()
+ax1.set(ylabel='Auto-correlation', xlabel='\u0394 Time (ms)')
+
+time_constant = []
+for i, region in enumerate(timescale.keys()):
+    time_constant.append(timescale[region]['time_constant'])
+ax2.bar(np.arange(len(time_constant[:-2])), time_constant[:-2])
