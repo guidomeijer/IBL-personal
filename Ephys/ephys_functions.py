@@ -23,13 +23,13 @@ def paths():
     return data_path, fig_path, save_path
 
 
-def figure_style(font_scale=2, despine=True):
+def figure_style(font_scale=2, despine=True, trim=True):
     """
     Set style for plotting figures
     """
     sns.set(style="ticks", context="paper", font_scale=font_scale)
     if despine is True:
-        sns.despine(trim=True)
+        sns.despine(trim=trim)
     matplotlib.rcParams['pdf.fonttype'] = 42
     matplotlib.rcParams['ps.fonttype'] = 42
     plt.tight_layout()

@@ -16,14 +16,13 @@ import pandas as pd
 from scipy.optimize import curve_fit
 from scipy.stats import pearsonr
 from ephys_functions import paths
-from brainbox.io.one import load_spike_sorting, load_channel_locations
 from oneibl.one import ONE
 one = ONE()
 
 # Settings
 BIN_SIZE = 50  # in ms
-BIN_START = np.arange(-550, -50, 50)  # ms relative to go cue
-MIN_NEURONS = 10
+BIN_START = np.arange(-1050, -50, 50)  # ms relative to go cue
+MIN_NEURONS = 20
 SUBJECT = 'ZM_2240'
 DATE = '2020-01-23'
 PROBE = '00'
@@ -98,21 +97,6 @@ spikes[probe].clusters = spikes[probe].clusters[np.isin(
         spikes[probe].clusters, clusters[probe].metrics.cluster_id[
             clusters[probe].metrics.ks2_label == 'good'])]
 
-# Make directory
-if (isdir(join(FIG_PATH, '%s_%s_%s' % (SUBJECT, DATE, probe)))
-        and (OVERWRITE is True)):
-    shutil.rmtree(join(FIG_PATH, '%s_%s_%s' % (SUBJECT, DATE, probe)))
-if not isdir(join(FIG_PATH, '%s_%s_%s' % (SUBJECT, DATE, probe))):
-    mkdir(join(FIG_PATH, '%s_%s_%s' % (SUBJECT, DATE, probe)))
-
-# Loop over neurons
-for n, cluster in enumerate(np.unique(spikes[probe].clusters)):
-
-    # Get brain region of neuron
-    region = channels[probe].acronym[clusters[probe].channels[
-                         clusters[probe].metrics.cluster_id == cluster][0]]
-    region = region.replace('/', '-')
-
 # Convert into seconds
 BIN_SIZE_S = BIN_SIZE / 1000
 BIN_START_S = BIN_START / 1000
@@ -179,36 +163,59 @@ for i, region in enumerate(np.unique(brain_region)):
         corr_bin.append(np.mean(np.diag(mat, j)))
     timescale[region]['decay_points'] = corr_bin
 
-    # Fit exponential decay starting at the bin with maximum autocorrelation
+    # Fit exponential decay starting at the bin with maximum autocorrelation decay
+    fit_start = np.argmin(np.diff(corr_bin))
+    if fit_start > BIN_START.shape[0]/3:
+        fit_start = np.argmax(corr_bin)
+    if fit_start > BIN_START.shape[0]/3:
+        fit_start = 0
     delta_time = np.arange(BIN_SIZE, BIN_SIZE*corr_matrix.shape[0], BIN_SIZE)
-    fitted_params, _ = curve_fit(exponential_decay, delta_time[np.argmax(corr_bin):],
-                                 corr_bin[np.argmax(corr_bin):], [0.5, 200, 0])
+    fitted_params, _ = curve_fit(exponential_decay, delta_time[fit_start:],
+                                 corr_bin[fit_start:], [0.5, 200, 0])
     timescale[region]['fit'] = fitted_params
     timescale[region]['time_constant'] = fitted_params[1]
 
 # %% Plot
 
+sns.set(style="ticks", context="paper", font_scale=1.5)
+
 ax_grid = int(np.ceil(np.sqrt(len(timescale.keys()))))
 f, ax = plt.subplots(ax_grid, ax_grid, sharex=True, sharey=True,
-                     figsize=(ax_grid*2.5, ax_grid*2.5))
+                     figsize=(ax_grid*3, ax_grid*3))
 ax = np.reshape(ax, (1, ax_grid * ax_grid))[0]
 for i, region in enumerate(timescale.keys()):
     sns.heatmap(timescale[region]['corr_matrix'], cbar=False, ax=ax[i])
-    ax[i].set(xticks=np.arange(0, BIN_START.shape[0], 2), xticklabels=BIN_START[0:-1:2],
-              yticks=np.arange(0, BIN_START.shape[0], 2),  yticklabels=BIN_START[0:-1:2],
+    ax[i].set(xticks=np.arange(0, BIN_START.shape[0], 3), xticklabels=BIN_START[0:-1:3],
+              yticks=np.arange(0, BIN_START.shape[0], 3),  yticklabels=BIN_START[0:-1:3],
               title=region)
+    ax[i].tick_params(labelsize=12, labelrotation=45)
+f.text(0.5, 0.02, 'Time to trial start (ms)', ha='center')
+f.text(0.02, 0.5, 'Time to trial start (ms)', va='center', rotation='vertical')
+plt.tight_layout(pad=1.8)
+plt.savefig(join(FIG_PATH, '%s_%s_probe%s_corrmat' % (SUBJECT, DATE, PROBE)), dpi=300)
 
 colors = sns.color_palette('colorblind', len(timescale.keys()))
 f, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+
 x = np.arange(0, BIN_START.shape[0] * BIN_SIZE, 1)
 for i, region in enumerate(timescale.keys()):
-    ax1.plot(x, exponential_decay(x, timescale[region]['fit'][0], timescale[region]['fit'][1],
-                                  timescale[region]['fit'][2]), color=colors[i], label=region)
+    ax1.plot(x, exponential_decay(
+                    x, timescale[region]['fit'][0], timescale[region]['fit'][1],
+                    timescale[region]['fit'][2]), color=colors[i], label=region, lw=2)
     ax1.plot(delta_time, timescale[region]['decay_points'], 'o', color=colors[i])
-plt.legend()
+ax1.legend(frameon=False)
 ax1.set(ylabel='Auto-correlation', xlabel='\u0394 Time (ms)')
 
 time_constant = []
 for i, region in enumerate(timescale.keys()):
     time_constant.append(timescale[region]['time_constant'])
-ax2.bar(np.arange(len(time_constant[:-2])), time_constant[:-2])
+
+ax2.bar(np.arange(len(time_constant)), np.array(time_constant)[np.argsort(time_constant)],
+        color=colors)
+ax2.set(ylabel='Intrinsic timescale (ms)', xticks=np.arange(len(timescale.keys())),
+        xticklabels=np.array(list(timescale.keys()))[np.argsort(time_constant)])
+plt.xticks(rotation=45)
+
+sns.despine(trim=True)
+plt.tight_layout()
+plt.savefig(join(FIG_PATH, '%s_%s_probe%s_timescale' % (SUBJECT, DATE, PROBE)), dpi=300)

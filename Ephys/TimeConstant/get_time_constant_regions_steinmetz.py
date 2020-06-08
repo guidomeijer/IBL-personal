@@ -1,31 +1,33 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu Feb  6 10:56:57 2020
+Calculate intrinsic time constants of all brain regions in the dataset from Steinmetz et al. (2019)
+Data is downloaded through the Open Neurophysiology Environment (ONE), installation instructions:
+https://github.com/int-brain-lab/ibllib/tree/onelight/oneibl#one-light
 
-Decode left/right block identity from all brain regions
-
-@author: Guido Meijer
+by Guido Meijer
+June 8, 2020
 """
 
-from os.path import join
+import os
+from os.path import join, normpath
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from scipy.optimize import curve_fit
 from scipy.stats import pearsonr
-from ephys_functions import paths, figure_style
-import brainbox.io.one as bbone
-from oneibl.one import ONE
-one = ONE()
+from oneibl.onelight import ONE
+
+# Paths (change this)
+FIG_PATH = '/home/guido/Figures/Ephys/TimeConstant'
+RESULT_PATH = '/home/guido/Data/Ephys'
+DATA_PATH = '/media/guido/data/Steinmetz'
 
 # Settings
 BIN_SIZE = 50  # in ms
 BIN_START = np.arange(-1050, -50, 50)  # ms relative to go cue
 MIN_NEURONS = 10
-DATA_PATH, FIG_PATH, SAVE_PATH = paths()
-FIG_PATH = join(FIG_PATH, 'WholeBrain')
 
 
 def exponential_decay(x, A, tau, B):
@@ -78,52 +80,34 @@ def _get_spike_counts_in_bins(spike_times, spike_clusters, intervals):
 
 
 # %%
-# Get list of all recordings that have histology
-rec_with_hist = one.alyx.rest('trajectories', 'list', provenance='Histology track')
-recordings = pd.DataFrame(data={
-                            'eid': [rec['session']['id'] for rec in rec_with_hist],
-                            'probe': [rec['probe_name'] for rec in rec_with_hist],
-                            'date': [rec['session']['start_time'][:10] for rec in rec_with_hist],
-                            'subject': [rec['session']['subject'] for rec in rec_with_hist]})
+# Set up ONE
+one = ONE()
+one.set_figshare_url('https://figshare.com/articles/steinmetz/9974357')
+one.set_download_dir(join(DATA_PATH, '{subject}', '{date}'))
 
-# Get list of eids of ephysChoiceWorld sessions
-eids = one.search(dataset_types=['spikes.times', 'probes.trajectory'],
-                  task_protocol='_iblrig_tasks_ephysChoiceWorld')
+# Query all sessions with ephys and behavior
+sessions = one.search(['spikes', 'trials'])
 
-# Select only the ephysChoiceWorld sessions and sort by eid
-recordings = recordings[recordings['eid'].isin(eids)]
-recordings = recordings.sort_values('eid').reset_index()
-
+# Loop over recording sessions
 timeconstant = pd.DataFrame()
-for i, eid in enumerate(recordings['eid'].values):
+for i, ses in enumerate(sessions):
 
-    # Load in data (only when not already loaded from other probe)
-    print('Processing recording %d of %d' % (i+1, len(recordings)))
-    if i == 0:
-        try:
-            spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
-            trials = one.load_object(eid, 'trials')
-        except:
-            continue
-    elif recordings.loc[i-1, 'eid'] != recordings.loc[i, 'eid']:
-        try:
-            spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
-            trials = one.load_object(eid, 'trials')
-        except:
-            continue
+    # Get subject and date
+    ses_path = normpath(ses)
+    ses_date = ses_path.split(os.sep)[-2]
+    subject = ses_path.split(os.sep)[-3]
 
-    # Get probe
-    probe = recordings.loc[i, 'probe']
-    if probe not in spikes.keys():
-        continue
+    # Download and load in data
+    spikes = one.load_object(ses, 'spikes')
+    clusters = one.load_object(ses, 'clusters')
+    channels = one.load_object(ses, 'channels')
+    trials = one.load_object(ses, 'trials')
 
     # Only use single units
-    spikes[probe].times = spikes[probe].times[np.isin(
-            spikes[probe].clusters, clusters[probe].metrics.cluster_id[
-                clusters[probe].metrics.ks2_label == 'good'])]
-    spikes[probe].clusters = spikes[probe].clusters[np.isin(
-            spikes[probe].clusters, clusters[probe].metrics.cluster_id[
-                clusters[probe].metrics.ks2_label == 'good'])]
+    good_clusters = [i for i, x in enumerate(clusters._phy_annotation) if x[0] >= 2]
+    spike_times = spikes.times[np.isin(spikes.clusters, good_clusters)]
+    spike_clusters = spikes.clusters[np.isin(spikes.clusters, good_clusters)]
+    cluster_channels = clusters.peakChannel[good_clusters]
 
     # Convert into seconds
     BIN_SIZE_S = BIN_SIZE / 1000
@@ -131,7 +115,7 @@ for i, eid in enumerate(recordings['eid'].values):
 
     # Pre-allocate 3D matrix (bin1 x bin2 x neuron)
     corr_matrix = np.empty((BIN_START.shape[0], BIN_START.shape[0],
-                            np.unique(spikes[probe].clusters).shape[0]))
+                            np.unique(spike_clusters).shape[0]))
 
     # Correlate every timebin with every other timebin
     for i, bin1 in enumerate(BIN_START_S):
@@ -140,13 +124,13 @@ for i, eid in enumerate(recordings['eid'].values):
             times1 = np.column_stack(((trials.goCue_times + bin1),
                                      (trials.goCue_times + (bin1 + BIN_SIZE_S))))
             pop_vector1, cluster_ids = _get_spike_counts_in_bins(
-                                        spikes[probe].times, spikes[probe].clusters, times1)
+                                                        spike_times, spike_clusters, times1)
 
             # Get spike counts of all neurons during bin 2
             times2 = np.column_stack(((trials.goCue_times + bin2),
                                      (trials.goCue_times + (bin2 + BIN_SIZE_S))))
             pop_vector2, cluster_ids = _get_spike_counts_in_bins(
-                                        spikes[probe].times, spikes[probe].clusters, times2)
+                                                        spike_times, spike_clusters, times2)
 
             # Correlate the two bins for each neuron
             for n, cluster in enumerate(cluster_ids):
@@ -154,12 +138,8 @@ for i, eid in enumerate(recordings['eid'].values):
                 # Correlate time bins
                 corr_matrix[i, j, n], _ = pearsonr(pop_vector1[n], pop_vector2[n])
 
-    # Get the brain regions
-    brain_region = []
-    for i, cluster in enumerate(cluster_ids):
-        region = clusters[probe].acronym[clusters[probe].metrics.cluster_id == cluster][0]
-        region = region.replace('/', '-')
-        brain_region.append(region)
+    # Get the brain region for each cluster
+    brain_region = channels.brainLocation.allen_ontology[np.squeeze(cluster_channels)].values
 
     # Exclude regions with too few neurons
     unique_regions, n_per_region = np.unique(brain_region, return_counts=True)
@@ -171,6 +151,7 @@ for i, eid in enumerate(recordings['eid'].values):
 
     # Average matrix over neurons in brain region and fit exponential decay at population level
     for i, region in enumerate(np.unique(brain_region)):
+
         # Get average matrix
         mat = np.nanmean(corr_matrix[:, :, np.array(
                             [j for j, r in enumerate(brain_region) if r == region])], axis=2)
@@ -192,19 +173,17 @@ for i, eid in enumerate(recordings['eid'].values):
             fitted_params, _ = curve_fit(exponential_decay, delta_time[fit_start:],
                                          corr_bin[fit_start:], [0.5, 200, 0])
             timeconstant = timeconstant.append(pd.DataFrame(
-                                    index=[0], data={'subject': recordings.loc[i, 'subject'],
-                                                     'date': recordings.loc[i, 'date'],
-                                                     'eid': recordings.loc[i, 'eid'],
-                                                     'probe': probe,
+                                    index=[0], data={'subject': subject,
+                                                     'date': ses_date,
                                                      'region': region,
                                                      'time_constant': fitted_params[1]}))
         except:
             continue
 
-    timeconstant.to_csv(join(SAVE_PATH, 'time_constant_regions.csv'))
+    timeconstant.to_csv(join(RESULT_PATH, 'time_constant_regions_steinmetz.csv'))
 
 # %% Plot
-timeconstant = pd.read_csv(join(SAVE_PATH, 'time_constant_regions.csv'))
+timeconstant = pd.read_csv(join(RESULT_PATH, 'time_constant_regions_steinmetz.csv'))
 
 n_regions = timeconstant.groupby('region').size()[
                                     timeconstant.groupby('region').size() > 3].reset_index()
@@ -218,4 +197,3 @@ f, ax1 = plt.subplots(1, 1, figsize=(10, 10))
 
 sns.barplot(x='time_constant', y='region', data=timeconstant, order=sort_regions, ci=68, ax=ax1)
 ax1.set(xlabel='Intrinsic timeconstant (ms)', ylabel='', xscale='log')
-figure_style(font_scale=1.2)
