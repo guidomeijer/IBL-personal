@@ -91,6 +91,7 @@ sessions = one.search(['spikes', 'trials'])
 # Loop over recording sessions
 timeconstant = pd.DataFrame()
 for i, ses in enumerate(sessions):
+    print('Calculating time constants for session %d of %d' % (i+1, len(sessions)))
 
     # Get subject and date
     ses_path = normpath(ses)
@@ -139,7 +140,8 @@ for i, ses in enumerate(sessions):
                 corr_matrix[i, j, n], _ = pearsonr(pop_vector1[n], pop_vector2[n])
 
     # Get the brain region for each cluster
-    brain_region = channels.brainLocation.allen_ontology[np.squeeze(cluster_channels)].values
+    brain_region = channels.brainLocation.allen_ontology[np.squeeze(
+                                                            cluster_channels)].values.astype(str)
 
     # Exclude regions with too few neurons
     unique_regions, n_per_region = np.unique(brain_region, return_counts=True)
@@ -183,7 +185,11 @@ for i, ses in enumerate(sessions):
     timeconstant.to_csv(join(RESULT_PATH, 'time_constant_regions_steinmetz.csv'))
 
 # %% Plot
+sns.set(context='paper', style='whitegrid', font_scale=2)
 timeconstant = pd.read_csv(join(RESULT_PATH, 'time_constant_regions_steinmetz.csv'))
+
+# Exclude outliers
+timeconstant = timeconstant[timeconstant['time_constant'] < 1000]
 
 n_regions = timeconstant.groupby('region').size()[
                                     timeconstant.groupby('region').size() > 3].reset_index()
@@ -194,6 +200,8 @@ sort_regions = timeconstant.groupby('region').mean().sort_values(
                         'time_constant', ascending=False).reset_index()['region']
 
 f, ax1 = plt.subplots(1, 1, figsize=(10, 10))
-
-sns.barplot(x='time_constant', y='region', data=timeconstant, order=sort_regions, ci=68, ax=ax1)
-ax1.set(xlabel='Intrinsic timeconstant (ms)', ylabel='', xscale='log')
+sns.barplot(x='time_constant', y='region', data=timeconstant,
+            order=sort_regions, ci=68, color=[0.6, 0.6, 0.6], ax=ax1)
+ax1.set(xlabel='Intrinsic timeconstant (ms)', ylabel='', xlim=[0, 450])
+sns.despine(trim=False)
+plt.savefig(join(FIG_PATH, 'time_constant_steinmetz'))

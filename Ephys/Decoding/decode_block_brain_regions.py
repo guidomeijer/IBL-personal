@@ -35,7 +35,9 @@ FIG_PATH = join(FIG_PATH, 'WholeBrain')
 
 # %%
 # Get list of all recordings that have histology
-rec_with_hist = one.alyx.rest('trajectories', 'list', provenance='Histology track')
+rec_with_hist = one.alyx.rest('trajectories', 'list', provenance='Histology track',
+                              task_protocol='_iblrig_tasks_ephysChoiceWorld')
+
 recordings = pd.DataFrame(data={
                             'eid': [rec['session']['id'] for rec in rec_with_hist],
                             'probe': [rec['probe_name'] for rec in rec_with_hist],
