@@ -11,10 +11,8 @@ Decode left/right block identity from all brain regions
 from os.path import join
 import matplotlib.pyplot as plt
 import numpy as np
-from brainbox.population import decode
 import pandas as pd
 import seaborn as sns
-from sklearn.utils import shuffle
 from ephys_functions import paths, figure_style
 import brainbox as bb
 import brainbox.io.one as bbone
@@ -137,7 +135,7 @@ for i, eid in enumerate(recordings['eid'].values):
     surprise_neurons.to_csv(join(SAVE_PATH, 'n_surprise_neurons_regions.csv'))
 
 # %% Plot
-# surprise_neurons = pd.read_csv(join(SAVE_PATH, 'n_surprise_neurons_regions.csv'))
+surprise_neurons = pd.read_csv(join(SAVE_PATH, 'n_surprise_neurons_regions.csv'))
 
 surprise_summed = surprise_neurons.groupby('region').sum()
 surprise_summed = surprise_summed.reset_index()

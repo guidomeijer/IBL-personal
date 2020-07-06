@@ -21,6 +21,7 @@ one = ONE()
 # Settings
 DOWNLOAD = False
 OVERWRITE = False
+MIN_CONTRAST = 0.1
 PRE_TIME = 0.6
 POST_TIME = -0.1
 MIN_NEURONS = 20  # min neurons per region
@@ -86,6 +87,38 @@ for i, eid in enumerate(recordings['eid'].values):
     trial_times = trials.stimOn_times[incl_trials]
     probability_left = trials.probabilityLeft[incl_trials]
     trial_blocks = (trials.probabilityLeft[incl_trials] > 0.55).astype(int)
+    
+    
+
+    # Get trial indices of inconsistent trials during left high blocks
+    incon_l_block = ((trials.probabilityLeft > 0.55)
+                     & (trials.contrastRight > MIN_CONTRAST))
+    cons_l_block = ((trials.probabilityLeft > 0.55)
+                    & (trials.contrastLeft > MIN_CONTRAST))
+    consistent_l = np.zeros(cons_l_block.shape[0])
+    consistent_l[cons_l_block == 1] = 1
+    consistent_l[incon_l_block == 1] = 2
+    sldfjk
+    
+    # Get trial indices of inconsistent trials during right high blocks
+    incon_r_block = ((trials.probabilityLeft < 0.45)
+                     & (trials.contrastLeft > MIN_CONTRAST))
+    cons_r_block = ((trials.probabilityLeft < 0.45)
+                    & (trials.contrastRight > MIN_CONTRAST))
+    right_times = trials.stimOn_times[(cons_r_block == 1) | (incon_r_block == 1)]
+    consistent_r = np.zeros(cons_r_block.shape[0])
+    consistent_r[cons_r_block == 1] = 1
+    consistent_r[incon_r_block == 1] = 2
+    resp_r = resp[(consistent_r == 1) | (consistent_r == 2), :]
+    consistent_r = consistent_r[(consistent_r == 1) | (consistent_r == 2)]
+            
+            
+            
+          
+    
+    
+    
+    
 
     # Check for number of trials
     if trial_times.shape[0] < MIN_TRIALS:
