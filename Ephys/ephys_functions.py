@@ -35,6 +35,23 @@ def figure_style(font_scale=2, despine=True, trim=True):
     plt.tight_layout()
 
 
+def check_trials(trials):
+    
+    if trials is None:
+        return False        
+    if trials.probabilityLeft is None:
+        return False
+    if len(trials.probabilityLeft[0].shape) > 0:
+        return False
+    if trials.probabilityLeft[0] != 0.5:
+        return False
+    if ((not hasattr(trials, 'stimOn_times'))  
+            or (len(trials.feedback_times) != len(trials.feedbackType))
+            or (len(trials.stimOn_times) != len(trials.probabilityLeft))):
+        return False
+    return True
+
+
 def sessions():
     ses = pd.read_csv(join(dirname(__file__), 'sessions.csv'), dtype='str')
     return ses

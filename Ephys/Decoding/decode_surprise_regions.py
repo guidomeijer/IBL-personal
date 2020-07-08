@@ -12,7 +12,7 @@ import numpy as np
 from brainbox.population import decode
 import pandas as pd
 import seaborn as sns
-from ephys_functions import paths, figure_style
+from ephys_functions import paths, figure_style, check_trials
 import brainbox.io.one as bbone
 from oneibl.one import ONE
 one = ONE()
@@ -39,11 +39,10 @@ ses_with_hist = one.alyx.rest('sessions', 'list',
                               task_protocol='_iblrig_tasks_ephysChoiceWorld',
                               project='ibl_neuropixel_brainwide',
                               django='subject__actions_sessions__procedures__name,Histology')
-eids = [i['url'][-36:] for i in ses_with_hist]
 
 decoding_result = pd.DataFrame()
 for i in range(len(ses_with_hist)):
-    print('Processing session %d of %d' % (i+1, len(eids)))
+    print('Processing session %d of %d' % (i+1, len(ses_with_hist)))
 
     # Get meta data
     subject = ses_with_hist[i]['url'][-36:]
@@ -57,24 +56,22 @@ for i in range(len(ses_with_hist)):
         continue
 
     # Check data integrity
-    if ((not hasattr(trials, 'stimOn_times'))
-            or (len(trials.feedback_times) != len(trials.feedbackType))
-            or (len(trials.stimOn_times) != len(trials.probabilityLeft))):
+    if check_trials(trials) is False:
         continue
 
     # Get trial indices of inconsistent trials during left high blocks
-    incon_l_block = ((trials.probabilityLeft > 0.55)
+    incon_l_block = ((trials.probabilityLeft == 0.8)
                      & (trials.contrastRight > MIN_CONTRAST))
-    cons_l_block = ((trials.probabilityLeft > 0.55)
+    cons_l_block = ((trials.probabilityLeft == 0.8)
                     & (trials.contrastLeft > MIN_CONTRAST))
     consistent_l = np.zeros(cons_l_block.shape[0])
     consistent_l[cons_l_block == 1] = 1
     consistent_l[incon_l_block == 1] = 2
     
     # Get trial indices of inconsistent trials during right high blocks
-    incon_r_block = ((trials.probabilityLeft < 0.45)
+    incon_r_block = ((trials.probabilityLeft == 0.2)
                      & (trials.contrastLeft > MIN_CONTRAST))
-    cons_r_block = ((trials.probabilityLeft < 0.45)
+    cons_r_block = ((trials.probabilityLeft == 0.2)
                     & (trials.contrastRight > MIN_CONTRAST))
     right_times = trials.stimOn_times[(cons_r_block == 1) | (incon_r_block == 1)]
     consistent_r = np.zeros(cons_r_block.shape[0])

@@ -8,8 +8,9 @@ Created on Fri Jul  3 13:58:04 2020
 
 from os.path import join
 import brainbox as bb
+import numpy as np
 import matplotlib.pyplot as plt
-from ephys_functions import paths
+from ephys_functions import paths, check_trials
 import brainbox.io.one as bbone
 from oneibl.one import ONE
 one = ONE()
@@ -36,6 +37,10 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
         trials = one.load_object(eid, 'trials')
     except:
         continue
+    
+    # Check data integrity
+    if check_trials(trials) is False:
+        continue    
         
     # Get trial indices
     r_in_l_block = trials.stimOn_times[((trials.probabilityLeft == 0.8)
@@ -49,13 +54,21 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
         
     # Loop over probes
     for p, probe in enumerate(spikes.keys()):
-        
+                
         # Get clusters in region of interest
         region_clusters = [ind for ind, s in enumerate(clusters[probe]['acronym']) if REGION in s]
+        region_clusters = np.array(region_clusters)
         
-        for c, cluster_ind in enumerate(region_clusters):
+        # Right stimulus
+        sig_units = bb.task.differentiate_units(spikes[probe].times, spikes[probe].clusters,
+                                                np.append(r_in_l_block, r_in_r_block),
+                                                np.append(np.zeros(len(r_in_l_block)),
+                                                          np.ones(len(r_in_r_block))),
+                                                pre_time=0, post_time=0.5,
+                                                test='ranksums', alpha=0.05)[0]
+                
+        for c, cluster_ind in enumerate(region_clusters[np.isin(region_clusters, sig_units)]):
             
-            # Right stimulus
             fig, ax = plt.subplots(1, 1)
             bb.plot.peri_event_time_histogram(spikes[probe].times, spikes[probe].clusters,
                                               r_in_r_block, cluster_ind,
@@ -79,6 +92,16 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
                                               clusters[probe]['acronym'][cluster_ind],
                                               str(cluster_ind))))
             plt.close(fig)
+         
+        # Left stimulus
+        sig_units = bb.task.differentiate_units(spikes[probe].times, spikes[probe].clusters,
+                                                np.append(l_in_l_block, l_in_r_block),
+                                                np.append(np.zeros(len(l_in_l_block)),
+                                                          np.ones(len(l_in_r_block))),
+                                                pre_time=0, post_time=0.5,
+                                                test='ranksums', alpha=0.05)[0]
+        
+        for c, cluster_ind in enumerate(region_clusters[np.isin(region_clusters, sig_units)]):
             
             # Left stimulus
             fig, ax = plt.subplots(1, 1)
@@ -100,7 +123,7 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
             plt.title('Stimulus Onset (right side)')
             plt.tight_layout()
             plt.savefig(join(FIG_PATH, 'PSTH', 'Surprise',
-                             '%s_%s_%s_%s_r' % (ses[i]['subject'], ses[i]['start_time'][:10],
+                             '%s_%s_%s_%s_l' % (ses[i]['subject'], ses[i]['start_time'][:10],
                                               clusters[probe]['acronym'][cluster_ind],
                                               str(cluster_ind))))
             plt.close(fig)
