@@ -5,7 +5,6 @@ Created on Wed Jan 22 16:22:01 2020
 @author: guido
 """
 
-from oneibl.one import ONE
 import seaborn as sns
 import matplotlib
 import matplotlib.pyplot as plt
@@ -38,63 +37,50 @@ def figure_style(font_scale=2, despine=True, trim=True):
 def check_trials(trials):
     
     if trials is None:
+        print('trials Bunch is None type')
         return False        
     if trials.probabilityLeft is None:
+        print('trials.probabilityLeft is None type')
         return False
     if len(trials.probabilityLeft[0].shape) > 0:
+        print('trials.probabilityLeft is an array of tuples')
         return False
     if trials.probabilityLeft[0] != 0.5:
+        print('trials.probabilityLeft does not start with 0.5')
         return False
     if ((not hasattr(trials, 'stimOn_times'))  
             or (len(trials.feedback_times) != len(trials.feedbackType))
             or (len(trials.stimOn_times) != len(trials.probabilityLeft))):
+        print('stimOn_times or feedback_times don not match with probabilityLeft')
         return False
     return True
+
+
+def sessions_with_hist():
+    from oneibl.one import ONE
+    one = ONE()
+    
+    # Query all ephysChoiceWorld sessions with histology
+    sessions = one.alyx.rest('sessions', 'list',
+                             task_protocol='_iblrig_tasks_ephysChoiceWorld',
+                             project='ibl_neuropixel_brainwide',
+                             dataset_types = ['spikes.times', 'trials.probabilityLeft'],
+                             histology=True)
+    return sessions
+
+
+def sessions_with_region(brain_region):
+    from oneibl.one import ONE
+    one = ONE()
+    
+    # Query sessions with at least one channel in the specified region
+    sessions = one.alyx.rest('sessions', 'list', atlas_acronym=brain_region,
+                        task_protocol='_iblrig_tasks_ephysChoiceWorld',
+                        dataset_types = ['spikes.times', 'trials.probabilityLeft'],
+                        project='ibl_neuropixel_brainwide')
+    return sessions
 
 
 def sessions():
     ses = pd.read_csv(join(dirname(__file__), 'sessions.csv'), dtype='str')
     return ses
-
-
-def download_data(nickname, date):
-    one = ONE()
-    eid = one.search(subject=nickname, date_range=[date, date])
-    assert len(eid) == 1
-    dtypes = ['_iblrig_taskSettings.raw',
-              'spikes.times',
-              'spikes.clusters',
-              'clusters.channels',
-              'clusters.metrics',
-              'probes.trajectory',
-              'trials.choice',
-              'trials.intervals',
-              'trials.contrastLeft',
-              'trials.contrastRight',
-              'trials.feedback_times',
-              'trials.goCue_times',
-              'trials.feedbackType',
-              'trials.probabilityLeft',
-              'trials.response_times',
-              'trials.stimOn_times']
-    one.load(eid[0], dataset_types=dtypes, download_only=True)
-
-
-def dataset_types_to_download():
-    dtypes = ['_iblrig_taskSettings.raw',
-              'spikes.times',
-              'spikes.clusters',
-              'clusters.channels',
-              'clusters.metrics',
-              'probes.trajectory',
-              'trials.choice',
-              'trials.intervals',
-              'trials.contrastLeft',
-              'trials.contrastRight',
-              'trials.feedback_times',
-              'trials.goCue_times',
-              'trials.feedbackType',
-              'trials.probabilityLeft',
-              'trials.response_times',
-              'trials.stimOn_times']
-    return dtypes

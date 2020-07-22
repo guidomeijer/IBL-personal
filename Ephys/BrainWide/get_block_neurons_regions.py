@@ -15,7 +15,7 @@ from brainbox.population import decode
 import pandas as pd
 import seaborn as sns
 from sklearn.utils import shuffle
-from ephys_functions import paths, figure_style
+from ephys_functions import paths, figure_style, check_trials
 import brainbox as bb
 import brainbox.io.one as bbone
 from oneibl.one import ONE
@@ -31,91 +31,76 @@ ALPHA = 0.05
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
 
+# %%
 # Get list of all recordings that have histology
-rec_with_hist = one.alyx.rest('trajectories', 'list', provenance='Histology track')
-recordings = pd.DataFrame(data={
-                            'eid': [rec['session']['id'] for rec in rec_with_hist],
-                            'probe': [rec['probe_name'] for rec in rec_with_hist],
-                            'date': [rec['session']['start_time'][:10] for rec in rec_with_hist],
-                            'subject': [rec['session']['subject'] for rec in rec_with_hist]})
-
-# Get list of eids of ephysChoiceWorld sessions
-eids = one.search(dataset_types=['spikes.times', 'probes.trajectory'],
-                  task_protocol='_iblrig_tasks_ephysChoiceWorld')
-
-# Select only the ephysChoiceWorld sessions and sort by eid
-recordings = recordings[recordings['eid'].isin(eids)]
-recordings = recordings.sort_values('eid').reset_index()
+session_list = one.alyx.rest('sessions', 'list',
+                             task_protocol='_iblrig_tasks_ephysChoiceWorld',
+                             project='ibl_neuropixel_brainwide',
+                             django='subject__actions_sessions__procedures__name,Histology')
 
 block_neurons = pd.DataFrame()
-for i, eid in enumerate(recordings['eid'].values):
-
-    # Load in data (only when not already loaded from other probe)
-    print('Processing recording %d of %d' % (i+1, len(recordings)))
-    if i == 0:
-        try:
-            spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
-            trials = one.load_object(eid, 'trials')
-        except:
-            continue
-    elif recordings.loc[i-1, 'eid'] != recordings.loc[i, 'eid']:
-        try:
-            spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
-            trials = one.load_object(eid, 'trials')
-        except:
-            continue
-
-    # Get probe
-    probe = recordings.loc[i, 'probe']
-    if probe not in spikes.keys():
+for i in range(len(session_list)):
+    print('Processing session %d of %d' % (i+1, len(session_list)))
+    
+    # Load in data
+    eid = session_list[i]['url'][-36:]
+    try:
+        spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
+        trials = one.load_object(eid, 'trials')
+    except:
         continue
 
     # Check data integrity
-    if ((not hasattr(trials, 'stimOn_times'))
-            or (len(trials.feedback_times) != len(trials.feedbackType))
-            or (len(trials.stimOn_times) != len(trials.probabilityLeft))):
+    if check_trials(trials) is False:
+        continue
+    if type(spikes) != dict:
         continue
 
     # Get trial vectors
-    incl_trials = (trials.probabilityLeft > 0.55) | (trials.probabilityLeft < 0.45)
+    incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
     trial_times = trials.stimOn_times[incl_trials]
     probability_left = trials.probabilityLeft[incl_trials]
-    trial_blocks = (trials.probabilityLeft[incl_trials] > 0.55).astype(int)
+    trial_blocks = (trials.probabilityLeft[incl_trials] == 0.8).astype(int)
 
     # Decode per brain region
-    for i, region in enumerate(np.unique(clusters[probe]['acronym'])):
+    for p, probe in enumerate(spikes.keys()):
 
-        # Get clusters in this brain region with KS2 label 'good'
-        clusters_in_region = clusters[probe].metrics.cluster_id[
-            (clusters[probe]['acronym'] == region) & (clusters[probe].metrics.ks2_label == 'good')]
-
-        # Check if there are enough neurons in this brain region
-        if np.shape(clusters_in_region)[0] < MIN_NEURONS:
-            continue
-
-        # Select spikes and clusters
-        spks_region = spikes[probe].times[np.isin(spikes[probe].clusters, clusters_in_region)]
-        clus_region = spikes[probe].clusters[np.isin(spikes[probe].clusters, clusters_in_region)]
-
-        # Get block neurons
-        sig_block = bb.task.differentiate_units(spks_region, clus_region,
-                                                trial_times, trial_blocks,
-                                                pre_time=PRE_TIME, post_time=POST_TIME,
-                                                alpha=ALPHA)[0]
-
-        # Add to dataframe
-        block_neurons = block_neurons.append(pd.DataFrame(
-                                index=[0], data={'subject': recordings.loc[i, 'subject'],
-                                                 'date': recordings.loc[i, 'date'],
-                                                 'eid': recordings.loc[i, 'eid'],
-                                                 'probe': probe,
-                                                 'region': region,
-                                                 'n_neurons': len(np.unique(clus_region)),
-                                                 'n_sig_block': sig_block.shape[0]}))
-        block_neurons.to_csv(join(SAVE_PATH, 'n_block_neurons_regions'))
+        # Decode per brain region
+        for i, region in enumerate(np.unique(clusters[probe]['acronym'])):
+    
+            # Get clusters in this brain region with KS2 label 'good'
+            clusters_in_region = clusters[probe].metrics.cluster_id[
+                                                ((clusters[probe]['acronym'] == region))]
+    
+            # Check if there are enough neurons in this brain region
+            if np.shape(clusters_in_region)[0] < MIN_NEURONS:
+                continue
+    
+            # Select spikes and clusters
+            spks_region = spikes[probe].times[np.isin(spikes[probe].clusters, clusters_in_region)]
+            clus_region = spikes[probe].clusters[np.isin(spikes[probe].clusters, clusters_in_region)]
+    
+            # Get block neurons
+            sig_block = bb.task.differentiate_units(spks_region, clus_region,
+                                                    trial_times, trial_blocks,
+                                                    pre_time=PRE_TIME, post_time=POST_TIME,
+                                                    alpha=ALPHA)[0]
+    
+            # Add to dataframe
+            block_neurons = block_neurons.append(pd.DataFrame(
+                                    index=[0], data={'subject': session_list[i]['subject'],
+                                                     'date': session_list[i]['start_time'][:10],
+                                                     'eid': eid,
+                                                     'probe': probe,
+                                                     'region': region,
+                                                     'n_neurons': len(np.unique(clus_region)),
+                                                     'n_sig_block': sig_block.shape[0]}))
+            block_neurons.to_csv(join(SAVE_PATH, 'n_block_neurons_regions'))
 
 # %% Plot
 block_neurons = pd.read_csv(join(SAVE_PATH, 'n_block_neurons_regions'))
+
+block_neurons['perc'] = block_neurons['']
 
 block_summed = block_neurons.groupby('region').sum()
 block_summed = block_summed.reset_index()
