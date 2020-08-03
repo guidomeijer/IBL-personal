@@ -8,18 +8,22 @@ Created on Wed Jan 22 16:22:01 2020
 import seaborn as sns
 import matplotlib
 import matplotlib.pyplot as plt
-from os.path import expanduser, join, dirname
+from os.path import join, dirname
 import pandas as pd
+import pathlib
+from paths import DATA_PATH, FIG_PATH
 
 
 def paths():
-    if expanduser('~') == '/home/guido':
-        data_path = '/media/guido/data/Flatiron/'
-    else:
-        data_path = join(expanduser('~'), 'Downloads', 'FlatIron')
-    fig_path = join(expanduser('~'), 'Figures', 'Ephys')
-    save_path = join(expanduser('~'), 'Data', 'Ephys')
-    return data_path, fig_path, save_path
+    """
+    Make a file in the root of the repository called 'paths.py' with in it:
+        
+    DATA_PATH = '/path/to/Flatiron/data'
+    FIG_PATH = '/path/to/save/figures'
+    
+    """
+    save_path = join(pathlib.Path(__file__).parent.absolute(), 'Data')
+    return DATA_PATH, FIG_PATH, save_path
 
 
 def figure_style(font_scale=2, despine=True, trim=True):
