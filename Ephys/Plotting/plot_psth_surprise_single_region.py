@@ -18,13 +18,13 @@ from oneibl.one import ONE
 one = ONE()
 
 # Settings
-REGION = 'MRN'
+REGION = 'MO'
 MIN_CONTRAST = 0.1
 PLOT_PRE_TIME = 0.5
 PLOT_POST_TIME = 1
 TEST_PRE_TIME = 0
 TEST_POST_TIME = 0.5
-ALPHA = 0.05
+ALPHA = 0.1
 FIG_PATH = paths()[1]
 
 # Query sessions with at least one channel in the region of interest
@@ -72,8 +72,7 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
         
         # Get clusters in region of interest
         clusters_in_region = clusters[probe].metrics.cluster_id[
-                                                        clusters[probe]['acronym'] == REGION]
-        
+                        [i for i, j in enumerate(clusters[probe]['acronym']) if REGION in j]]
         
         # Select spikes and clusters
         spks_region = spikes[probe].times[np.isin(spikes[probe].clusters, clusters_in_region)]
@@ -109,7 +108,8 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
             plt.tight_layout()
             plt.savefig(join(FIG_PATH, 'PSTH', 'Surprise', REGION,
                              '%s_%s_%s_%s_r' % (ses[i]['subject'], ses[i]['start_time'][:10],
-                                              clusters[probe]['acronym'][cluster_ind],
+                                              clusters[probe]['acronym'][cluster_ind].replace(
+                                                                                        '/', '-'),
                                               str(cluster_ind))))
             plt.close(fig)
          
@@ -144,7 +144,8 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
             plt.tight_layout()
             plt.savefig(join(FIG_PATH, 'PSTH', 'Surprise', REGION,
                              '%s_%s_%s_%s_l' % (ses[i]['subject'], ses[i]['start_time'][:10],
-                                              clusters[probe]['acronym'][cluster_ind],
+                                              clusters[probe]['acronym'][cluster_ind].replace(
+                                                                                        '/', '-'),
                                               str(cluster_ind))))
             plt.close(fig)
     

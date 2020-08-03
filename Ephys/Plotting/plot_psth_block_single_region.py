@@ -9,6 +9,7 @@ Created on Fri Jul  3 13:58:04 2020
 from os import mkdir
 from os.path import join, isdir
 import brainbox as bb
+import alf
 import numpy as np
 import matplotlib.pyplot as plt
 from ephys_functions import paths, check_trials
@@ -17,7 +18,7 @@ from oneibl.one import ONE
 one = ONE()
 
 # Settings
-REGION = 'MB'
+REGION = 'RSP'
 TEST_PRE_TIME = 0.6
 TEST_POST_TIME = -0.1
 PLOT_PRE_TIME = 0.5
@@ -41,7 +42,8 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
     # Load in data
     try:
         spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
-        trials = one.load_object(eid, 'trials')
+        ses_path = one.path_from_eid(eid)
+        trials = alf.io.load_object(join(ses_path, 'alf'), '_ibl_trials')
     except:
         continue
     
@@ -58,9 +60,10 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
     # Loop over probes
     for p, probe in enumerate(spikes.keys()):
         
-        # Get clusters in this brain region with KS2 label 'good'
+        # Get clusters in region of interest
         clusters_in_region = clusters[probe].metrics.cluster_id[
-                                            ((clusters[probe]['acronym'] == REGION))]
+                        [i for i, j in enumerate(clusters[probe]['acronym']) if REGION in j]]
+        
         if len(clusters_in_region) == 0:
             continue
 
@@ -96,7 +99,8 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
             plt.tight_layout()
             plt.savefig(join(FIG_PATH, 'PSTH', 'Block', REGION,
                              '%s_%s_%s_%s' % (ses[i]['subject'], ses[i]['start_time'][:10],
-                                              clusters[probe]['acronym'][cluster_ind],
+                                              clusters[probe]['acronym'][cluster_ind].replace(
+                                                                                        '/', '-'),
                                               str(cluster_ind))))
             plt.close(fig)
          

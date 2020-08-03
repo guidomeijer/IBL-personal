@@ -12,6 +12,7 @@ import numpy as np
 from brainbox.population import decode
 import pandas as pd
 import seaborn as sns
+from scipy.stats import wilcoxon
 from ephys_functions import paths, figure_style, check_trials, sessions_with_hist
 import brainbox.io.one as bbone
 import alf
@@ -22,10 +23,10 @@ one = ONE()
 DOWNLOAD = False
 OVERWRITE = False
 MIN_CONTRAST = 0.1
-PRE_TIME = 0.1
-POST_TIME = 0.6
-MIN_NEURONS = 15  # min neurons per region
-N_NEURONS = 15  # number of neurons to use for decoding
+PRE_TIME = 0
+POST_TIME = 0.5
+MIN_NEURONS = 10  # min neurons per region
+N_NEURONS = 10  # number of neurons to use for decoding
 MIN_TRIALS = 400
 ITERATIONS = 1000
 DECODER = 'bayes'  # bayes, regression or forest
@@ -168,22 +169,60 @@ for i in range(len(ses_with_hist)):
     decoding_result.to_csv(join(SAVE_PATH, 'decoding_surprise_regions_%d_neurons.csv' % N_NEURONS))
 
 # %% Plot
-decoding_result = pd.read_csv(join(SAVE_PATH, 'decoding_surprise_regions_10_neurons.csv'))
-decoding_result['accuracy'] = (decoding_result['accuracy_right']
-                               - decoding_result['accuracy_right_shuf'])
-decoding_result['f1'] = (decoding_result['f1_right']
-                               - decoding_result['f1_right_shuffle'])
+    
+p_value = 1
+min_perf = 0.05
+side = 'r'
+max_fano = 0.5
+    
+# Load in data
+decoding_result = pd.read_csv(join(SAVE_PATH, 'decoding_surprise_regions_%d_neurons.csv' 
+                                   % N_NEURONS))
 
-decoding_regions = decoding_result.groupby('region').size()[
-                                    decoding_result.groupby('region').size() > 3].reset_index()
-decoding_result = decoding_result[decoding_result['region'].isin(decoding_regions['region'])]
-decoding_result = decoding_result.sort_values('accuracy', ascending=False)
+# Exclude root
+decoding_result = decoding_result.reset_index()
+incl_regions = [i for i, j in enumerate(decoding_result['region']) if not j.islower()]
+decoding_result = decoding_result.loc[incl_regions]
 
+# Get decoding performance over chance
+decoding_result['acc_r_over_chance'] = (decoding_result['accuracy_right']
+                                        - decoding_result['accuracy_right_shuf'])
+decoding_result['f1_r_over_chance'] = (decoding_result['f1_right']
+                                       - decoding_result['f1_right_shuffle'])
+decoding_result['acc_l_over_chance'] = (decoding_result['accuracy_right']
+                                        - decoding_result['accuracy_left_shuf'])
+decoding_result['f1_l_over_chance'] = (decoding_result['f1_left']
+                                       - decoding_result['f1_left_shuf'])
+
+# Calculate significance and average decoding performance per region
+for i, region in enumerate(decoding_result['region'].unique()):
+    _, p = wilcoxon(decoding_result.loc[decoding_result['region'] == region, 'f1_right'],
+                    decoding_result.loc[decoding_result['region'] == region,
+                                        'f1_right_shuffle'])
+    decoding_result.loc[decoding_result['region'] == region, 'p_value'] = p           
+    decoding_result.loc[decoding_result['region'] == region, 'f1_r_mean'] = decoding_result.loc[
+                            decoding_result['region'] == region, 'f1_r_over_chance'].mean()
+    decoding_result.loc[decoding_result['region'] == region, 'f1_l_mean'] = decoding_result.loc[
+                            decoding_result['region'] == region, 'f1_l_over_chance'].mean()
+    decoding_result.loc[decoding_result['region'] == region, 'f1_l_fano'] = (
+        decoding_result.loc[decoding_result['region'] == region, 'f1_l_over_chance'].std()
+        / decoding_result.loc[decoding_result['region'] == region, 'f1_l_over_chance'].mean())
+    decoding_result.loc[decoding_result['region'] == region, 'f1_r_fano'] = (
+        decoding_result.loc[decoding_result['region'] == region, 'f1_r_over_chance'].std()
+        / decoding_result.loc[decoding_result['region'] == region, 'f1_r_over_chance'].mean())
+
+# Apply plotting thresholds
+decoding_result = decoding_result[((decoding_result['p_value'] < p_value)
+                                   & (decoding_result['f1_%s_fano' % side] < max_fano)
+                                   & (decoding_result['f1_%s_mean' % side] > min_perf))]
+
+# Get sorting
 sort_regions = decoding_result.groupby('region').mean().sort_values(
-                                            'accuracy', ascending=False).reset_index()['region']
+                            'f1_%s_over_chance' % side, ascending=False).reset_index()['region']
 
 f, ax1 = plt.subplots(1, 1, figsize=(10, 10))
-sns.barplot(x='accuracy', y='region', data=decoding_result, order=sort_regions, ci=68, ax=ax1)
-ax1.set(xlabel='Decoding accuracy of inconsistent stimuli (% over chance)', ylabel='')
-figure_style(font_scale=1.2)
-plt.savefig(join(FIG_PATH, 'decode_surprise_regions_%d_neurons' % N_NEURONS))
+sns.barplot(x='f1_%s_over_chance' % side, y='region', data=decoding_result,
+            order=sort_regions, ci=68, ax=ax1)
+ax1.set(xlabel='Decoding accuracy of inconsistent stimuli (F1-score over chance)', ylabel='')
+figure_style(font_scale=2)
+plt.savefig(join(FIG_PATH, 'decode_surprise_%s_regions_%d_neurons' % (side, N_NEURONS)))
