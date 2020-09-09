@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Sep  9 09:15:34 2020
+
+@author: guido
+"""
+
+from os.path import join
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import alf
+import brainbox.io.one as bbone
+from oneibl.one import ONE
+one = ONE()
+
+# List of regions in repeated site
+target_regions = ['VISa1', 'VISa2/3', 'VISa4', 'VISa5', 'VISa6a', 'VISa6b', 'CA1', 'DG-mo', 'DG-sg',
+                  'DG-po', 'LP', 'PO', 'VPM', 'VPLpc', 'VM', 'ZI']
+hit_regions = pd.DataFrame(columns=target_regions)
+
+# Query repeated site sessions
+rep_site = one.alyx.rest('trajectories', 'list', provenance='Planned', x=-2243, y=-2000,
+                         django=('probe_insertion__session__project__name__icontains,'
+                                 + 'ibl_neuropixel_brainwide_01,'
+                                 + 'probe_insertion__session__qc__lt,40'))
+
+for i in range(len(rep_site)):
+    print('Processing session %d of %d' % (i+1, len(rep_site)))
+    
+    # Load in data
+    eid = rep_site[i]['session']['id']
+    try:
+        spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
+    except:
+        continue
+       
+    # Get coordinates of micro-manipulator and histology
+    hist = one.alyx.rest('trajectories', 'list', provenance='Histology track',
+                     probe_insertion=rep_site[i]['probe_insertion'])
+    if len(hist) == 0:
+        continue
+    hit_regions.loc[eid, 'x_hist'] = hist[0]['x']
+    hit_regions.loc[eid, 'y_hist'] = hist[0]['y']
+    manipulator = one.alyx.rest('trajectories', 'list', provenance='Micro-manipulator',
+                                probe_insertion=rep_site[i]['probe_insertion'])
+    if len(manipulator) > 0:
+        hit_regions.loc[eid, 'x_target'] = manipulator[0]['x']
+        hit_regions.loc[eid, 'y_target'] = manipulator[0]['y']
+    
+    # Check if recorded regions are in target regions   
+    rec_regions = channels[rep_site[i]['probe_name']]['acronym']
+    this_hits = np.zeros(len(target_regions))
+    this_hits[[j for j, k in enumerate(target_regions) if k in rec_regions]] = 1
+    hit_regions.loc[eid, target_regions] = this_hits
+   
+# Calculate distance to target at surface
+hit_regions['dist'] = np.sqrt((hit_regions['x_hist'] - -2243)**2
+                              + (hit_regions['y_hist'] - -2000)**2)
+    
+# %% Plot
+
+dist_cutoff = 300
+
+f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(11, 12))
+
+ax1.scatter(hit_regions['x_hist'], hit_regions['y_hist'], s=50)
+ax1.scatter(-2243, -2000, color='k', s=50)
+ax1.set(ylim=[-3000, -1500], xlim=[-3000, -1500], yticks=[-3000, -2500, -2000, -1500],
+        xlabel='ML coordinates (\u03BCm)', ylabel='AP coordinates (\u03BCm)')
+
+ax2.barh(target_regions, hit_regions[target_regions].mean() * 100)
+ax2.set(xlabel='Repeated site targeting accuracy (%)',
+        title='n = %d recordings' % hit_regions.shape[0],
+        xlim=[0, 100])
+ax2.invert_yaxis()  
+
+incl_rec = hit_regions['dist'] < dist_cutoff
+ax3.add_artist(plt.Circle((-2243, -2000), dist_cutoff, color=[0.6, 0.6, 0.6], linestyle='--', lw=3,
+                          fill=False))
+ax3.scatter(hit_regions['x_hist'], hit_regions['y_hist'], color='r', s=50)
+ax3.scatter(hit_regions.loc[incl_rec, 'x_hist'], hit_regions.loc[incl_rec, 'y_hist'],
+            color='g', s=50)
+ax3.scatter(-2243, -2000, color='k', s=50)
+ax3.set(ylim=[-3000, -1500], xlim=[-3000, -1500], yticks=[-3000, -2500, -2000, -1500],
+        xlabel='ML coordinates (\u03BCm)', ylabel='AP coordinates (\u03BCm)')
+
+ax4.barh(target_regions, hit_regions.loc[incl_rec, target_regions].mean() * 100)
+ax4.set(xlabel='Repeated site targeting accuracy (%)',
+        title='n = %d recordings' % np.sum(incl_rec),
+        xlim=[0, 100])
+ax4.invert_yaxis()  
+
+sns.set(style="ticks", context="paper", font_scale=1.7)
+plt.tight_layout(pad=2.5)
+sns.despine(trim=False)
+
