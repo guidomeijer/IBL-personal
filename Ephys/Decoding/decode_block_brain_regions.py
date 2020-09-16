@@ -122,10 +122,11 @@ for i in range(len(ses_with_hist)):
                                  'auroc_shuffle': shuffle_result['auroc'].mean()}))
     
         decoding_result.to_csv(join(SAVE_PATH,
-                                    'decoding_block_all_regions_%d_neurons' % N_NEURONS))
+                                    'decoding_block_regions_%d_neurons.csv' % N_NEURONS))
 
 # %% Plot
-decoding_result = pd.read_csv(join(SAVE_PATH, 'decoding_block_all_regions_%d_neurons' % N_NEURONS))
+decoding_result = pd.read_csv(join(SAVE_PATH, 'decoding_block_all_regions_%d_neurons.csv'
+                                   % N_NEURONS))
 
 p_value = 1
 min_perf = 0.15
