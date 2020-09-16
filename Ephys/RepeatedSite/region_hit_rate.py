@@ -18,8 +18,12 @@ one = ONE()
 
 # List of regions in repeated site
 target_regions = ['VISa1', 'VISa2/3', 'VISa4', 'VISa5', 'VISa6a', 'VISa6b', 'CA1', 'DG-mo', 'DG-sg',
-                  'DG-po', 'LP', 'PO', 'VPM', 'VPLpc', 'VM', 'ZI']
+                  'DG-po', 'CA3', 'LP', 'PO']
+
+# Create empty dataframes
 hit_regions = pd.DataFrame(columns=target_regions)
+cell_counts = pd.DataFrame(columns=target_regions)
+other_recs = pd.DataFrame(columns=target_regions)
 
 # Query repeated site sessions
 rep_site = one.alyx.rest('trajectories', 'list', provenance='Planned', x=-2243, y=-2000,
@@ -55,16 +59,33 @@ for i in range(len(rep_site)):
     this_hits = np.zeros(len(target_regions))
     this_hits[[j for j, k in enumerate(target_regions) if k in rec_regions]] = 1
     hit_regions.loc[eid, target_regions] = this_hits
+    
+    # Get number of neurons per region
+    clus_regions = list(clusters[rep_site[i]['probe_name']]['acronym'])
+    for j, region in enumerate(target_regions):
+        cell_counts.loc[eid, region] = clus_regions.count(region)
    
 # Calculate distance to target at surface
 hit_regions['dist'] = np.sqrt((hit_regions['x_hist'] - -2243)**2
                               + (hit_regions['y_hist'] - -2000)**2)
+
+# Query other sessions that hit the regions of the repeated site
+for i, region in enumerate(target_regions):
+    ses = one.alyx.rest('sessions', 'list', atlas_acronym=region, histology=True,
+                        django='project__name__icontains,ibl_neuropixel_brainwide_01')
+    other_recs.loc[0, region] = len(ses) - hit_regions[region].sum()
     
 # %% Plot
 
 dist_cutoff = 300
+region_colors = [(0, 128/255, 129/255), (0, 128/255, 129/255), (0, 128/255, 129/255),
+                 (0, 128/255, 129/255), (0, 128/255, 129/255), (0, 128/255, 129/255),
+                 (76/255, 187/255, 23/255), (76/255, 187/255, 23/255), (76/255, 187/255, 23/255),
+                 (76/255, 187/255, 23/255), (76/255, 187/255, 23/255), (254/255, 127/255, 156/255),
+                 (254/255, 127/255, 156/255)] 
 
 f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(11, 12))
+sns.set(style="ticks", context="paper", font_scale=1.7)
 
 ax1.scatter(hit_regions['x_hist'], hit_regions['y_hist'], s=50)
 ax1.scatter(-2243, -2000, color='k', s=50)
@@ -93,7 +114,22 @@ ax4.set(xlabel='Repeated site targeting accuracy (%)',
         xlim=[0, 100])
 ax4.invert_yaxis()  
 
-sns.set(style="ticks", context="paper", font_scale=1.7)
 plt.tight_layout(pad=2.5)
 sns.despine(trim=False)
+
+f, ax1 = plt.subplots(1, 1, figsize=(12, 6))
+sns.set(style="ticks", context="paper", font_scale=1.7)
+sns.swarmplot(data=cell_counts, palette=region_colors)
+ax1.set(ylabel='Number of cells per recording')
+
+plt.tight_layout(pad=2.5)
+sns.despine(trim=True)
+
+f, ax1 = plt.subplots(1, 1, figsize=(12, 6))
+sns.set(style="ticks", context="paper", font_scale=1.7)
+sns.swarmplot(data=cell_counts, palette=region_colors)
+ax1.set(ylabel='Number of cells per recording')
+
+plt.tight_layout(pad=2.5)
+sns.despine(trim=True)
 

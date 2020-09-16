@@ -24,8 +24,8 @@ DOWNLOAD = False
 OVERWRITE = False
 PRE_TIME = 0.6
 POST_TIME = -0.1
-MIN_NEURONS = 10  # min neurons per region
-N_NEURONS = 10  # number of neurons to use for decoding
+MIN_NEURONS = 15  # min neurons per region
+N_NEURONS = 15  # number of neurons to use for decoding
 MIN_TRIALS = 300
 ITERATIONS = 1000
 DECODER = 'bayes'  # bayes, regression or forest
@@ -47,7 +47,7 @@ for i in range(len(ses_with_hist)):
     try:
         spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
         ses_path = one.path_from_eid(eid)
-        trials = alf.io.load_object(join(ses_path, 'alf'), '_ibl_trials')
+        trials = alf.io.load_object(join(ses_path, 'alf'), 'trials')
     except:
         continue
 
@@ -128,8 +128,8 @@ for i in range(len(ses_with_hist)):
 decoding_result = pd.read_csv(join(SAVE_PATH, 'decoding_block_all_regions_%d_neurons' % N_NEURONS))
 
 p_value = 1
-min_perf = 0.02
-max_fano = 0.75
+min_perf = 0.15
+max_fano = 0.85
 metric = 'f1'  # f1 or acc    
 
 # Exclude root
@@ -161,9 +161,12 @@ for i, region in enumerate(decoding_result['region'].unique()):
         / decoding_result.loc[decoding_result['region'] == region, 'f1_over_chance'].mean())
     
 # Apply plotting thresholds
+"""
 decoding_result = decoding_result[(decoding_result['%s_mean' % metric] > min_perf)
                                   & (decoding_result['p_value_%s' % metric] < p_value)
                                   & (decoding_result['%s_fano' % metric] < max_fano)]
+"""
+decoding_result = decoding_result[(decoding_result['%s_mean' % metric] > min_perf)]
 
 # Get sorting
 sort_regions = decoding_result.groupby('region').mean().sort_values(

@@ -25,7 +25,7 @@ OVERWRITE = False
 MIN_CONTRAST = 0.1
 PRE_TIME = 0
 POST_TIME = 0.5
-MIN_NEURONS = 10  # min neurons per region
+MIN_NEURONS = 20  # min neurons per region
 N_NEURONS = 10  # number of neurons to use for decoding
 MIN_TRIALS = 400
 ITERATIONS = 1000
@@ -48,7 +48,7 @@ for i in range(len(ses_with_hist)):
     try:
         spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
         ses_path = one.path_from_eid(eid)
-        trials = alf.io.load_object(join(ses_path, 'alf'), '_ibl_trials')
+        trials = alf.io.load_object(join(ses_path, 'alf'), 'trials')
     except:
         continue
 
@@ -171,8 +171,8 @@ for i in range(len(ses_with_hist)):
 # %% Plot
     
 p_value = 1
-min_perf = 0.05
-side = 'r'
+min_perf = 0.15
+side = 'l'
 max_fano = 0.5
     
 # Load in data
@@ -211,10 +211,14 @@ for i, region in enumerate(decoding_result['region'].unique()):
         decoding_result.loc[decoding_result['region'] == region, 'f1_r_over_chance'].std()
         / decoding_result.loc[decoding_result['region'] == region, 'f1_r_over_chance'].mean())
 
+"""
 # Apply plotting thresholds
 decoding_result = decoding_result[((decoding_result['p_value'] < p_value)
                                    & (decoding_result['f1_%s_fano' % side] < max_fano)
                                    & (decoding_result['f1_%s_mean' % side] > min_perf))]
+"""
+# Apply plotting thresholds
+decoding_result = decoding_result[decoding_result['f1_%s_mean' % side] > min_perf]
 
 # Get sorting
 sort_regions = decoding_result.groupby('region').mean().sort_values(
