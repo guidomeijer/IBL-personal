@@ -13,7 +13,8 @@ from brainbox.population import decode
 import pandas as pd
 import seaborn as sns
 from scipy.stats import wilcoxon
-from ephys_functions import paths, figure_style, check_trials, sessions_with_hist
+from ephys_functions import (paths, figure_style, check_trials, sessions_with_hist,
+                             combine_layers_cortex)
 import brainbox.io.one as bbone
 import alf
 from oneibl.one import ONE
@@ -25,13 +26,14 @@ OVERWRITE = False
 MIN_CONTRAST = 0.1
 PRE_TIME = 0
 POST_TIME = 0.5
-MIN_NEURONS = 20  # min neurons per region
+MIN_NEURONS = 10  # min neurons per region
 N_NEURONS = 10  # number of neurons to use for decoding
 MIN_TRIALS = 400
 ITERATIONS = 1000
 DECODER = 'bayes'  # bayes, regression or forest
 VALIDATION = 'kfold'
 NUM_SPLITS = 5
+COMBINE_LAYERS_CORTEX = True
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
 
@@ -88,7 +90,13 @@ for i in range(len(ses_with_hist)):
         if not hasattr(clusters[probe], 'acronym'):
             continue       
         
-        for r, region in enumerate(np.unique(clusters[probe]['acronym'])):
+        # Get brain regions and combine cortical layers
+        if COMBINE_LAYERS_CORTEX:
+            regions = combine_layers_cortex(np.unique(clusters[probe]['acronym']))
+        else:
+            regions = np.unique(clusters[probe]['acronym'])
+        
+        for r, region in enumerate(regions):
             """  
             # Get clusters in this brain region with KS2 label 'good'
             clusters_in_region = clusters[probe].metrics.cluster_id[
@@ -96,10 +104,13 @@ for i in range(len(ses_with_hist)):
                                             & (clusters[probe].metrics.ks2_label == 'good')]
             """
             
-            # Get clusters in this brain region with KS2 label 'good'
-            clusters_in_region = clusters[probe].metrics.cluster_id[
-                                                            clusters[probe]['acronym'] == region]
-   
+            # Get clusters in this brain region 
+            if COMBINE_LAYERS_CORTEX:
+                region_clusters = combine_layers_cortex(clusters[probe]['acronym'])
+            else:
+                region_clusters = clusters[probe]['acronym']
+            clusters_in_region = clusters[probe].metrics.cluster_id[region_clusters == region]
+               
             # Select spikes and clusters
             spks_region = spikes[probe].times[np.isin(spikes[probe].clusters,
                                                       clusters_in_region)]
@@ -166,18 +177,29 @@ for i in range(len(ses_with_hist)):
                                  'auroc_right': decode_left['auroc'].mean(),
                                  'auroc_right_shuf': shuffle_left['auroc'].mean()}))
 
-    decoding_result.to_csv(join(SAVE_PATH, 'decoding_surprise_regions_%d_neurons.csv' % N_NEURONS))
+    if COMBINE_LAYERS_CORTEX:
+        decoding_result.to_csv(join(SAVE_PATH,
+                                    ('decoding_surprise_combined_regions_%d_neurons.csv'
+                                     % N_NEURONS)))
+    else:
+        decoding_result.to_csv(join(SAVE_PATH,
+                                    'decoding_surprise_regions_%d_neurons.csv' % N_NEURONS))
 
 # %% Plot
     
 p_value = 1
 min_perf = 0.15
 side = 'l'
-max_fano = 0.5
+max_fano = 100
     
 # Load in data
-decoding_result = pd.read_csv(join(SAVE_PATH, 'decoding_surprise_regions_%d_neurons.csv' 
-                                   % N_NEURONS))
+if COMBINE_LAYERS_CORTEX:
+    decoding_result = pd.read_csv(join(SAVE_PATH,
+                                       ('decoding_surprise_combined_regions_%d_neurons.csv' 
+                                        % N_NEURONS)))
+else:
+    decoding_result = pd.read_csv(join(SAVE_PATH, 'decoding_surprise_regions_%d_neurons.csv' 
+                                       % N_NEURONS))
 
 # Exclude root
 decoding_result = decoding_result.reset_index()

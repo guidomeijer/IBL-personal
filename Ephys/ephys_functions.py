@@ -88,3 +88,12 @@ def sessions_with_region(brain_region):
 def sessions():
     ses = pd.read_csv(join(dirname(__file__), 'sessions.csv'), dtype='str')
     return ses
+
+
+def combine_layers_cortex(regions):
+    remove = ['1', '2', '3', '4', '5', '6a', '6b', '/']
+    for i, region in enumerate(regions):
+        for j, char in enumerate(remove):
+            regions[i] = regions[i].replace(char, '')
+    return regions
+            
