@@ -153,7 +153,7 @@ else:
                                        % N_NEURONS))
 
 p_value = 1
-min_perf = 0.15
+min_perf = 0.1
 max_fano = 0.85
 metric = 'f1'  # f1 or acc    
 
@@ -202,4 +202,8 @@ sns.barplot(x='%s_over_chance' % metric, y='region', data=decoding_result,
             order=sort_regions, ci=68, ax=ax1)
 ax1.set(xlabel='Decoding accuracy of stimulus prior (f1 score over chance)', ylabel='')
 figure_style(font_scale=1.2)
-plt.savefig(join(FIG_PATH, 'decode_block_regions_%d_neurons' % N_NEURONS))
+
+if COMBINE_LAYERS_CORTEX:
+    plt.savefig(join(FIG_PATH, 'decode_block_combined_regions_%d_neurons' % N_NEURONS))
+else:
+    plt.savefig(join(FIG_PATH, 'decode_block_regions_%d_neurons' % N_NEURONS))

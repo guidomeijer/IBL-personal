@@ -26,8 +26,8 @@ OVERWRITE = False
 MIN_CONTRAST = 0.1
 PRE_TIME = 0
 POST_TIME = 0.5
-MIN_NEURONS = 10  # min neurons per region
-N_NEURONS = 10  # number of neurons to use for decoding
+MIN_NEURONS = 20  # min neurons per region
+N_NEURONS = 20  # number of neurons to use for decoding
 MIN_TRIALS = 400
 ITERATIONS = 1000
 DECODER = 'bayes'  # bayes, regression or forest
@@ -189,7 +189,7 @@ for i in range(len(ses_with_hist)):
     
 p_value = 1
 min_perf = 0.15
-side = 'l'
+side = 'r'
 max_fano = 100
     
 # Load in data
@@ -251,4 +251,9 @@ sns.barplot(x='f1_%s_over_chance' % side, y='region', data=decoding_result,
             order=sort_regions, ci=68, ax=ax1)
 ax1.set(xlabel='Decoding accuracy of inconsistent stimuli (F1-score over chance)', ylabel='')
 figure_style(font_scale=2)
-plt.savefig(join(FIG_PATH, 'decode_surprise_%s_regions_%d_neurons' % (side, N_NEURONS)))
+
+if COMBINE_LAYERS_CORTEX:
+    plt.savefig(join(FIG_PATH, 'decode_surprise_%s_regions_%d_neurons' % (side, N_NEURONS)))
+else:
+    plt.savefig(join(FIG_PATH, 'decode_surprise_%s_combined_regions_%d_neurons' % (side,
+                                                                                   N_NEURONS)))
