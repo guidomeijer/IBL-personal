@@ -171,7 +171,7 @@ for i in range(len(ses_with_hist)):
                                  'auroc_left': decode_left['auroc'].mean(),
                                  'auroc_left_shuf': shuffle_left['auroc'].mean(),
                                  'f1_right': decode_left['f1'].mean(),
-                                 'f1_right_shuffle': shuffle_left['f1'].mean(),
+                                 'f1_right_shuf': shuffle_left['f1'].mean(),
                                  'accuracy_right': decode_left['accuracy'].mean(),
                                  'accuracy_right_shuf': shuffle_left['accuracy'].mean(),
                                  'auroc_right': decode_left['auroc'].mean(),
@@ -184,76 +184,3 @@ for i in range(len(ses_with_hist)):
     else:
         decoding_result.to_csv(join(SAVE_PATH,
                                     'decoding_surprise_regions_%d_neurons.csv' % N_NEURONS))
-
-# %% Plot
-    
-p_value = 1
-min_perf = 0.15
-side = 'r'
-max_fano = 100
-    
-# Load in data
-if COMBINE_LAYERS_CORTEX:
-    decoding_result = pd.read_csv(join(SAVE_PATH,
-                                       ('decoding_surprise_combined_regions_%d_neurons.csv' 
-                                        % N_NEURONS)))
-else:
-    decoding_result = pd.read_csv(join(SAVE_PATH, 'decoding_surprise_regions_%d_neurons.csv' 
-                                       % N_NEURONS))
-
-# Exclude root
-decoding_result = decoding_result.reset_index()
-incl_regions = [i for i, j in enumerate(decoding_result['region']) if not j.islower()]
-decoding_result = decoding_result.loc[incl_regions]
-
-# Get decoding performance over chance
-decoding_result['acc_r_over_chance'] = (decoding_result['accuracy_right']
-                                        - decoding_result['accuracy_right_shuf'])
-decoding_result['f1_r_over_chance'] = (decoding_result['f1_right']
-                                       - decoding_result['f1_right_shuffle'])
-decoding_result['acc_l_over_chance'] = (decoding_result['accuracy_right']
-                                        - decoding_result['accuracy_left_shuf'])
-decoding_result['f1_l_over_chance'] = (decoding_result['f1_left']
-                                       - decoding_result['f1_left_shuf'])
-
-# Calculate significance and average decoding performance per region
-for i, region in enumerate(decoding_result['region'].unique()):
-    _, p = wilcoxon(decoding_result.loc[decoding_result['region'] == region, 'f1_right'],
-                    decoding_result.loc[decoding_result['region'] == region,
-                                        'f1_right_shuffle'])
-    decoding_result.loc[decoding_result['region'] == region, 'p_value'] = p           
-    decoding_result.loc[decoding_result['region'] == region, 'f1_r_mean'] = decoding_result.loc[
-                            decoding_result['region'] == region, 'f1_r_over_chance'].mean()
-    decoding_result.loc[decoding_result['region'] == region, 'f1_l_mean'] = decoding_result.loc[
-                            decoding_result['region'] == region, 'f1_l_over_chance'].mean()
-    decoding_result.loc[decoding_result['region'] == region, 'f1_l_fano'] = (
-        decoding_result.loc[decoding_result['region'] == region, 'f1_l_over_chance'].std()
-        / decoding_result.loc[decoding_result['region'] == region, 'f1_l_over_chance'].mean())
-    decoding_result.loc[decoding_result['region'] == region, 'f1_r_fano'] = (
-        decoding_result.loc[decoding_result['region'] == region, 'f1_r_over_chance'].std()
-        / decoding_result.loc[decoding_result['region'] == region, 'f1_r_over_chance'].mean())
-
-"""
-# Apply plotting thresholds
-decoding_result = decoding_result[((decoding_result['p_value'] < p_value)
-                                   & (decoding_result['f1_%s_fano' % side] < max_fano)
-                                   & (decoding_result['f1_%s_mean' % side] > min_perf))]
-"""
-# Apply plotting thresholds
-decoding_result = decoding_result[decoding_result['f1_%s_mean' % side] > min_perf]
-
-# Get sorting
-sort_regions = decoding_result.groupby('region').mean().sort_values(
-                            'f1_%s_over_chance' % side, ascending=False).reset_index()['region']
-
-f, ax1 = plt.subplots(1, 1, figsize=(10, 10))
-sns.barplot(x='f1_%s_over_chance' % side, y='region', data=decoding_result,
-            order=sort_regions, ci=68, ax=ax1)
-ax1.set(xlabel='Decoding accuracy of inconsistent stimuli (F1-score over chance)', ylabel='')
-figure_style(font_scale=2)
-
-if COMBINE_LAYERS_CORTEX:
-    plt.savefig(join(FIG_PATH, 'decode_surprise_%s_regions_%d_neurons' % (side, N_NEURONS)))
-else:
-    plt.savefig(join(FIG_PATH, 'decode_surprise_%s_combined_regions_%d_neurons' % (side,
-                                                                                   N_NEURONS)))

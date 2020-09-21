@@ -21,6 +21,7 @@ from ephys_functions import (paths, figure_style, sessions_with_hist, check_tria
 N_NEURONS = 10  # number of neurons to use for decoding
 METRIC = 'f1'
 MIN_PERF = 0.1
+SIDE = 'right'
 COMBINE_LAYERS_CORTEX = True
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
@@ -31,11 +32,14 @@ FIG_PATH = join(FIG_PATH, 'WholeBrain')
 # Load in data
 if COMBINE_LAYERS_CORTEX:
     decoding_result = pd.read_csv(join(SAVE_PATH,
-                                       ('decoding_block_combined_regions_%d_neurons.csv' 
+                                       ('decoding_surprise_combined_regions_%d_neurons.csv' 
                                         % N_NEURONS)))
 else:
-    decoding_result = pd.read_csv(join(SAVE_PATH, 'decoding_block_regions_%d_neurons.csv' 
+    decoding_result = pd.read_csv(join(SAVE_PATH, 'decoding_surprise_regions_%d_neurons.csv' 
                                        % N_NEURONS))
+
+# Fix stupid naming mistake
+decoding_result['f1_right_shuf'] = decoding_result['f1_right_shuffle']
 
 # Exclude root
 decoding_result = decoding_result.reset_index()
@@ -43,9 +47,10 @@ incl_regions = [i for i, j in enumerate(decoding_result['region']) if not j.islo
 decoding_result = decoding_result.loc[incl_regions]
 
 # Get decoding performance over chance
-decoding_result['acc_over_chance'] = (decoding_result['accuracy']
-                                      - decoding_result['accuracy_shuffle'])
-decoding_result['f1_over_chance'] = (decoding_result['f1'] - decoding_result['f1_shuffle'])
+decoding_result['acc_over_chance'] = (decoding_result['accuracy_%s' % SIDE]
+                                      - decoding_result['accuracy_%s_shuf' % SIDE])
+decoding_result['f1_over_chance'] = (decoding_result['f1_%s' % SIDE]
+                                     - decoding_result['f1_%s_shuf' % SIDE])
 
 # Calculate average decoding performance per region
 for i, region in enumerate(decoding_result['region'].unique()):
@@ -61,7 +66,7 @@ decoding_result = decoding_result[(decoding_result['%s_mean' % METRIC] > MIN_PER
 sort_regions = decoding_result.groupby('region').mean().sort_values(
                             '%s_over_chance' % METRIC, ascending=False).reset_index()['region']
 
-figure_style(font_scale=2)
+figure_style(font_scale=1.8)
 f, ax1 = plt.subplots(1, 1, figsize=(10, 10))
 sns.barplot(x='%s_over_chance' % METRIC, y='region', data=decoding_result,
             order=sort_regions, ci=68, ax=ax1)
