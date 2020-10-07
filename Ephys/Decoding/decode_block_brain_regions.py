@@ -25,8 +25,8 @@ DOWNLOAD = False
 OVERWRITE = False
 PRE_TIME = 0.6
 POST_TIME = -0.1
-MIN_NEURONS = 20  # min neurons per region
-N_NEURONS = 20  # number of neurons to use for decoding
+MIN_NEURONS = 15  # min neurons per region
+N_NEURONS = 15  # number of neurons to use for decoding
 MIN_TRIALS = 300
 ITERATIONS = 1000
 DECODER = 'bayes'  # bayes, regression or forest
@@ -111,7 +111,7 @@ for i in range(len(ses_with_hist)):
                                    iterations=ITERATIONS)
     
             # Shuffle
-            shuffle_result = decode(spikes[probe].times, spikes[probe].clusters,
+            shuffle_result = decode(spks_region, clus_region,
                                     trial_times, trial_blocks,
                                     pre_time=PRE_TIME, post_time=POST_TIME,
                                     classifier=DECODER, cross_validation=VALIDATION,

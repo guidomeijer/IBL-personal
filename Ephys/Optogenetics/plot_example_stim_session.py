@@ -11,8 +11,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from ibl_pipeline import subject, acquisition, behavior
 
-SWITCH_PROB = 0.05
-
 # Get stim prob left from example session
 b = ((subject.Subject & 'subject_nickname="KS014"') * behavior.TrialSet.Trial
      * (acquisition.Session & 'task_protocol LIKE "%biased%"'

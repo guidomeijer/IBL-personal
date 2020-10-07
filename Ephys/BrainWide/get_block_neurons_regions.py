@@ -15,7 +15,8 @@ from brainbox.population import decode
 import pandas as pd
 import seaborn as sns
 from sklearn.utils import shuffle
-from ephys_functions import paths, figure_style, check_trials
+from ephys_functions import (paths, figure_style, check_trials, sessions_with_hist,
+                             combine_layers_cortex)
 import brainbox as bb
 import brainbox.io.one as bbone
 from oneibl.one import ONE
@@ -28,15 +29,13 @@ PRE_TIME = 0.6
 POST_TIME = -0.1
 MIN_NEURONS = 1
 ALPHA = 0.05
+COMBINE_LAYERS_CORTEX = True
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
 
 # %%
 # Get list of all recordings that have histology
-session_list = one.alyx.rest('sessions', 'list',
-                             task_protocol='_iblrig_tasks_ephysChoiceWorld',
-                             project='ibl_neuropixel_brainwide',
-                             django='subject__actions_sessions__procedures__name,Histology')
+session_list = sessions_with_hist()
 
 block_neurons = pd.DataFrame()
 for i in range(len(session_list)):
@@ -53,8 +52,6 @@ for i in range(len(session_list)):
     # Check data integrity
     if check_trials(trials) is False:
         continue
-    if type(spikes) != dict:
-        continue
 
     # Get trial vectors
     incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
@@ -62,15 +59,28 @@ for i in range(len(session_list)):
     probability_left = trials.probabilityLeft[incl_trials]
     trial_blocks = (trials.probabilityLeft[incl_trials] == 0.8).astype(int)
 
-    # Decode per brain region
     for p, probe in enumerate(spikes.keys()):
 
-        # Decode per brain region
-        for i, region in enumerate(np.unique(clusters[probe]['acronym'])):
+        # Check if histology is available
+        if not hasattr(clusters[probe], 'acronym'):
+            continue       
+        
+        # Get brain regions and combine cortical layers
+        if COMBINE_LAYERS_CORTEX:
+            regions = combine_layers_cortex(np.unique(clusters[probe]['acronym']))
+        else:
+            regions = np.unique(clusters[probe]['acronym'])
+                
+        for i, region in enumerate(regions):
+            
+            # Get clusters in this brain region 
+            if COMBINE_LAYERS_CORTEX:
+                region_clusters = combine_layers_cortex(clusters[probe]['acronym'])
+            else:
+                region_clusters = clusters[probe]['acronym']
     
-            # Get clusters in this brain region with KS2 label 'good'
-            clusters_in_region = clusters[probe].metrics.cluster_id[
-                                                ((clusters[probe]['acronym'] == region))]
+            # Get clusters in this brain region 
+            clusters_in_region = clusters[probe].metrics.cluster_id[region_clusters == region]
     
             # Check if there are enough neurons in this brain region
             if np.shape(clusters_in_region)[0] < MIN_NEURONS:
@@ -95,16 +105,19 @@ for i in range(len(session_list)):
                                                      'region': region,
                                                      'n_neurons': len(np.unique(clus_region)),
                                                      'n_sig_block': sig_block.shape[0]}))
-            block_neurons.to_csv(join(SAVE_PATH, 'n_block_neurons_regions'))
+            
+    if COMBINE_LAYERS_CORTEX:
+        block_neurons.to_csv(join(SAVE_PATH, 'n_block_neurons_combined_regions.csv'))
+    else:
+        block_neurons.to_csv(join(SAVE_PATH, 'n_block_neurons_regions.csv'))
 
 # %% Plot
-block_neurons = pd.read_csv(join(SAVE_PATH, 'n_block_neurons_regions'))
-
-block_neurons['perc'] = block_neurons['']
+"""
+block_neurons = pd.read_csv(join(SAVE_PATH, 'n_block_neurons_combined_regions.csv'))
 
 block_summed = block_neurons.groupby('region').sum()
 block_summed = block_summed.reset_index()
-block_summed = block_summed[block_summed['n_neurons'] > 100]
+block_summed = block_summed[block_summed['n_neurons'] > 10]
 block_summed['perc'] = (block_summed['n_sig_block'] / block_summed['n_neurons']) * 100
 block_summed = block_summed.sort_values('perc', ascending=False)
 
@@ -113,3 +126,5 @@ f, ax1 = plt.subplots(1, 1, figsize=(10, 10))
 sns.barplot(x='perc', y='region', data=block_summed)
 ax1.set(xlabel='Stimulus prior neurons (%)', ylabel='')
 figure_style(font_scale=1.1)
+
+"""

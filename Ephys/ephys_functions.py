@@ -8,6 +8,7 @@ Created on Wed Jan 22 16:22:01 2020
 import seaborn as sns
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 from os.path import join, dirname
 import pandas as pd
 import pathlib
@@ -90,10 +91,12 @@ def sessions():
     return ses
 
 
-def combine_layers_cortex(regions):
+def combine_layers_cortex(regions, delete_duplicates=False):
     remove = ['1', '2', '3', '4', '5', '6a', '6b', '/']
     for i, region in enumerate(regions):
         for j, char in enumerate(remove):
             regions[i] = regions[i].replace(char, '')
+    if delete_duplicates:
+        regions = list(set(regions))
     return regions
             

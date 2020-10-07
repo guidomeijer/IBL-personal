@@ -18,9 +18,10 @@ from ephys_functions import (paths, figure_style, sessions_with_hist, check_tria
                              combine_layers_cortex)
 
 # Settings
-N_NEURONS = 10  # number of neurons to use for decoding
+N_NEURONS = 15  # number of neurons to use for decoding
 METRIC = 'f1'
-MIN_PERF = 0.1
+MIN_PERF = 0.05
+MIN_REC = 2
 SIDE = 'right'
 COMBINE_LAYERS_CORTEX = True
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
@@ -39,12 +40,16 @@ else:
                                        % N_NEURONS))
 
 # Fix stupid naming mistake
-decoding_result['f1_right_shuf'] = decoding_result['f1_right_shuffle']
+if 'f1_right_shuffle' in decoding_result.columns:
+    decoding_result['f1_right_shuf'] = decoding_result['f1_right_shuffle']
 
 # Exclude root
 decoding_result = decoding_result.reset_index()
 incl_regions = [i for i, j in enumerate(decoding_result['region']) if not j.islower()]
 decoding_result = decoding_result.loc[incl_regions]
+
+# Drop duplicates
+decoding_result = decoding_result[~decoding_result.duplicated(subset=['region', 'eid', 'probe'])]
 
 # Get decoding performance over chance
 decoding_result['acc_over_chance'] = (decoding_result['accuracy_%s' % SIDE]
@@ -58,9 +63,12 @@ for i, region in enumerate(decoding_result['region'].unique()):
                             decoding_result['region'] == region, 'acc_over_chance'].mean()
     decoding_result.loc[decoding_result['region'] == region, 'f1_mean'] = decoding_result.loc[
                             decoding_result['region'] == region, 'f1_over_chance'].mean()
+    decoding_result.loc[decoding_result['region'] == region, 'n_rec'] = np.sum(
+                                                            decoding_result['region'] == region)
         
 # Apply plotting threshold
-decoding_result = decoding_result[(decoding_result['%s_mean' % METRIC] > MIN_PERF)]
+decoding_result = decoding_result[(decoding_result['%s_mean' % METRIC] > MIN_PERF) & 
+                                  (decoding_result['n_rec'] >= MIN_REC)]
 
 # Get sorting
 sort_regions = decoding_result.groupby('region').mean().sort_values(
@@ -73,6 +81,6 @@ sns.barplot(x='%s_over_chance' % METRIC, y='region', data=decoding_result,
 ax1.set(xlabel='Decoding accuracy of stimulus prior (f1 score over chance)', ylabel='')
 
 if COMBINE_LAYERS_CORTEX:
-    plt.savefig(join(FIG_PATH, 'decode_block_combined_regions_%d_neurons' % N_NEURONS))
+    plt.savefig(join(FIG_PATH, 'decode_surprise_combined_regions_%d_neurons' % N_NEURONS))
 else:
-    plt.savefig(join(FIG_PATH, 'decode_block_regions_%d_neurons' % N_NEURONS))
+    plt.savefig(join(FIG_PATH, 'decode_surprise_regions_%d_neurons' % N_NEURONS))

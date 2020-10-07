@@ -1,9 +1,8 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Created on Wed Sep  9 09:15:34 2020
+Get number of neurons per region for all repeated site recordings
 
-@author: guido
+Created on Wed Sep  9 09:15:34 2020
+Guido Meijer
 """
 
 from os.path import join

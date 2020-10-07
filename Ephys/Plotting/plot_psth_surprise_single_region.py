@@ -18,13 +18,13 @@ from oneibl.one import ONE
 one = ONE()
 
 # Settings
-REGION = 'MO'
+REGION = 'SCsg'
 MIN_CONTRAST = 0.1
 PLOT_PRE_TIME = 0.5
 PLOT_POST_TIME = 1
 TEST_PRE_TIME = 0
 TEST_POST_TIME = 0.5
-ALPHA = 0.1
+ALPHA = 0.5
 FIG_PATH = paths()[1]
 
 # Query sessions with at least one channel in the region of interest
@@ -44,8 +44,9 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
     try:
         spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
         ses_path = one.path_from_eid(eid)
-        trials = alf.io.load_object(join(ses_path, 'alf'), '_ibl_trials')
+        trials = alf.io.load_object(join(ses_path, 'alf'), 'trials')
     except:
+        print('Could not load data, skipping recording..')
         continue
 
     # Check data integrity
@@ -67,12 +68,11 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
     # Loop over probes
     for p, probe in enumerate(spikes.keys()):
         
-        if sum(clusters[probe]['acronym'] == REGION) == 0:
-            continue
-        
         # Get clusters in region of interest
         clusters_in_region = clusters[probe].metrics.cluster_id[
                         [i for i, j in enumerate(clusters[probe]['acronym']) if REGION in j]]
+        if len(clusters_in_region) == 0:
+            continue
         
         # Select spikes and clusters
         spks_region = spikes[probe].times[np.isin(spikes[probe].clusters, clusters_in_region)]

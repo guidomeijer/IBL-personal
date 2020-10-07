@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from ephys_functions import paths, figure_style, check_trials
+from ephys_functions import paths, figure_style, check_trials, sessions_with_hist
 import brainbox as bb
 import brainbox.io.one as bbone
 from oneibl.one import ONE
@@ -31,11 +31,7 @@ FIG_PATH = join(FIG_PATH, 'WholeBrain')
 
 # %%
 # Get list of all recordings that have histology
-session_list = one.alyx.rest('sessions', 'list',
-                             task_protocol='_iblrig_tasks_ephysChoiceWorld',
-                             project='ibl_neuropixel_brainwide',
-                             dataset_types = ['spikes.times', 'trials.probabilityLeft'],
-                             histology=True)
+session_list = sessions_with_hist()
 
 surprise_neurons = pd.DataFrame()
 for i in range(len(session_list)):

@@ -18,9 +18,11 @@ from ephys_functions import (paths, figure_style, sessions_with_hist, check_tria
                              combine_layers_cortex)
 
 # Settings
-N_NEURONS = 10  # number of neurons to use for decoding
+N_NEURONS = 15  # number of neurons to use for decoding
 METRIC = 'f1'
-MIN_PERF = 0.1
+# MIN_PERF = 0.05
+MIN_PERF = -1
+MIN_REC = 2
 COMBINE_LAYERS_CORTEX = True
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
@@ -42,6 +44,10 @@ decoding_result = decoding_result.reset_index()
 incl_regions = [i for i, j in enumerate(decoding_result['region']) if not j.islower()]
 decoding_result = decoding_result.loc[incl_regions]
 
+# Drop duplicates
+decoding_result = decoding_result[decoding_result.duplicated(subset=['region', 'eid', 'probe'])
+                                  == False]
+
 # Get decoding performance over chance
 decoding_result['acc_over_chance'] = (decoding_result['accuracy']
                                       - decoding_result['accuracy_shuffle'])
@@ -53,9 +59,12 @@ for i, region in enumerate(decoding_result['region'].unique()):
                             decoding_result['region'] == region, 'acc_over_chance'].mean()
     decoding_result.loc[decoding_result['region'] == region, 'f1_mean'] = decoding_result.loc[
                             decoding_result['region'] == region, 'f1_over_chance'].mean()
-        
+    decoding_result.loc[decoding_result['region'] == region, 'n_rec'] = np.sum(
+                                                            decoding_result['region'] == region)
+    
 # Apply plotting threshold
-decoding_result = decoding_result[(decoding_result['%s_mean' % METRIC] > MIN_PERF)]
+decoding_result = decoding_result[(decoding_result['%s_mean' % METRIC] > MIN_PERF) & 
+                                  (decoding_result['n_rec'] >= MIN_REC)]
 
 # Get sorting
 sort_regions = decoding_result.groupby('region').mean().sort_values(

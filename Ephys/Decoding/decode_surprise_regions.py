@@ -26,9 +26,9 @@ OVERWRITE = False
 MIN_CONTRAST = 0.1
 PRE_TIME = 0
 POST_TIME = 0.5
-MIN_NEURONS = 20  # min neurons per region
-N_NEURONS = 20  # number of neurons to use for decoding
-MIN_TRIALS = 400
+MIN_NEURONS = 15  # min neurons per region
+N_NEURONS = 15  # number of neurons to use for decoding
+MIN_TRIALS = 300
 ITERATIONS = 1000
 DECODER = 'bayes'  # bayes, regression or forest
 VALIDATION = 'kfold'
@@ -131,7 +131,7 @@ for i in range(len(ses_with_hist)):
                                  iterations=ITERATIONS)
     
             # Shuffle
-            shuffle_left = decode(spikes[probe].times, spikes[probe].clusters,
+            shuffle_left = decode(spks_region, clus_region,
                                   trials.stimOn_times[consistent_l != 0],
                                   consistent_l[consistent_l != 0],
                                   pre_time=PRE_TIME, post_time=POST_TIME,
@@ -149,7 +149,7 @@ for i in range(len(ses_with_hist)):
                                   iterations=ITERATIONS)
     
             # Shuffle
-            shuffle_right = decode(spikes[probe].times, spikes[probe].clusters,
+            shuffle_right = decode(spks_region, clus_region,
                                    trials.stimOn_times[consistent_r != 0],
                                    consistent_r[consistent_r != 0],
                                    pre_time=PRE_TIME, post_time=POST_TIME,

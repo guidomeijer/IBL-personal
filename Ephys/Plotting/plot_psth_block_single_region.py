@@ -18,7 +18,7 @@ from oneibl.one import ONE
 one = ONE()
 
 # Settings
-REGION = 'RSP'
+REGION = 'SCdg'
 TEST_PRE_TIME = 0.6
 TEST_POST_TIME = -0.1
 PLOT_PRE_TIME = 0.5
@@ -43,7 +43,7 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
     try:
         spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
         ses_path = one.path_from_eid(eid)
-        trials = alf.io.load_object(join(ses_path, 'alf'), '_ibl_trials')
+        trials = alf.io.load_object(join(ses_path, 'alf'), 'trials')
     except:
         continue
     
@@ -63,7 +63,6 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
         # Get clusters in region of interest
         clusters_in_region = clusters[probe].metrics.cluster_id[
                         [i for i, j in enumerate(clusters[probe]['acronym']) if REGION in j]]
-        
         if len(clusters_in_region) == 0:
             continue
 
@@ -94,8 +93,8 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
             y_lim_2 = ax.get_ylim()
             if y_lim_1[1] > y_lim_2[1]:
                 ax.set(ylim=y_lim_1)
-            plt.legend(['Left', 'Right'])
-            plt.title('Stimulus Onset (right side)')
+            plt.legend(['Left', 'Right'], frameon=False)
+            plt.title('Stim. onset')
             plt.tight_layout()
             plt.savefig(join(FIG_PATH, 'PSTH', 'Block', REGION,
                              '%s_%s_%s_%s' % (ses[i]['subject'], ses[i]['start_time'][:10],
