@@ -20,8 +20,9 @@ from ephys_functions import (paths, figure_style, sessions_with_hist, check_tria
 # Settings
 N_NEURONS = 15  # number of neurons to use for decoding
 METRIC = 'f1'
-# MIN_PERF = 0.05
-MIN_PERF = -1
+MIN_PERF = 0.02
+DECODER = 'regression'
+#MIN_PERF = -1
 MIN_REC = 2
 COMBINE_LAYERS_CORTEX = True
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
@@ -33,10 +34,10 @@ FIG_PATH = join(FIG_PATH, 'WholeBrain')
 # Load in data
 if COMBINE_LAYERS_CORTEX:
     decoding_result = pd.read_csv(join(SAVE_PATH,
-                                       ('decoding_block_combined_regions_%d_neurons.csv' 
-                                        % N_NEURONS)))
+                                       ('decoding_block_combined_regions_%d_neurons_%s.csv'
+                                        % (N_NEURONS, DECODER))))
 else:
-    decoding_result = pd.read_csv(join(SAVE_PATH, 'decoding_block_regions_%d_neurons.csv' 
+    decoding_result = pd.read_csv(join(SAVE_PATH, 'decoding_block_regions_%d_neurons.csv'
                                        % N_NEURONS))
 
 # Exclude root
@@ -61,9 +62,9 @@ for i, region in enumerate(decoding_result['region'].unique()):
                             decoding_result['region'] == region, 'f1_over_chance'].mean()
     decoding_result.loc[decoding_result['region'] == region, 'n_rec'] = np.sum(
                                                             decoding_result['region'] == region)
-    
+
 # Apply plotting threshold
-decoding_result = decoding_result[(decoding_result['%s_mean' % METRIC] > MIN_PERF) & 
+decoding_result = decoding_result[(decoding_result['%s_mean' % METRIC] > MIN_PERF) &
                                   (decoding_result['n_rec'] >= MIN_REC)]
 
 # Get sorting
@@ -77,6 +78,7 @@ sns.barplot(x='%s_over_chance' % METRIC, y='region', data=decoding_result,
 ax1.set(xlabel='Decoding accuracy of stimulus prior (f1 score over chance)', ylabel='')
 
 if COMBINE_LAYERS_CORTEX:
-    plt.savefig(join(FIG_PATH, 'decode_block_combined_regions_%d_neurons' % N_NEURONS))
+    plt.savefig(join(FIG_PATH, 'decode_block_combined_regions_%d_neurons_%s' % (N_NEURONS,
+                                                                                DECODER)))
 else:
     plt.savefig(join(FIG_PATH, 'decode_block_regions_%d_neurons' % N_NEURONS))

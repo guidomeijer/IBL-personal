@@ -11,3 +11,5 @@ dj_local_conf.json
 5HT/Pharmacology/__pycache__/
 
 Ephys/paths.py
+
+.vscode/

@@ -18,7 +18,7 @@ from oneibl.one import ONE
 one = ONE()
 
 # Settings
-REGION = 'SCdg'
+REGION = 'MD'
 TEST_PRE_TIME = 0.6
 TEST_POST_TIME = -0.1
 PLOT_PRE_TIME = 0.5
@@ -34,11 +34,11 @@ ses = one.alyx.rest('sessions', 'list', atlas_acronym=REGION,
 # Make directory for region
 if not isdir(join(FIG_PATH, 'PSTH', 'Block', REGION)):
     mkdir(join(FIG_PATH, 'PSTH', 'Block', REGION))
-         
+
 # Loop over sessions
 for i, eid in enumerate([j['url'][-36:] for j in ses]):
     print('Processing session %d of %d' % (i+1, len(ses)))
-    
+
     # Load in data
     try:
         spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
@@ -46,20 +46,20 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
         trials = alf.io.load_object(join(ses_path, 'alf'), 'trials')
     except:
         continue
-    
+
     # Check data integrity
     if check_trials(trials) is False:
-        continue    
-        
+        continue
+
     # Get trial indices
     trial_times = trials.goCue_times[
         ((trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2))]
     trial_blocks = (trials.probabilityLeft[
         (((trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)))] == 0.8).astype(int)
-        
+
     # Loop over probes
     for p, probe in enumerate(spikes.keys()):
-        
+
         # Get clusters in region of interest
         clusters_in_region = clusters[probe].metrics.cluster_id[
                         [i for i, j in enumerate(clusters[probe]['acronym']) if REGION in j]]
@@ -75,9 +75,9 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
                                                 trial_times, trial_blocks,
                                                 pre_time=TEST_PRE_TIME, post_time=TEST_POST_TIME,
                                                 alpha=ALPHA)[0]
-                        
+
         for c, cluster_ind in enumerate(sig_block):
-            
+
             fig, ax = plt.subplots(1, 1)
             bb.plot.peri_event_time_histogram(spikes[probe].times, spikes[probe].clusters,
                                               trials.stimOn_times[trials.probabilityLeft == 0.8],
@@ -102,6 +102,6 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
                                                                                         '/', '-'),
                                               str(cluster_ind))))
             plt.close(fig)
-         
-   
-    
+
+
+

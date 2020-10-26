@@ -14,6 +14,7 @@ import numpy as np
 from brainbox.population import decode
 import pandas as pd
 import seaborn as sns
+import alf
 from sklearn.utils import shuffle
 from ephys_functions import (paths, figure_style, check_trials, sessions_with_hist,
                              combine_layers_cortex)
@@ -45,7 +46,8 @@ for i in range(len(session_list)):
     eid = session_list[i]['url'][-36:]
     try:
         spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
-        trials = one.load_object(eid, 'trials')
+        ses_path = one.path_from_eid(eid)
+        trials = alf.io.load_object(join(ses_path, 'alf'), 'trials')
     except:
         continue
 
@@ -111,20 +113,3 @@ for i in range(len(session_list)):
     else:
         block_neurons.to_csv(join(SAVE_PATH, 'n_block_neurons_regions.csv'))
 
-# %% Plot
-"""
-block_neurons = pd.read_csv(join(SAVE_PATH, 'n_block_neurons_combined_regions.csv'))
-
-block_summed = block_neurons.groupby('region').sum()
-block_summed = block_summed.reset_index()
-block_summed = block_summed[block_summed['n_neurons'] > 10]
-block_summed['perc'] = (block_summed['n_sig_block'] / block_summed['n_neurons']) * 100
-block_summed = block_summed.sort_values('perc', ascending=False)
-
-f, ax1 = plt.subplots(1, 1, figsize=(10, 10))
-
-sns.barplot(x='perc', y='region', data=block_summed)
-ax1.set(xlabel='Stimulus prior neurons (%)', ylabel='')
-figure_style(font_scale=1.1)
-
-"""

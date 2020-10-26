@@ -21,15 +21,13 @@ from oneibl.one import ONE
 one = ONE()
 
 # Settings
-DOWNLOAD = False
-OVERWRITE = False
 PRE_TIME = 0.6
 POST_TIME = -0.1
 MIN_NEURONS = 15  # min neurons per region
 N_NEURONS = 15  # number of neurons to use for decoding
 MIN_TRIALS = 300
 ITERATIONS = 1000
-DECODER = 'bayes'  # bayes, regression or forest
+DECODER = 'regression'
 VALIDATION = 'kfold'
 NUM_SPLITS = 5
 COMBINE_LAYERS_CORTEX = True
@@ -43,7 +41,7 @@ ses_with_hist = sessions_with_hist()
 decoding_result = pd.DataFrame()
 for i in range(len(ses_with_hist)):
     print('Processing session %d of %d' % (i+1, len(ses_with_hist)))
-    
+
     # Load in data
     eid = ses_with_hist[i]['url'][-36:]
     try:
@@ -64,7 +62,7 @@ for i in range(len(ses_with_hist)):
     trial_times = trials.stimOn_times[incl_trials]
     probability_left = trials.probabilityLeft[incl_trials]
     trial_blocks = (trials.probabilityLeft[incl_trials] == 0.8).astype(int)
-    
+
     # Check for number of trials
     if trial_times.shape[0] < MIN_TRIALS:
         continue
@@ -72,11 +70,11 @@ for i in range(len(ses_with_hist)):
 
     # Decode per brain region
     for p, probe in enumerate(spikes.keys()):
-        
+
         # Check if histology is available for this probe
         if not hasattr(clusters[probe], 'acronym'):
-            continue       
-        
+            continue
+
         # Get brain regions and combine cortical layers
         if COMBINE_LAYERS_CORTEX:
             regions = combine_layers_cortex(np.unique(clusters[probe]['acronym']))
@@ -85,23 +83,23 @@ for i in range(len(ses_with_hist)):
 
         # Decode per brain region
         for r, region in enumerate(regions):
-    
-            # Get clusters in this brain region 
+
+            # Get clusters in this brain region
             if COMBINE_LAYERS_CORTEX:
                 region_clusters = combine_layers_cortex(clusters[probe]['acronym'])
             else:
                 region_clusters = clusters[probe]['acronym']
             clusters_in_region = clusters[probe].metrics.cluster_id[region_clusters == region]
-    
+
             # Select spikes and clusters
             spks_region = spikes[probe].times[np.isin(spikes[probe].clusters, clusters_in_region)]
             clus_region = spikes[probe].clusters[np.isin(spikes[probe].clusters,
                                                          clusters_in_region)]
-            
+
             # Check if there are enough neurons in this brain region
             if np.unique(clus_region).shape[0] < MIN_NEURONS:
                 continue
-    
+
             # Decode block identity
             decode_result = decode(spks_region, clus_region,
                                    trial_times, trial_blocks,
@@ -109,7 +107,7 @@ for i in range(len(ses_with_hist)):
                                    classifier=DECODER, cross_validation=VALIDATION,
                                    num_splits=NUM_SPLITS, n_neurons=N_NEURONS,
                                    iterations=ITERATIONS)
-    
+
             # Shuffle
             shuffle_result = decode(spks_region, clus_region,
                                     trial_times, trial_blocks,
@@ -117,7 +115,7 @@ for i in range(len(ses_with_hist)):
                                     classifier=DECODER, cross_validation=VALIDATION,
                                     num_splits=NUM_SPLITS, n_neurons=N_NEURONS,
                                     iterations=ITERATIONS, shuffle=True)
-    
+
             # Add to dataframe
             decoding_result = decoding_result.append(pd.DataFrame(
                 index=[0], data={'subject': ses_with_hist[i]['subject'],
@@ -131,12 +129,13 @@ for i in range(len(ses_with_hist)):
                                  'accuracy_shuffle': shuffle_result['accuracy'].mean(),
                                  'auroc': decode_result['auroc'].mean(),
                                  'auroc_shuffle': shuffle_result['auroc'].mean()}))
-    
+
 
     if COMBINE_LAYERS_CORTEX:
         decoding_result.to_csv(join(SAVE_PATH,
-                                    ('decoding_block_combined_regions_%d_neurons.csv'
-                                     % N_NEURONS)))
+                                    ('decoding_block_combined_regions_%d_neurons_%s.csv'
+                                     % (N_NEURONS, DECODER))))
     else:
         decoding_result.to_csv(join(SAVE_PATH,
-                                    'decoding_block_regions_%d_neurons.csv' % N_NEURONS))
+                                    'decoding_block_regions_%d_neurons_%s.csv' % (N_NEURONS,
+                                                                                  DECODER)))

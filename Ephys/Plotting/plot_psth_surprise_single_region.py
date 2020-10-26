@@ -18,7 +18,7 @@ from oneibl.one import ONE
 one = ONE()
 
 # Settings
-REGION = 'SCsg'
+REGION = 'PAL'
 MIN_CONTRAST = 0.1
 PLOT_PRE_TIME = 0.5
 PLOT_POST_TIME = 1
@@ -34,12 +34,12 @@ ses = one.alyx.rest('sessions', 'list', atlas_acronym=REGION,
 
 # Make folder
 if not isdir(join(FIG_PATH, 'PSTH', 'Surprise', REGION)):
-    mkdir(join(FIG_PATH, 'PSTH', 'Surprise', REGION))             
+    mkdir(join(FIG_PATH, 'PSTH', 'Surprise', REGION))
 
 # Loop over sessions
 for i, eid in enumerate([j['url'][-36:] for j in ses]):
     print('Processing session %d of %d' % (i+1, len(ses)))
-    
+
    # Load in data
     try:
         spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
@@ -54,7 +54,7 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
         continue
     if type(spikes) == tuple:
         continue
-        
+
     # Get trial indices
     r_in_l_block = trials.stimOn_times[((trials.probabilityLeft == 0.8)
                                         & (trials.contrastRight > MIN_CONTRAST))]
@@ -64,20 +64,20 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
                                         & (trials.contrastLeft > MIN_CONTRAST))]
     l_in_l_block = trials.stimOn_times[((trials.probabilityLeft == 0.8)
                                         & (trials.contrastLeft > MIN_CONTRAST))]
-        
+
     # Loop over probes
     for p, probe in enumerate(spikes.keys()):
-        
+
         # Get clusters in region of interest
         clusters_in_region = clusters[probe].metrics.cluster_id[
                         [i for i, j in enumerate(clusters[probe]['acronym']) if REGION in j]]
         if len(clusters_in_region) == 0:
             continue
-        
+
         # Select spikes and clusters
         spks_region = spikes[probe].times[np.isin(spikes[probe].clusters, clusters_in_region)]
         clus_region = spikes[probe].clusters[np.isin(spikes[probe].clusters, clusters_in_region)]
-                
+
         # Get significant units
         r_units = bb.task.differentiate_units(spks_region, clus_region,
                                               np.append(r_in_l_block, r_in_r_block),
@@ -85,9 +85,9 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
                                                         np.ones(len(r_in_r_block))),
                                               pre_time=TEST_PRE_TIME, post_time=TEST_POST_TIME,
                                               test='ranksums', alpha=ALPHA)[0]
-                
+
         for c, cluster_ind in enumerate(r_units):
-            
+
             fig, ax = plt.subplots(1, 1)
             bb.plot.peri_event_time_histogram(spikes[probe].times, spikes[probe].clusters,
                                               r_in_r_block, cluster_ind,
@@ -112,7 +112,7 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
                                                                                         '/', '-'),
                                               str(cluster_ind))))
             plt.close(fig)
-         
+
         # Left stimulus
         l_units = bb.task.differentiate_units(spks_region, clus_region,
                                               np.append(l_in_l_block, l_in_r_block),
@@ -120,9 +120,9 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
                                                         np.ones(len(l_in_r_block))),
                                               pre_time=TEST_PRE_TIME, post_time=TEST_POST_TIME,
                                               test='ranksums', alpha=0.05)[0]
-        
+
         for c, cluster_ind in enumerate(l_units):
-            
+
             # Left stimulus
             fig, ax = plt.subplots(1, 1)
             bb.plot.peri_event_time_histogram(spikes[probe].times, spikes[probe].clusters,
@@ -148,5 +148,5 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
                                                                                         '/', '-'),
                                               str(cluster_ind))))
             plt.close(fig)
-    
-    
+
+
