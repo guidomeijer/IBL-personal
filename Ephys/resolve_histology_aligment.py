@@ -20,3 +20,12 @@ from ibllib.qc.alignment_qc import AlignmentQC
 align_key = "2020-06-15T10:03:50_guido"  # change this to your chosen alignment key
 align_qc = AlignmentQC(probe_id, one=one)
 align_qc.resolve_manual(align_key)
+
+
+from oneibl.one import ONE
+one = ONE()
+probe_id = one.alyx.rest('insertions', 'list', subject='SWC_014', date='2019-12-10', name='probe01')[0]['id']
+align_key =  '2020-06-15T10:03:50_guido'
+from ibllib.qc.alignment_qc import AlignmentQC
+align_qc = AlignmentQC(probe_id, one=one)
+align_qc.resolve_manual(align_key, force=True)

@@ -20,11 +20,14 @@ one = ONE()
 # Settings
 PRE_TIME = 0.6
 POST_TIME = -0.1
-MIN_NEURONS = 5  # min neurons per region
+MIN_NEURONS = 15  # min neurons per region
+N_NEURONS = 15  # number of neurons to use for decoding
 MIN_TRIALS = 300
+ITERATIONS = 1000
 DECODER = 'bayes'
 VALIDATION = 'kfold'
 NUM_SPLITS = 5
+COMBINE_LAYERS_CORTEX = True
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
 
@@ -93,7 +96,17 @@ for i in range(len(ses_with_hist)):
                                    trial_times, trial_blocks,
                                    pre_time=PRE_TIME, post_time=POST_TIME,
                                    classifier=DECODER, cross_validation=VALIDATION,
-                                   num_splits=NUM_SPLITS)
+                                   num_splits=NUM_SPLITS, n_neurons=N_NEURONS,
+                                   iterations=ITERATIONS)
+            """
+            # Shuffle
+            shuffle_result = decode(spks_region, clus_region,
+                                    trial_times, trial_blocks,
+                                    pre_time=PRE_TIME, post_time=POST_TIME,
+                                    classifier=DECODER, cross_validation=VALIDATION,
+                                    num_splits=NUM_SPLITS, n_neurons=N_NEURONS,
+                                    iterations=ITERATIONS, shuffle=True)
+            """
 
             # Add to dataframe
             decoding_result = decoding_result.append(pd.DataFrame(
@@ -104,9 +117,8 @@ for i in range(len(ses_with_hist)):
                                  'region': region,
                                  'f1': decode_result['f1'].mean(),
                                  'accuracy': decode_result['accuracy'].mean(),
-                                 'auroc': decode_result['auroc'].mean(),
-                                 'chance_level': (np.sum(trial_blocks == 0)
-                                                  / trial_blocks.shape[0])}))
+                                 'auroc': decode_result['auroc'].mean()}))
 
     decoding_result.to_csv(join(SAVE_PATH,
-                                ('decoding_block_regions_all_neurons_%s.csv' % DECODER)))
+                                ('decoding_block_regions_%d_neurons_%s.csv'
+                                 % (N_NEURONS, DECODER))))

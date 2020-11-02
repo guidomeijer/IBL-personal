@@ -16,7 +16,7 @@ import os
 from oneibl.one import ONE
 one = ONE()
 
-SUBJECT = 'ZM_3001'
+SUBJECT = 'ZM_2241'
 
 trajs = one.alyx.rest('trajectories', 'list', provenance='micro-manipulator')
 traj = pd.DataFrame(list(trajs))
@@ -52,13 +52,13 @@ traj_mm = traj.copy()
 # %% plot
 sns.set(style="darkgrid", context="paper")
 markers = ['o', 's', 'v',  'D', 'X', '^', '*', 'h', 'H',  'd', 'p', 'P']
-    
+
 f, ax = plt.subplots(1, 1, figsize=(10, 5), dpi=300)
 df = traj[traj.subject_nickname==SUBJECT]
 sns.lineplot(data=df, x='x', y='y', hue="session_date", style="probe_label",
-             hue_order=sorted(df.session_date.unique()), 
-             style_order=sorted(df.probe_label.dropna().unique()), 
-             markers=markers, linewidth=0, markersize=8, mfc='none', mec='auto', 
+             hue_order=sorted(df.session_date.unique()),
+             style_order=sorted(df.probe_label.dropna().unique()), linewidth=0,
+             markers=markers[:len(df.session_date.unique())], markersize=8, mfc='none', mec='auto',
              ax=ax, legend='full', dashes=False)
 
 ax.set_title(SUBJECT, fontsize=12)
