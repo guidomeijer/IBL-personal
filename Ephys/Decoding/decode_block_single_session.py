@@ -29,6 +29,7 @@ POST_TIME = -0.1
 DECODER = 'bayes'
 VALIDATION = 'kfold'
 NUM_SPLITS = 5
+DOWNLOAD_TRIALS = False
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
 
@@ -37,6 +38,9 @@ FIG_PATH = join(FIG_PATH, 'WholeBrain')
 # Load in data
 spikes, clusters, channels = bbone.load_spike_sorting_with_channel(EID, one=one)
 ses_path = one.path_from_eid(EID)
+if DOWNLOAD_TRIALS:
+    _ = one.load(EID, dataset_types=['trials.stimOn_times', 'trials.probabilityLeft'],
+                 download_only=True, clobber=True)
 trials = alf.io.load_object(join(ses_path, 'alf'), 'trials')
 
 # Get trial vectors
@@ -65,6 +69,11 @@ shuffle_5fold = decode(spks_region, clus_region, trial_times, trial_blocks,
                        classifier=DECODER, cross_validation='kfold',
                        num_splits=5, shuffle=True)
 
+phase_5fold = decode(spks_region, clus_region, trial_times, trial_blocks,
+                     pre_time=PRE_TIME, post_time=POST_TIME,
+                     classifier=DECODER, cross_validation='kfold',
+                     num_splits=5, phase_rand=True)
+
 decode_2fold = decode(spks_region, clus_region, trial_times, trial_blocks,
                       pre_time=PRE_TIME, post_time=POST_TIME,
                       classifier=DECODER, cross_validation='kfold',
@@ -75,50 +84,65 @@ shuffle_2fold = decode(spks_region, clus_region, trial_times, trial_blocks,
                        classifier=DECODER, cross_validation='kfold',
                        num_splits=2, shuffle=True)
 
+phase_2fold = decode(spks_region, clus_region, trial_times, trial_blocks,
+                     pre_time=PRE_TIME, post_time=POST_TIME,
+                     classifier=DECODER, cross_validation='kfold',
+                     num_splits=2, phase_rand=True)
+
 decode_loe = decode(spks_region, clus_region, trial_times, trial_blocks,
-                      pre_time=PRE_TIME, post_time=POST_TIME,
-                      classifier=DECODER, cross_validation='leave-one-out')
+                    pre_time=PRE_TIME, post_time=POST_TIME,
+                    classifier=DECODER, cross_validation='leave-one-out')
 
 shuffle_loe = decode(spks_region, clus_region, trial_times, trial_blocks,
                      pre_time=PRE_TIME, post_time=POST_TIME,
                      classifier=DECODER, cross_validation='leave-one-out', shuffle=True)
+
+phase_loe = decode(spks_region, clus_region, trial_times, trial_blocks,
+                   pre_time=PRE_TIME, post_time=POST_TIME,
+                   classifier=DECODER, cross_validation='leave-one-out', phase_rand=True)
 
 decode_block = decode(spks_region, clus_region, trial_times, trial_blocks,
                       pre_time=PRE_TIME, post_time=POST_TIME, prob_left=probability_left,
                       classifier=DECODER, cross_validation='block')
 
 shuffle_block = decode(spks_region, clus_region, trial_times, trial_blocks,
+                       pre_time=PRE_TIME, post_time=POST_TIME, prob_left=probability_left,
+                       classifier=DECODER, cross_validation='block', shuffle=True)
+
+phase_block = decode(spks_region, clus_region, trial_times, trial_blocks,
                      pre_time=PRE_TIME, post_time=POST_TIME, prob_left=probability_left,
-                     classifier=DECODER, cross_validation='block', shuffle=True)
+                     classifier=DECODER, cross_validation='block', phase_rand=True)
 
-
+"""
 # Get matrix of all neuronal responses
 times = np.column_stack(((trial_times - PRE_TIME), (trial_times + POST_TIME)))
 pop_vector, cluster_ids = _get_spike_counts_in_bins(spks_region, clus_region, times)
 pop_vector = np.rot90(pop_vector)
 
 # Phase randomization
-frequencies = (pop_vector.shape[0] - 1) / 2
+rand_pop_vector = np.empty(pop_vector.shape)
+frequencies = int((pop_vector.shape[0] - 1) / 2)
 fsignal = scipy.fft.fft(pop_vector, axis=0)
-power = np.abs(fsignal[2:1+int(frequencies)])
-phases = 2*np.pi*np.random.rand(int(frequencies))
-newfsignal = fsignal
-newfsignal[0] = fsignal[0]
-newfsignal[1:(1+frequencies)] = np.exp(phases) * power
-newfsignal((1+2*frequencies):-1:(2+frequencies)) = ...
-     exp(-i*phases).*power;   % depending on how the fft is 'packed'
-newsignal=ifft(newfsignal);   % recomposed as the new signal
-max(abs(imag(newsignal)))     % for sanity
-
+power = np.abs(fsignal[1:1+frequencies])
+phases = 2*np.pi*np.random.rand(frequencies)
+for i in range(pop_vector.shape[1]):
+    newfsignal = fsignal[0, i]
+    newfsignal = np.append(newfsignal, np.exp(1j * phases) * power[:, i])
+    newfsignal = np.append(newfsignal, np.flip(np.exp(-1j * phases) * power[:, i]))
+    newsignal = scipy.fft.ifft(newfsignal)
+    rand_pop_vector[:, i] = np.abs(newsignal.real)
+"""
 
 # %%
 f, ax1 = plt.subplots(1, 1)
-ax1.bar(np.arange(9), [decode_5fold['accuracy'], shuffle_5fold['accuracy'], decode_2fold['accuracy'],
-         shuffle_2fold['accuracy'], decode_loe['accuracy'], shuffle_loe['accuracy'],
-         decode_block['accuracy'], shuffle_block['accuracy'],
-         np.sum(trial_blocks == 0) / len(trial_blocks)])
-ax1.set(xticks=np.arange(9),
-        xticklabels=['5fold', 'shuffle', '2fold', 'shuffle', 'loe', 'shuffle', 'block', 'shuffle', 'chance'],
+ax1.bar(np.arange(13), [decode_5fold['accuracy'], shuffle_5fold['accuracy'], phase_5fold['accuracy'],
+                        decode_2fold['accuracy'], shuffle_2fold['accuracy'], phase_2fold['accuracy'],
+                        decode_loe['accuracy'], shuffle_loe['accuracy'], phase_loe['accuracy'],
+                        decode_block['accuracy'], shuffle_block['accuracy'], phase_block['accuracy'],
+                        np.sum(trial_blocks == 0) / len(trial_blocks)])
+ax1.set(xticks=np.arange(13),
+        xticklabels=['5fold', 'shuffle', 'phase', '2fold', 'shuffle', 'phase', 'loe', 'shuffle',
+                     'phase', 'block', 'shuffle',  'phase', 'chance'],
         ylabel='Decoding accuracy', title='Central medial nucleus of the thalamus')
 
 
