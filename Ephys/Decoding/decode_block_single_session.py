@@ -135,14 +135,15 @@ for i in range(pop_vector.shape[1]):
 
 # %%
 f, ax1 = plt.subplots(1, 1)
-ax1.bar(np.arange(13), [decode_5fold['accuracy'], shuffle_5fold['accuracy'], phase_5fold['accuracy'],
-                        decode_2fold['accuracy'], shuffle_2fold['accuracy'], phase_2fold['accuracy'],
+ax1.bar(np.arange(15), [decode_5fold['accuracy'], shuffle_5fold['accuracy'],
+                        phase_5fold['accuracy'], np.nan, decode_2fold['accuracy'],
+                        shuffle_2fold['accuracy'], phase_2fold['accuracy'], np.nan,
                         decode_loe['accuracy'], shuffle_loe['accuracy'], phase_loe['accuracy'],
-                        decode_block['accuracy'], shuffle_block['accuracy'], phase_block['accuracy'],
-                        np.sum(trial_blocks == 0) / len(trial_blocks)])
-ax1.set(xticks=np.arange(13),
-        xticklabels=['5fold', 'shuffle', 'phase', '2fold', 'shuffle', 'phase', 'loe', 'shuffle',
-                     'phase', 'block', 'shuffle',  'phase', 'chance'],
+                        np.nan, decode_block['accuracy'], shuffle_block['accuracy'],
+                        phase_block['accuracy']])
+ax1.set(xticks=np.arange(15),
+        xticklabels=['5fold', 'shuffle', 'phase', '', '2fold', 'shuffle', 'phase', '',
+                     'loe', 'shuffle', 'phase', '', 'block', 'shuffle',  'phase'],
         ylabel='Decoding accuracy', title='Central medial nucleus of the thalamus')
 
 
