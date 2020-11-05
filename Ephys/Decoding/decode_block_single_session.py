@@ -15,20 +15,18 @@ import pandas as pd
 from scipy.stats import wilcoxon
 import seaborn as sns
 import alf
-from ephys_functions import (paths, figure_style, sessions_with_hist, check_trials,
-                             combine_layers_cortex)
+from ephys_functions import paths, combine_layers_cortex, figure_style
 import brainbox.io.one as bbone
 from oneibl.one import ONE
 one = ONE()
 
 EID = '510b1a50-825d-44ce-86f6-9678f5396e02'
-REGION = 'CM'
+REGION = 'CM'  # Central medial nucleus of the thalamus
 PROBE = 'probe00'
 PRE_TIME = 0.6
 POST_TIME = -0.1
 DECODER = 'bayes'
-VALIDATION = 'kfold'
-NUM_SPLITS = 5
+ITERATIONS = 5
 DOWNLOAD_TRIALS = False
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
@@ -67,12 +65,12 @@ decode_5fold = decode(spks_region, clus_region, trial_times, trial_blocks,
 shuffle_5fold = decode(spks_region, clus_region, trial_times, trial_blocks,
                        pre_time=PRE_TIME, post_time=POST_TIME,
                        classifier=DECODER, cross_validation='kfold',
-                       num_splits=5, shuffle=True)
+                       num_splits=5, shuffle=True, iterations=ITERATIONS)
 
 phase_5fold = decode(spks_region, clus_region, trial_times, trial_blocks,
                      pre_time=PRE_TIME, post_time=POST_TIME,
                      classifier=DECODER, cross_validation='kfold',
-                     num_splits=5, phase_rand=True)
+                     num_splits=5, phase_rand=True, iterations=ITERATIONS)
 
 decode_2fold = decode(spks_region, clus_region, trial_times, trial_blocks,
                       pre_time=PRE_TIME, post_time=POST_TIME,
@@ -82,12 +80,12 @@ decode_2fold = decode(spks_region, clus_region, trial_times, trial_blocks,
 shuffle_2fold = decode(spks_region, clus_region, trial_times, trial_blocks,
                        pre_time=PRE_TIME, post_time=POST_TIME,
                        classifier=DECODER, cross_validation='kfold',
-                       num_splits=2, shuffle=True)
+                       num_splits=2, shuffle=True, iterations=ITERATIONS)
 
 phase_2fold = decode(spks_region, clus_region, trial_times, trial_blocks,
                      pre_time=PRE_TIME, post_time=POST_TIME,
                      classifier=DECODER, cross_validation='kfold',
-                     num_splits=2, phase_rand=True)
+                     num_splits=2, phase_rand=True, iterations=ITERATIONS)
 
 decode_loe = decode(spks_region, clus_region, trial_times, trial_blocks,
                     pre_time=PRE_TIME, post_time=POST_TIME,
@@ -95,11 +93,13 @@ decode_loe = decode(spks_region, clus_region, trial_times, trial_blocks,
 
 shuffle_loe = decode(spks_region, clus_region, trial_times, trial_blocks,
                      pre_time=PRE_TIME, post_time=POST_TIME,
-                     classifier=DECODER, cross_validation='leave-one-out', shuffle=True)
+                     classifier=DECODER, cross_validation='leave-one-out',
+                     shuffle=True, iterations=ITERATIONS)
 
 phase_loe = decode(spks_region, clus_region, trial_times, trial_blocks,
                    pre_time=PRE_TIME, post_time=POST_TIME,
-                   classifier=DECODER, cross_validation='leave-one-out', phase_rand=True)
+                   classifier=DECODER, cross_validation='leave-one-out',
+                   phase_rand=True, iterations=ITERATIONS)
 
 decode_block = decode(spks_region, clus_region, trial_times, trial_blocks,
                       pre_time=PRE_TIME, post_time=POST_TIME, prob_left=probability_left,
@@ -107,44 +107,50 @@ decode_block = decode(spks_region, clus_region, trial_times, trial_blocks,
 
 shuffle_block = decode(spks_region, clus_region, trial_times, trial_blocks,
                        pre_time=PRE_TIME, post_time=POST_TIME, prob_left=probability_left,
-                       classifier=DECODER, cross_validation='block', shuffle=True)
+                       classifier=DECODER, cross_validation='block', shuffle=True,
+                       iterations=ITERATIONS)
 
 phase_block = decode(spks_region, clus_region, trial_times, trial_blocks,
                      pre_time=PRE_TIME, post_time=POST_TIME, prob_left=probability_left,
-                     classifier=DECODER, cross_validation='block', phase_rand=True)
-
-"""
-# Get matrix of all neuronal responses
-times = np.column_stack(((trial_times - PRE_TIME), (trial_times + POST_TIME)))
-pop_vector, cluster_ids = _get_spike_counts_in_bins(spks_region, clus_region, times)
-pop_vector = np.rot90(pop_vector)
-
-# Phase randomization
-rand_pop_vector = np.empty(pop_vector.shape)
-frequencies = int((pop_vector.shape[0] - 1) / 2)
-fsignal = scipy.fft.fft(pop_vector, axis=0)
-power = np.abs(fsignal[1:1+frequencies])
-phases = 2*np.pi*np.random.rand(frequencies)
-for i in range(pop_vector.shape[1]):
-    newfsignal = fsignal[0, i]
-    newfsignal = np.append(newfsignal, np.exp(1j * phases) * power[:, i])
-    newfsignal = np.append(newfsignal, np.flip(np.exp(-1j * phases) * power[:, i]))
-    newsignal = scipy.fft.ifft(newfsignal)
-    rand_pop_vector[:, i] = np.abs(newsignal.real)
-"""
+                     classifier=DECODER, cross_validation='block', phase_rand=True,
+                     iterations=ITERATIONS)
 
 # %%
-f, ax1 = plt.subplots(1, 1)
-ax1.bar(np.arange(15), [decode_5fold['accuracy'], shuffle_5fold['accuracy'],
-                        phase_5fold['accuracy'], np.nan, decode_2fold['accuracy'],
-                        shuffle_2fold['accuracy'], phase_2fold['accuracy'], np.nan,
-                        decode_loe['accuracy'], shuffle_loe['accuracy'], phase_loe['accuracy'],
-                        np.nan, decode_block['accuracy'], shuffle_block['accuracy'],
-                        phase_block['accuracy']])
+figure_style()
+f, ax1 = plt.subplots(1, 1, figsize=(10,10), dpi=150)
+ax1.bar(np.arange(15), [decode_5fold['accuracy'], shuffle_5fold['accuracy'].mean(),
+                        phase_5fold['accuracy'].mean(), np.nan, decode_2fold['accuracy'],
+                        shuffle_2fold['accuracy'].mean(), phase_2fold['accuracy'].mean(), np.nan,
+                        decode_loe['accuracy'], shuffle_loe['accuracy'].mean(),
+                        phase_loe['accuracy'].mean(), np.nan, decode_block['accuracy'],
+                        shuffle_block['accuracy'].mean(), phase_block['accuracy'].mean()],
+        yerr=[0, shuffle_5fold['accuracy'].std(), phase_5fold['accuracy'].std(), 0,
+              0, shuffle_2fold['accuracy'].std(), phase_2fold['accuracy'].std(), 0,
+              0, shuffle_loe['accuracy'].std(), phase_loe['accuracy'].std(), 0,
+              0, shuffle_block['accuracy'].std(), phase_block['accuracy'].std()])
 ax1.set(xticks=np.arange(15),
         xticklabels=['5fold', 'shuffle', 'phase', '', '2fold', 'shuffle', 'phase', '',
                      'loe', 'shuffle', 'phase', '', 'block', 'shuffle',  'phase'],
         ylabel='Decoding accuracy', title='Central medial nucleus of the thalamus')
 
-
+print(('p 5-fold shuffle: %.2f \np 5-fold phase: %.2f \np 2-fold shuffle: %.2f \np 2-fold phase: %.2f\n'
+      + 'p leave-one-out shuffle: %.2f\np leave-one-out phase: %.2f\np block shuffle: %.2f'
+      + '\np block phase: %.2f') % (
+          (np.sum(shuffle_5fold['accuracy'] > decode_5fold['accuracy'])
+           / shuffle_5fold['accuracy'].shape[0]),
+          (np.sum(phase_5fold['accuracy'] > decode_5fold['accuracy'])
+           / phase_5fold['accuracy'].shape[0]),
+          (np.sum(shuffle_2fold['accuracy'] > decode_2fold['accuracy'])
+           / shuffle_2fold['accuracy'].shape[0]),
+          (np.sum(phase_2fold['accuracy'] > decode_2fold['accuracy'])
+           / phase_2fold['accuracy'].shape[0]),
+          (np.sum(shuffle_loe['accuracy'] > decode_loe['accuracy'])
+           / shuffle_loe['accuracy'].shape[0]),
+          (np.sum(phase_loe['accuracy'] > decode_loe['accuracy'])
+           / phase_loe['accuracy'].shape[0]),
+          (np.sum(shuffle_block['accuracy'] > decode_block['accuracy'])
+           / shuffle_block['accuracy'].shape[0]),
+          (np.sum(phase_block['accuracy'] > decode_block['accuracy'])
+           / phase_block['accuracy'].shape[0])
+          ))
 # ax1.plot(np.arange(len(decode_5fold['probabilities'][0])), decode_5fold['probabilities'][0])

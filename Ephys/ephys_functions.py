@@ -60,16 +60,21 @@ def check_trials(trials):
     return True
 
 
-def sessions_with_hist():
+def query_sessions(selection='all'):
     from oneibl.one import ONE
     one = ONE()
 
-    # Query all ephysChoiceWorld sessions with histology
-    sessions = one.alyx.rest('sessions', 'list',
-                             task_protocol='_iblrig_tasks_ephysChoiceWorld',
-                             project='ibl_neuropixel_brainwide',
-                             dataset_types = ['spikes.times', 'trials.probabilityLeft'],
-                             histology=True)
+    if selection == 'all':
+        # Query all ephysChoiceWorld sessions with histology
+        sessions = one.alyx.rest('sessions', 'list',
+                                 task_protocol='_iblrig_tasks_ephysChoiceWorld',
+                                 project='ibl_neuropixel_brainwide',
+                                 dataset_types = ['spikes.times', 'trials.probabilityLeft'],
+                                 histology=True)
+    elif selection == 'resolved':
+        # Query all sessions with resolved alignment
+        sessions = one.alyx.rest('insertions', 'list',
+                                 django='json__extended_qc__alignment_resolved,True')
     return sessions
 
 
@@ -83,11 +88,6 @@ def sessions_with_region(brain_region):
                         dataset_types = ['spikes.times', 'trials.probabilityLeft'],
                         project='ibl_neuropixel_brainwide')
     return sessions
-
-
-def sessions():
-    ses = pd.read_csv(join(dirname(__file__), 'sessions.csv'), dtype='str')
-    return ses
 
 
 def combine_layers_cortex(regions, delete_duplicates=False):
