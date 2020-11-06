@@ -35,9 +35,8 @@ FIG_PATH = join(FIG_PATH, 'WholeBrain')
 # Get list of all recordings that have histology
 sessions = query_sessions()
 
-# decoding_result = pd.DataFrame()
-# for i in range(len(sessions)):
-for i in range(58, len(sessions)):
+decoding_result = pd.DataFrame()
+for i in range(len(sessions)):
     print('Processing session %d of %d' % (i+1, len(sessions)))
 
     # Load in data
