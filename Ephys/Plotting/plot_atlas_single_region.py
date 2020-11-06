@@ -16,9 +16,9 @@ from brainbox.atlas import plot_atlas
 from ephys_functions import paths, figure_style, combine_layers_cortex
 
 # Settings
-REGION = 'VISpor'
+REGION = 'ORBm'
 ML = -0.5  # in mm
-AP = 2.2  # in mm
+AP = 2  # in mm
 DV = -2  # in mm
 COMBINE_LAYERS_CORTEX = True
 
@@ -26,8 +26,8 @@ COMBINE_LAYERS_CORTEX = True
 ba = atlas.AllenAtlas(25)
 if COMBINE_LAYERS_CORTEX:
     all_regions = combine_layers_cortex(ba.regions.acronym)
-else: 
-    all_regions = ba.regions.acronym    
+else:
+    all_regions = ba.regions.acronym
 
 # Highlight region
 fill_region = np.zeros(all_regions.shape)

@@ -66,12 +66,12 @@ def query_sessions(selection='all'):
 
     if selection == 'all':
         # Query all ephysChoiceWorld sessions with histology
-        sessions = one.alyx.rest('sessions', 'list',
+        sessions = one.alyx.rest('insertions', 'list',
                                  task_protocol='_iblrig_tasks_ephysChoiceWorld',
                                  project='ibl_neuropixel_brainwide',
                                  dataset_types = ['spikes.times', 'trials.probabilityLeft'],
                                  histology=True)
-    elif selection == 'resolved':
+    elif selection == 'aligned':
         # Query all sessions with resolved alignment
         sessions = one.alyx.rest('insertions', 'list',
                                  django='json__extended_qc__alignment_resolved,True')
