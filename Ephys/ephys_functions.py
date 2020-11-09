@@ -66,7 +66,7 @@ def query_sessions(selection='all'):
 
     if selection == 'all':
         # Query all ephysChoiceWorld sessions with histology
-        sessions = one.alyx.rest('insertions', 'list',
+        sessions = one.alyx.rest('sessions', 'list',
                                  task_protocol='_iblrig_tasks_ephysChoiceWorld',
                                  project='ibl_neuropixel_brainwide',
                                  dataset_types = ['spikes.times', 'trials.probabilityLeft'],

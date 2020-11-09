@@ -22,15 +22,16 @@ PRE_TIME = 0.6
 POST_TIME = -0.1
 MIN_NEURONS = 5  # min neurons per region
 MIN_TRIALS = 300
-DECODER = 'bayes'
+DECODER = 'lda'
 VALIDATION = 'kfold'
-INCL_NEURONS = 'no_drift'  # all or no_drift
-INCL_SESSIONS = 'aligned'  # all or aligned
+INCL_NEURONS = 'all'  # all or no_drift
+INCL_SESSIONS = 'all'  # all or aligned
 NUM_SPLITS = 5
 CHANCE_LEVEL = 'phase_rand'  # phase_rand, shuffle or none
 ITERATIONS = 1000  # for null distribution estimation
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
+DOWNLOAD_TRIALS = False
 
 # %%
 # Get list of all recordings that have histology
@@ -56,6 +57,9 @@ for i in range(len(sessions)):
     try:
         spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
         ses_path = one.path_from_eid(eid)
+        if DOWNLOAD_TRIALS:
+            _ = one.load(eid, dataset_types=['trials.stimOn_times', 'trials.probabilityLeft'],
+                         download_only=True, clobber=True)
         trials = alf.io.load_object(join(ses_path, 'alf'), 'trials')
     except:
         continue

@@ -20,8 +20,8 @@ MIN_PERF_F1 = 0.05
 MIN_REC = 2
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
-INCL_NEURONS = 'no_drift'  # all or no_drift
-INCL_SESSIONS = 'aligned'  # all or aligned
+INCL_NEURONS = 'all'  # all or no_drift
+INCL_SESSIONS = 'all'  # all or aligned
 
 # %% Plot
 # Load in data
