@@ -18,7 +18,7 @@ from oneibl.one import ONE
 one = ONE()
 
 # Settings
-REGION = 'MD'
+REGION = 'ACAd'
 TEST_PRE_TIME = 0.6
 TEST_POST_TIME = -0.1
 PLOT_PRE_TIME = 0.5
@@ -52,10 +52,10 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
         continue
 
     # Get trial indices
-    trial_times = trials.goCue_times[
-        ((trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2))]
-    trial_blocks = (trials.probabilityLeft[
-        (((trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)))] == 0.8).astype(int)
+    incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
+    trial_times = trials.stimOn_times[incl_trials]
+    probability_left = trials.probabilityLeft[incl_trials]
+    trial_blocks = (trials.probabilityLeft[incl_trials] == 0.2).astype(int)
 
     # Loop over probes
     for p, probe in enumerate(spikes.keys()):
@@ -80,12 +80,12 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
 
             fig, ax = plt.subplots(1, 1)
             bb.plot.peri_event_time_histogram(spikes[probe].times, spikes[probe].clusters,
-                                              trials.stimOn_times[trials.probabilityLeft == 0.8],
+                                              trial_times[trial_blocks == 0],
                                               cluster_ind, t_before=PLOT_PRE_TIME,
                                               t_after=PLOT_POST_TIME, error_bars='sem', ax=ax)
             y_lim_1 = ax.get_ylim()
             bb.plot.peri_event_time_histogram(spikes[probe].times, spikes[probe].clusters,
-                                              trials.stimOn_times[trials.probabilityLeft == 0.2],
+                                              trial_times[trial_blocks == 1],
                                               cluster_ind, t_before=PLOT_PRE_TIME,
                                               t_after=PLOT_POST_TIME, error_bars='sem',
                                               pethline_kwargs={'color': 'red', 'lw': 2},

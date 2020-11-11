@@ -14,7 +14,7 @@ import seaborn as sns
 from ephys_functions import paths, figure_style
 
 # Settings
-TARGET = 'block_stim'
+TARGET = 'block'
 DECODER = 'bayes'
 MIN_PERF_ACC = 3
 MIN_PERF_F1 = 0.05

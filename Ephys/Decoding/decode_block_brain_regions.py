@@ -25,37 +25,40 @@ MIN_TRIALS = 300
 DECODER = 'bayes'
 VALIDATION = 'kfold'
 INCL_NEURONS = 'all'  # all or no_drift
-INCL_SESSIONS = 'all'  # all or aligned
+INCL_SESSIONS = 'aligned'  # all, aligned or resolved
 NUM_SPLITS = 5
 CHANCE_LEVEL = 'phase_rand'  # phase_rand, shuffle or none
 ITERATIONS = 1000  # for null distribution estimation
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
-DOWNLOAD_TRIALS = True
+DOWNLOAD_TRIALS = False
+sessions = query_sessions(selection=INCL_SESSIONS)  # query session list
 
 # %%
-# Get list of all recordings that have histology
-sessions = query_sessions(selection=INCL_SESSIONS)
-
 # Detect if is a list of sessions or insertions
 if 'model' in sessions[0]:
     ses_type = 'insertions'
+elif 'good_enough_for_brainwide_map' in sessions[0]:
+    ses_type = 'datajoint'
 else:
     ses_type = 'sessions'
 
 decoding_result = pd.DataFrame()
 for i in range(len(sessions)):
-    print('Processing session %d of %d' % (i+1, len(sessions)))
+    print('\nProcessing session %d of %d' % (i+1, len(sessions)))
 
     # Detect if sessions is a list of sessions or insertions
-    if 'model' in sessions[i]:
+    if ses_type == 'insertions':
         eid = sessions[i]['session']
-    else:
+    elif ses_type == 'datajoint':
+        eid = str(sessions[i]['session_uuid'])
+    elif ses_type == 'sessions':
         eid = sessions[i]['url'][-36:]
 
     # Load in data
     try:
-        spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
+        spikes, clusters, channels = bbone.load_spike_sorting_with_channel(
+                                                                    eid, aligned=True, one=one)
         ses_path = one.path_from_eid(eid)
         if DOWNLOAD_TRIALS:
             _ = one.load(eid, dataset_types=['trials.stimOn_times', 'trials.probabilityLeft',
@@ -84,10 +87,14 @@ for i in range(len(sessions)):
         continue
 
     # Extract session data depending on whether input is a list of sessions or insertions
-    if 'model' in sessions[i]:
+    if ses_type == 'insertions':
         subject = sessions[i]['session_info']['subject']
         date = sessions[i]['session_info']['start_time'][:10]
         probes_to_use = [sessions[i]['name']]
+    elif ses_type == 'datajoint':
+        subject = sessions[i]['subject_nickname']
+        date = str(sessions[i]['session_ts'].date())
+        probes_to_use = spikes.keys()
     else:
         subject = sessions[i]['subject']
         date = sessions[i]['start_time'][:10]
@@ -115,6 +122,7 @@ for i in range(len(sessions)):
 
         # Decode per brain region
         for r, region in enumerate(np.unique(regions)):
+            print('Decoding region %s (%d of %d)' % (region, r + 1, len(np.unique(regions))))
 
             # Get clusters in this brain region
             region_clusters = combine_layers_cortex(clusters[probe]['acronym'])

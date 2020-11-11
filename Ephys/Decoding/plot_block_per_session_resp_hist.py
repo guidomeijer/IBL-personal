@@ -32,9 +32,9 @@ METRIC = 'accuracy'
 # %%
 
 
-eid = '413a6825-2144-4a50-b3fc-cf38ddd6fd1a'
+eid = '259927fd-7563-4b03-bc5d-17b4d0fa7a55'
 probe = 'probe00'
-region = 'P'
+region = 'ACAd'
 
 # Load in data
 spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
@@ -59,16 +59,17 @@ clus_region = spikes[probe].clusters[np.isin(spikes[probe].clusters,
 # Get matrix of all neuronal responses
 times = np.column_stack(((trial_times - PRE_TIME), (trial_times + POST_TIME)))
 pop_vector, cluster_ids = _get_spike_counts_in_bins(spks_region, clus_region, times)
-pop_vector = np.rot90(pop_vector)
+pop_vector = pop_vector.T
 
 # Plot histograms
 for k in range(pop_vector.shape[1]):
     f, ax1 = plt.subplots(1, 1)
     ax1.hist(pop_vector[trial_blocks == 0, k], label='L', histtype='step', lw=3)
     ax1.hist(pop_vector[trial_blocks == 1, k], label='R', histtype='step', lw=3)
-    ax1.set(xlabel='Spike count per trial', ylabel='Count', title='Region: %s' % region)
+    ax1.set(xlabel='Spike count per trial', ylabel='Count', title='Region: %s, neuron %d' %
+            (region, cluster_ids[k]))
     plt.legend()
-    plt.savefig(join(FIG_PATH, '%s_neuron%d_%s' % (region, k, eid)))
+    plt.savefig(join(FIG_PATH, '%s_neuron%d_%s' % (region, cluster_ids[k], eid)))
     plt.close(f)
 
 

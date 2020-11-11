@@ -71,6 +71,16 @@ def query_sessions(selection='all'):
                                  dataset_types = ['spikes.times', 'trials.probabilityLeft'],
                                  histology=True)
     elif selection == 'aligned':
+        from ibl_pipeline import subject, ephys, histology
+        from ibl_pipeline.analyses import behavior as behavior_ana
+        regionlabeled = (histology.ProbeTrajectory
+                         & 'insertion_data_source = "Ephys aligned histology track"')
+        ses = (subject.Subject * subject.SubjectProject * ephys.acquisition.Session
+               * regionlabeled * behavior_ana.SessionTrainingStatus)
+        bwm_sess = (ses & 'subject_project = "ibl_neuropixel_brainwide_01"'
+                    & 'good_enough_for_brainwide_map = 1')
+        sessions = [info for info in bwm_sess]
+    elif selection == 'resolved':
         # Query all sessions with resolved alignment
         sessions = one.alyx.rest('insertions', 'list',
                                  django='json__extended_qc__alignment_resolved,True')
