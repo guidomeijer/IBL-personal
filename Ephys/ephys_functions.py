@@ -53,9 +53,8 @@ def check_trials(trials):
         print('trials.probabilityLeft does not start with 0.5')
         return False
     if ((not hasattr(trials, 'stimOn_times'))
-            or (len(trials.feedback_times) != len(trials.feedbackType))
             or (len(trials.stimOn_times) != len(trials.probabilityLeft))):
-        print('stimOn_times or feedback_times don not match with probabilityLeft')
+        print('stimOn_times do not match with probabilityLeft')
         return False
     return True
 

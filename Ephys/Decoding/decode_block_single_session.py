@@ -21,16 +21,16 @@ import brainbox.io.one as bbone
 from oneibl.one import ONE
 one = ONE()
 
-EID = '36280321-555b-446d-9b7d-c2e17991e090'
-REGION = 'MOs'
-PROBE = 'probe00'
+EID = '1538493d-226a-46f7-b428-59ce5f43f0f9'
+REGION = 'VISpor'
+PROBE = 'probe01'
 PRE_TIME = 0.6
 POST_TIME = -0.1
-DECODER = 'regression'
+DECODER = 'lda'
 ITERATIONS = 1000
 DOWNLOAD_TRIALS = False
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
-FIG_PATH = join(FIG_PATH, 'WholeBrain')
+FIG_PATH = join(FIG_PATH, 'Decoding')
 
 # %%
 # Load in data
@@ -92,6 +92,10 @@ for i, trans in enumerate(block_trans[:-1]):
     p = Rectangle((trans, -0.05), block_trans[i+1] - trans, 1.1, alpha=0.5,
                   color=block_colors[trial_blocks[trans]])
     ax2.add_patch(p)
-ax2.plot(decode_block['probabilities'][0], lw=2, color='k')
-ax2.set(xlim=[0, trial_blocks.shape[0]], ylim=[-0.05, 1.05], ylabel='Posterior probability',
-        xlabel='Trials')
+ax2.plot(np.convolve(decode_block['predictions'][0], np.ones(10), 'same') / 10, lw=2, color='k')
+
+ax2.set(xlim=[0, trial_blocks.shape[0]], ylim=[-0.05, 1.05],
+        ylabel='Block prediction (10 trial rolling average)', xlabel='Trials')
+
+plt.savefig(join(FIG_PATH, '%s_%s' % (REGION, DECODER)))
+

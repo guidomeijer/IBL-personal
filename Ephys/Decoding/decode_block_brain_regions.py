@@ -22,7 +22,7 @@ PRE_TIME = 0.6
 POST_TIME = -0.1
 MIN_NEURONS = 5  # min neurons per region
 MIN_TRIALS = 300
-DECODER = 'lda'
+DECODER = 'bayes'
 VALIDATION = 'kfold'
 INCL_NEURONS = 'all'  # all or no_drift
 INCL_SESSIONS = 'all'  # all or aligned
@@ -31,7 +31,7 @@ CHANCE_LEVEL = 'phase_rand'  # phase_rand, shuffle or none
 ITERATIONS = 1000  # for null distribution estimation
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
-DOWNLOAD_TRIALS = False
+DOWNLOAD_TRIALS = True
 
 # %%
 # Get list of all recordings that have histology
@@ -58,7 +58,10 @@ for i in range(len(sessions)):
         spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
         ses_path = one.path_from_eid(eid)
         if DOWNLOAD_TRIALS:
-            _ = one.load(eid, dataset_types=['trials.stimOn_times', 'trials.probabilityLeft'],
+            _ = one.load(eid, dataset_types=['trials.stimOn_times', 'trials.probabilityLeft',
+                                             'trials.contrastLeft', 'trials.contrastRight',
+                                             'trials.feedbackType', 'trials.choice',
+                                             'trials.feedback_times'],
                          download_only=True, clobber=True)
         trials = alf.io.load_object(join(ses_path, 'alf'), 'trials')
     except:
@@ -74,7 +77,7 @@ for i in range(len(sessions)):
     incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
     trial_times = trials.stimOn_times[incl_trials]
     probability_left = trials.probabilityLeft[incl_trials]
-    trial_blocks = (trials.probabilityLeft[incl_trials] == 0.8).astype(int)
+    trial_blocks = (trials.probabilityLeft[incl_trials] == 0.2).astype(int)
 
     # Check for number of trials
     if trial_times.shape[0] < MIN_TRIALS:
@@ -90,8 +93,18 @@ for i in range(len(sessions)):
         date = sessions[i]['start_time'][:10]
         probes_to_use = spikes.keys()
 
+    # Calculate bias shift for this subject
+    blank_left = trials.choice[((trials.contrastLeft == 0) | (trials.contrastRight == 0))
+                               & (trials.probabilityLeft == 0.8) & incl_trials]
+    blank_right = trials.choice[((trials.contrastLeft == 0) | (trials.contrastRight == 0))
+                                & (trials.probabilityLeft == 0.2) & incl_trials]
+    prop_right_l = np.sum(blank_left == 1) / np.sum((blank_left == 1) | (blank_left == -1))
+    prop_right_r = np.sum(blank_right == 1) / np.sum((blank_right == 1) | (blank_right == -1))
+    bias = prop_right_l - prop_right_r
+
     # Decode per brain region
     for p, probe in enumerate(probes_to_use):
+        print('Processing %s (%d of %d)' % (probe, p + 1, len(probes_to_use)))
 
         # Check if histology is available for this probe
         if not hasattr(clusters[probe], 'acronym'):
@@ -161,7 +174,10 @@ for i in range(len(sessions)):
                                  'auroc': decode_result['auroc'].mean(),
                                  'chance_accuracy': [np.array(decode_chance['accuracy'])],
                                  'chance_f1': [np.array(decode_chance['f1'])],
-                                 'chance_auroc': [np.array(decode_chance['auroc'])]}))
+                                 'chance_auroc': [np.array(decode_chance['auroc'])],
+                                 'bias': bias,
+                                 'n_trials': trial_blocks.shape[0],
+                                 'n_neurons': np.unique(clus_region).shape[0]}))
 
     decoding_result.to_pickle(join(SAVE_PATH,
            ('decode_block_%s_%s_neurons_%s_sessions.p' % (DECODER, INCL_NEURONS, INCL_SESSIONS))))
