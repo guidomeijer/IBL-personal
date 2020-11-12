@@ -23,14 +23,14 @@ one = ONE()
 
 PRE_TIME = 0.6
 POST_TIME = -0.1
-DECODER = 'lda'
+DECODER = 'bayes'
 ITERATIONS = 1000
 CROSS_VALIDATION = 'kfold'
 DOWNLOAD_TRIALS = False
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Decoding', 'Single sessions', '%s' % DECODER)
 INCL_NEURONS = 'all'  # all or no_drift
-INCL_SESSIONS = 'all'  # all or aligned
+INCL_SESSIONS = 'behavior_crit'  # all or aligned
 N_SESSIONS = 20
 METRIC = 'accuracy'
 
@@ -49,7 +49,7 @@ decoding_result = decoding_result[decoding_result.duplicated(subset=['region', '
 
 # Get decoding performance over chance
 decoding_result['%s_over_chance' % METRIC] = (
-            decoding_result[METRIC] - [i.mean() for i in decoding_result['chance_%s' % METRIC]])
+            decoding_result[METRIC] - decoding_result['chance_%s' % METRIC])
 decoding_result = decoding_result.sort_values(by='%s_over_chance' % METRIC,
                                               ascending=False).reset_index(drop=True)
 
@@ -60,7 +60,7 @@ for i in range(N_SESSIONS):
     eid = decoding_result.loc[i, 'eid']
     probe = decoding_result.loc[i, 'probe']
     region = decoding_result.loc[i, 'region']
-    spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
+    spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, aligned=True, one=one)
     ses_path = one.path_from_eid(eid)
     if DOWNLOAD_TRIALS:
         _ = one.load(decoding_result[i, 'eid'], dataset_types=['trials.stimOn_times',

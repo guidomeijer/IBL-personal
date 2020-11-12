@@ -16,7 +16,7 @@ from brainbox.atlas import plot_atlas
 from ephys_functions import paths, figure_style, combine_layers_cortex
 
 # Settings
-REGION = 'ORBm'
+REGION = 'ACAv'
 ML = -0.5  # in mm
 AP = 2  # in mm
 DV = -2  # in mm

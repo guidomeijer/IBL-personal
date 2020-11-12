@@ -18,14 +18,14 @@ one = ONE()
 
 # Settings
 PRE_TIME = 0
-POST_TIME = 0.3
+POST_TIME = 0.2
 MIN_NEURONS = 5  # min neurons per region
 MIN_TRIALS = 300
 DECODER = 'bayes'
 VALIDATION = 'kfold'
 INCL_NEURONS = 'all'  # all or no_drift
-INCL_SESSIONS = 'all'  # all or aligned
-MIN_CONTRAST = 0.1
+INCL_SESSIONS = 'behavior_crit'  # all or aligned
+MIN_CONTRAST = 0.2
 NUM_SPLITS = 5
 CHANCE_LEVEL = 'phase_rand'  # phase_rand, shuffle or none
 ITERATIONS = 1000  # for null distribution estimation
@@ -36,9 +36,11 @@ FIG_PATH = join(FIG_PATH, 'WholeBrain')
 # Get list of all recordings that have histology
 sessions = query_sessions(selection=INCL_SESSIONS)
 
-# Detect if is a list of sessions or insertions
+# Detect data format
 if 'model' in sessions[0]:
     ses_type = 'insertions'
+elif 'good_enough_for_brainwide_map' in sessions[0]:
+    ses_type = 'datajoint'
 else:
     ses_type = 'sessions'
 
@@ -46,15 +48,18 @@ decoding_result = pd.DataFrame()
 for i in range(len(sessions)):
     print('Processing session %d of %d' % (i+1, len(sessions)))
 
-    # Detect if sessions is a list of sessions or insertions
-    if 'model' in sessions[i]:
+    # Extract eid based on data format
+    if ses_type == 'insertions':
         eid = sessions[i]['session']
-    else:
+    elif ses_type == 'datajoint':
+        eid = str(sessions[i]['session_uuid'])
+    elif ses_type == 'sessions':
         eid = sessions[i]['url'][-36:]
 
     # Load in data
     try:
-        spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
+        spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, aligned=True,
+                                                                           one=one)
         ses_path = one.path_from_eid(eid)
         trials = alf.io.load_object(join(ses_path, 'alf'), 'trials')
     except Exception as error_message:
@@ -76,11 +81,15 @@ for i in range(len(sessions)):
     if trial_times.shape[0] < MIN_TRIALS:
         continue
 
-    # Extract session data depending on whether input is a list of sessions or insertions
-    if 'model' in sessions[i]:
+    # Extract session data depending on data format
+    if ses_type == 'insertions':
         subject = sessions[i]['session_info']['subject']
         date = sessions[i]['session_info']['start_time'][:10]
         probes_to_use = [sessions[i]['name']]
+    elif ses_type == 'datajoint':
+        subject = sessions[i]['subject_nickname']
+        date = str(sessions[i]['session_ts'].date())
+        probes_to_use = spikes.keys()
     else:
         subject = sessions[i]['subject']
         date = sessions[i]['start_time'][:10]
@@ -135,9 +144,17 @@ for i in range(len(sessions)):
             else:
                 raise Exception('CHANCE_LEVEL must be phase_rand, shuffle or none')
 
+            # Calculate p-values
+            p_accuracy = (np.sum(decode_chance['accuracy'] > decode_result['accuracy'])
+                          / decode_chance['accuracy'].shape[0])
+            p_f1 = (np.sum(decode_chance['f1'] > decode_result['f1'])
+                          / decode_chance['f1'].shape[0])
+            p_auroc = (np.sum(decode_chance['auroc'] > decode_result['auroc'])
+                          / decode_chance['auroc'].shape[0])
+
             # Add to dataframe
             decoding_result = decoding_result.append(pd.DataFrame(
-                index=[0], data={'subject': subject,
+                index=[decoding_result.shape[0] + 1], data={'subject': subject,
                                  'date': date,
                                  'eid': eid,
                                  'probe': probe,
@@ -145,10 +162,13 @@ for i in range(len(sessions)):
                                  'f1': decode_result['f1'].mean(),
                                  'accuracy': decode_result['accuracy'].mean(),
                                  'auroc': decode_result['auroc'].mean(),
-                                 'chance_accuracy': [np.array(decode_chance['accuracy'])],
-                                 'chance_f1': [np.array(decode_chance['f1'])],
-                                 'chance_auroc': [np.array(decode_chance['auroc'])],
-                                 'n_trials': trial_ids.shape[0],
+                                 'chance_accuracy': decode_chance['accuracy'].mean(),
+                                 'chance_f1': decode_chance['f1'].mean(),
+                                 'chance_auroc': decode_chance['auroc'].mean(),
+                                 'p_accuracy': p_accuracy,
+                                 'p_f1': p_f1,
+                                 'p_auroc': p_auroc,
+                                 'n_trials': trial_times.shape[0],
                                  'n_neurons': np.unique(clus_region).shape[0]}))
 
     decoding_result.to_pickle(join(SAVE_PATH,

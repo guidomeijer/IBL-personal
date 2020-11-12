@@ -9,10 +9,7 @@ Created on Mon Nov  2 13:28:36 2020
 from os.path import join
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy
-from brainbox.population import decode, _get_spike_counts_in_bins
-import pandas as pd
-from scipy.stats import wilcoxon
+from brainbox.population import decode
 from matplotlib.patches import Rectangle
 import seaborn as sns
 import alf
@@ -21,31 +18,27 @@ import brainbox.io.one as bbone
 from oneibl.one import ONE
 one = ONE()
 
-EID = '1538493d-226a-46f7-b428-59ce5f43f0f9'
-REGION = 'VISpor'
+EID = 'c9fec76e-7a20-4da4-93ad-04510a89473b'
+REGION = 'ACAd'
 PROBE = 'probe01'
 PRE_TIME = 0.6
 POST_TIME = -0.1
-DECODER = 'lda'
+DECODER = 'bayes'
 ITERATIONS = 1000
-DOWNLOAD_TRIALS = False
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
-FIG_PATH = join(FIG_PATH, 'Decoding')
+FIG_PATH = join(FIG_PATH, 'Decoding', 'Single sessions', DECODER)
 
 # %%
 # Load in data
-spikes, clusters, channels = bbone.load_spike_sorting_with_channel(EID, one=one)
+spikes, clusters, channels = bbone.load_spike_sorting_with_channel(EID, aligned=True, one=one)
 ses_path = one.path_from_eid(EID)
-if DOWNLOAD_TRIALS:
-    _ = one.load(EID, dataset_types=['trials.stimOn_times', 'trials.probabilityLeft'],
-                 download_only=True, clobber=True)
 trials = alf.io.load_object(join(ses_path, 'alf'), 'trials')
 
 # Get trial vectors
 incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
 trial_times = trials.stimOn_times[incl_trials]
 probability_left = trials.probabilityLeft[incl_trials]
-trial_blocks = (trials.probabilityLeft[incl_trials] == 0.8).astype(int)
+trial_blocks = (trials.probabilityLeft[incl_trials] == 0.2).astype(int)
 
 # Get clusters in this brain region
 region_clusters = combine_layers_cortex(clusters[PROBE]['acronym'])
@@ -92,10 +85,12 @@ for i, trans in enumerate(block_trans[:-1]):
     p = Rectangle((trans, -0.05), block_trans[i+1] - trans, 1.1, alpha=0.5,
                   color=block_colors[trial_blocks[trans]])
     ax2.add_patch(p)
-ax2.plot(np.convolve(decode_block['predictions'][0], np.ones(10), 'same') / 10, lw=2, color='k')
+# ax2.plot(np.convolve(decode_block['predictions'][0], np.ones(10), 'same') / 10, lw=2, color='k')
+ax2.plot(np.convolve(decode_block['probabilities'][0], np.ones(10), 'same') / 10, lw=2, color='k')
+# ax2.plot(decode_block['probabilities'][0], lw=2, color='k')
 
 ax2.set(xlim=[0, trial_blocks.shape[0]], ylim=[-0.05, 1.05],
-        ylabel='Block prediction (10 trial rolling average)', xlabel='Trials')
+        ylabel='Decoding probability (10 trial rolling average)', xlabel='Trials')
 
 plt.savefig(join(FIG_PATH, '%s_%s' % (REGION, DECODER)))
 

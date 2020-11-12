@@ -18,12 +18,12 @@ from oneibl.one import ONE
 one = ONE()
 
 # Settings
-REGION = 'ACAd'
+REGION = 'ACAv'
 TEST_PRE_TIME = 0.6
 TEST_POST_TIME = -0.1
 PLOT_PRE_TIME = 0.5
 PLOT_POST_TIME = 1
-ALPHA = 0.05
+ALPHA = 0.2
 FIG_PATH = paths()[1]
 
 # Query sessions with at least one channel in the region of interest
@@ -41,7 +41,8 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
 
     # Load in data
     try:
-        spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
+        spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, aligned=True,
+                                                                           one=one)
         ses_path = one.path_from_eid(eid)
         trials = alf.io.load_object(join(ses_path, 'alf'), 'trials')
     except:

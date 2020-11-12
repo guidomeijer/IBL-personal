@@ -32,9 +32,9 @@ METRIC = 'accuracy'
 # %%
 
 
-eid = '259927fd-7563-4b03-bc5d-17b4d0fa7a55'
-probe = 'probe00'
-region = 'ACAd'
+eid = 'c9fec76e-7a20-4da4-93ad-04510a89473b'
+probe = 'probe01'
+region = 'ILA'
 
 # Load in data
 spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)

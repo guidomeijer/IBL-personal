@@ -21,11 +21,10 @@ one = ONE()
 PRE_TIME = 0.6
 POST_TIME = -0.1
 MIN_NEURONS = 5  # min neurons per region
-MIN_TRIALS = 300
 DECODER = 'bayes'
 VALIDATION = 'kfold'
 INCL_NEURONS = 'all'  # all or no_drift
-INCL_SESSIONS = 'aligned'  # all, aligned or resolved
+INCL_SESSIONS = 'behavior_crit'  # all, aligned or resolved
 NUM_SPLITS = 5
 CHANCE_LEVEL = 'phase_rand'  # phase_rand, shuffle or none
 ITERATIONS = 1000  # for null distribution estimation
@@ -35,7 +34,7 @@ DOWNLOAD_TRIALS = False
 sessions = query_sessions(selection=INCL_SESSIONS)  # query session list
 
 # %%
-# Detect if is a list of sessions or insertions
+# Detect data format
 if 'model' in sessions[0]:
     ses_type = 'insertions'
 elif 'good_enough_for_brainwide_map' in sessions[0]:
@@ -47,7 +46,7 @@ decoding_result = pd.DataFrame()
 for i in range(len(sessions)):
     print('\nProcessing session %d of %d' % (i+1, len(sessions)))
 
-    # Detect if sessions is a list of sessions or insertions
+    # Extract eid based on data format
     if ses_type == 'insertions':
         eid = sessions[i]['session']
     elif ses_type == 'datajoint':
@@ -67,23 +66,12 @@ for i in range(len(sessions)):
                                              'trials.feedback_times'],
                          download_only=True, clobber=True)
         trials = alf.io.load_object(join(ses_path, 'alf'), 'trials')
-    except:
+    except Exception as error_message:
+        print(error_message)
         continue
 
     # Check data integrity
     if check_trials(trials) is False:
-        continue
-    if type(spikes) == tuple:
-        continue
-
-    # Get trial vectors
-    incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
-    trial_times = trials.stimOn_times[incl_trials]
-    probability_left = trials.probabilityLeft[incl_trials]
-    trial_blocks = (trials.probabilityLeft[incl_trials] == 0.2).astype(int)
-
-    # Check for number of trials
-    if trial_times.shape[0] < MIN_TRIALS:
         continue
 
     # Extract session data depending on whether input is a list of sessions or insertions
@@ -99,6 +87,12 @@ for i in range(len(sessions)):
         subject = sessions[i]['subject']
         date = sessions[i]['start_time'][:10]
         probes_to_use = spikes.keys()
+
+    # Get trial vectors
+    incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
+    trial_times = trials.stimOn_times[incl_trials]
+    probability_left = trials.probabilityLeft[incl_trials]
+    trial_blocks = (trials.probabilityLeft[incl_trials] == 0.2).astype(int)
 
     # Calculate bias shift for this subject
     blank_left = trials.choice[((trials.contrastLeft == 0) | (trials.contrastRight == 0))
@@ -170,9 +164,17 @@ for i in range(len(sessions)):
             else:
                 raise Exception('CHANCE_LEVEL must be phase_rand, shuffle or none')
 
+            # Calculate p-values
+            p_accuracy = (np.sum(decode_chance['accuracy'] > decode_result['accuracy'])
+                          / decode_chance['accuracy'].shape[0])
+            p_f1 = (np.sum(decode_chance['f1'] > decode_result['f1'])
+                          / decode_chance['f1'].shape[0])
+            p_auroc = (np.sum(decode_chance['auroc'] > decode_result['auroc'])
+                          / decode_chance['auroc'].shape[0])
+
             # Add to dataframe
             decoding_result = decoding_result.append(pd.DataFrame(
-                index=[0], data={'subject': subject,
+                index=[decoding_result.shape[0] + 1], data={'subject': subject,
                                  'date': date,
                                  'eid': eid,
                                  'probe': probe,
@@ -180,9 +182,12 @@ for i in range(len(sessions)):
                                  'f1': decode_result['f1'].mean(),
                                  'accuracy': decode_result['accuracy'].mean(),
                                  'auroc': decode_result['auroc'].mean(),
-                                 'chance_accuracy': [np.array(decode_chance['accuracy'])],
-                                 'chance_f1': [np.array(decode_chance['f1'])],
-                                 'chance_auroc': [np.array(decode_chance['auroc'])],
+                                 'chance_accuracy': decode_chance['accuracy'].mean(),
+                                 'chance_f1': decode_chance['f1'].mean(),
+                                 'chance_auroc': decode_chance['auroc'].mean(),
+                                 'p_accuracy': p_accuracy,
+                                 'p_f1': p_f1,
+                                 'p_auroc': p_auroc,
                                  'bias': bias,
                                  'n_trials': trial_blocks.shape[0],
                                  'n_neurons': np.unique(clus_region).shape[0]}))
