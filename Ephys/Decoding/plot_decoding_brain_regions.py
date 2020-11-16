@@ -16,8 +16,8 @@ from ephys_functions import paths, figure_style
 # Settings
 TARGET = 'block'
 DECODER = 'bayes'
-MIN_PERF = 3
-YLIM = 15
+MIN_PERF = 6
+YLIM = 40
 MIN_REC = 2
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Decoding')
@@ -50,7 +50,7 @@ for i, region in enumerate(decoding_result['region'].unique()):
                                                             decoding_result['region'] == region)
 
 # %%
-figure_style(font_scale=2)
+figure_style(font_scale=1.8)
 f, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 10), dpi=150)
 decoding_plot = decoding_result[(decoding_result['acc_mean'] >= MIN_PERF)
                                 & (decoding_result['n_rec'] >= MIN_REC)]

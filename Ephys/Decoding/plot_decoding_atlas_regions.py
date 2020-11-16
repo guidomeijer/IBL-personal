@@ -13,15 +13,15 @@ from brainbox.atlas import plot_atlas
 from ephys_functions import paths, figure_style, combine_layers_cortex
 
 # Settings
-TARGET = 'block_stim'
+TARGET = 'reward'
 DECODER = 'bayes'
-MIN_REC = 2
-MINMAX = 10
+MIN_REC = 1
+MINMAX = 30
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Decoding')
 INCL_NEURONS = 'all'  # all or no_drift
 INCL_SESSIONS = 'behavior_crit'  # all or aligned
-ML = -0.5  # in mm
+ML = -2  # in mm
 AP = 2  # in mm
 DV = -3  # in mm
 

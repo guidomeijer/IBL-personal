@@ -19,11 +19,12 @@ one = ONE()
 
 # Settings
 PRE_TIME = 0
-POST_TIME = 0.2
+POST_TIME = 0.3
 MIN_NEURONS = 5  # min neurons per region
 STIM_SIDE = 'right'
 DECODER = 'bayes'
-VALIDATION = 'leave-one-out'
+VALIDATION = 'kfold'
+NUM_SPLITS = 10
 INCL_NEURONS = 'all'  # all or no_drift
 INCL_SESSIONS = 'behavior_crit'
 CHANCE_LEVEL = 'phase_rand'  # phase_rand, shuffle or none
@@ -152,18 +153,18 @@ for i in range(len(sessions)):
             # Decode block identity
             decode_result = decode(spks_region, clus_region, trial_times, trial_blocks,
                                    pre_time=PRE_TIME, post_time=POST_TIME, classifier=DECODER,
-                                   cross_validation=VALIDATION)
+                                   cross_validation=VALIDATION, num_splits=NUM_SPLITS,)
 
             # Estimate chance level
             if CHANCE_LEVEL == 'phase_rand':
                 decode_chance = decode(spks_region, clus_region, trial_times, trial_blocks,
                                        pre_time=PRE_TIME, post_time=POST_TIME, classifier=DECODER,
-                                       cross_validation=VALIDATION,
+                                       cross_validation=VALIDATION, num_splits=NUM_SPLITS,
                                        phase_rand=True, iterations=ITERATIONS)
             elif CHANCE_LEVEL == 'shuffle':
                 decode_chance = decode(spks_region, clus_region, trial_times, trial_blocks,
                                        pre_time=PRE_TIME, post_time=POST_TIME, classifier=DECODER,
-                                       cross_validation=VALIDATION,
+                                       cross_validation=VALIDATION, num_splits=NUM_SPLITS,
                                        shuffle=True, iterations=ITERATIONS)
             elif CHANCE_LEVEL == 'none':
                 decode_chance = []

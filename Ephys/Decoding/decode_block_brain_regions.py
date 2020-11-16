@@ -12,6 +12,7 @@ from brainbox.population import decode
 from brainbox.task import differentiate_units
 import pandas as pd
 import alf
+from sklearn.linear_model import LogisticRegression
 from ephys_functions import paths, query_sessions, check_trials, combine_layers_cortex
 import brainbox.io.one as bbone
 from oneibl.one import ONE
@@ -21,7 +22,8 @@ one = ONE()
 PRE_TIME = 0.6
 POST_TIME = -0.1
 MIN_NEURONS = 5  # min neurons per region
-DECODER = 'bayes'
+DECODER = 'regression'
+CLF = LogisticRegression(solver='liblinear')
 VALIDATION = 'kfold'
 INCL_NEURONS = 'all'  # all or no_drift
 INCL_SESSIONS = 'behavior_crit'  # all, aligned or resolved
@@ -145,18 +147,18 @@ for i in range(len(sessions)):
 
             # Decode block identity
             decode_result = decode(spks_region, clus_region, trial_times, trial_blocks,
-                                   pre_time=PRE_TIME, post_time=POST_TIME, classifier=DECODER,
+                                   pre_time=PRE_TIME, post_time=POST_TIME, classifier=CLF,
                                    cross_validation=VALIDATION, num_splits=NUM_SPLITS)
 
             # Estimate chance level
             if CHANCE_LEVEL == 'phase_rand':
                 decode_chance = decode(spks_region, clus_region, trial_times, trial_blocks,
-                                       pre_time=PRE_TIME, post_time=POST_TIME, classifier=DECODER,
+                                       pre_time=PRE_TIME, post_time=POST_TIME, classifier=CLF,
                                        cross_validation=VALIDATION, num_splits=NUM_SPLITS,
                                        phase_rand=True, iterations=ITERATIONS)
             elif CHANCE_LEVEL == 'shuffle':
                 decode_chance = decode(spks_region, clus_region, trial_times, trial_blocks,
-                                       pre_time=PRE_TIME, post_time=POST_TIME, classifier=DECODER,
+                                       pre_time=PRE_TIME, post_time=POST_TIME, classifier=CLF,
                                        cross_validation=VALIDATION, num_splits=NUM_SPLITS,
                                        shuffle=True, iterations=ITERATIONS)
             elif CHANCE_LEVEL == 'none':
