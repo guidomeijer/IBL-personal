@@ -16,14 +16,14 @@ from ephys_functions import paths, figure_style, combine_layers_cortex
 TARGET = 'block'
 DECODER = 'bayes'
 MIN_REC = 2
-MINMAX = 10
+MINMAX = 12
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Decoding')
 INCL_NEURONS = 'all'  # all or no_drift
-INCL_SESSIONS = 'behavior_crit'  # all or aligned
+INCL_SESSIONS = 'aligned_behavior'
 
 ML = [-0.5, -3]  # in mm
-AP = [2, -2.5]  # in mm
+AP = [1.5, -2.5]  # in mm
 DV = [-2, -3.5]  # in mm
 
 

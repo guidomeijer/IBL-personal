@@ -18,8 +18,8 @@ import brainbox.io.one as bbone
 from oneibl.one import ONE
 one = ONE()
 
-EID = 'c9fec76e-7a20-4da4-93ad-04510a89473b'
-REGION = 'ACAd'
+EID = '15f742e1-1043-45c9-9504-f1e8a53c1744'
+REGION = 'SNr'
 PROBE = 'probe01'
 PRE_TIME = 0.6
 POST_TIME = -0.1
@@ -63,7 +63,7 @@ phase_block = decode(spks_region, clus_region, trial_times, trial_blocks,
 shuffle_block = decode(spks_region, clus_region, trial_times, trial_blocks,
                        pre_time=PRE_TIME, post_time=POST_TIME,
                        classifier=DECODER, cross_validation='kfold',
-                       num_splits=5, shuffle=True, iterations=ITERATIONS)
+                       num_splits=5, pseudo_blocks=True, iterations=ITERATIONS)
 
 # %%
 figure_style()
@@ -74,7 +74,7 @@ ax1.bar(np.arange(7), [decode_block['accuracy'], phase_block['accuracy'].mean(),
         yerr=[0, phase_block['accuracy'].std(), shuffle_block['accuracy'].std(), 0,
               0, phase_block['f1'].std(), shuffle_block['f1'].std()])
 ax1.set(xticks=np.arange(7),
-        xticklabels=['acc.', 'phase', 'shuffle', '', 'f1', 'phase', 'shuffle'],
+        xticklabels=['acc.', 'phase', 'pseudo blocks', '', 'f1', 'phase', 'pseudo blocks'],
         ylabel='Decoding performance', title='Region: %s' % REGION)
 
 block_colors = [sns.color_palette('colorblind', as_cmap=True)[0],
@@ -86,11 +86,13 @@ for i, trans in enumerate(block_trans[:-1]):
                   color=block_colors[trial_blocks[trans]])
     ax2.add_patch(p)
 # ax2.plot(np.convolve(decode_block['predictions'][0], np.ones(10), 'same') / 10, lw=2, color='k')
-ax2.plot(np.convolve(decode_block['probabilities'][0], np.ones(10), 'same') / 10, lw=2, color='k')
-# ax2.plot(decode_block['probabilities'][0], lw=2, color='k')
+# ax2.plot(np.convolve(decode_block['probabilities'][0], np.ones(10), 'same') / 10, lw=2, color='k')
+ax2.plot(decode_block['probabilities'][0], lw=2, color='k')
+ax2.plot(np.isnan(trials.contrastLeft[incl_trials]).astype(int), 'o', color='k')
+ax2.set(xlim=[0, 200], ylim=[-0.05, 1.05],
+        ylabel='Block probability', xlabel='Trials',
+        title='Blue = left, orange = right', yticks=[0, 1], yticklabels=['R', 'L'])
 
-ax2.set(xlim=[0, trial_blocks.shape[0]], ylim=[-0.05, 1.05],
-        ylabel='Decoding probability (10 trial rolling average)', xlabel='Trials')
 
-plt.savefig(join(FIG_PATH, '%s_%s' % (REGION, DECODER)))
+# plt.savefig(join(FIG_PATH, '%s_%s' % (REGION, DECODER)))
 

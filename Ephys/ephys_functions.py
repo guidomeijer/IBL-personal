@@ -5,12 +5,13 @@ Created on Wed Jan 22 16:22:01 2020
 @author: guido
 """
 
+import numpy as np
 import seaborn as sns
 import matplotlib
 import matplotlib.pyplot as plt
-from os.path import join, dirname
-import pandas as pd
+from os.path import join
 import pathlib
+from ibllib.atlas import regions_from_allen_csv
 from paths import DATA_PATH, FIG_PATH
 
 
@@ -70,16 +71,6 @@ def query_sessions(selection='all'):
                                  project='ibl_neuropixel_brainwide',
                                  dataset_types=['spikes.times', 'trials.probabilityLeft'],
                                  histology=True)
-    elif selection == 'behavior_crit':
-        from ibl_pipeline import subject, ephys, histology
-        from ibl_pipeline.analyses import behavior as behavior_ana
-        regionlabeled = (histology.ProbeTrajectory
-                         & 'insertion_data_source = "Ephys aligned histology track"')
-        ses = (subject.Subject * subject.SubjectProject * ephys.acquisition.Session
-               * regionlabeled * behavior_ana.SessionTrainingStatus)
-        bwm_sess = (ses & 'subject_project = "ibl_neuropixel_brainwide_01"'
-                    & 'good_enough_for_brainwide_map = "1"')
-        sessions = [info for info in bwm_sess]
     elif selection == 'aligned':
         # Query all sessions with resolved alignment
         sessions = one.alyx.rest('trajectories', 'list',
@@ -89,6 +80,31 @@ def query_sessions(selection='all'):
         sessions = one.alyx.rest('insertions', 'list',
                                  provenance='Ephys aligned histology track',
                                  django='json__extended_qc__alignment_resolved,True')
+    elif selection == 'aligned-behavior':
+        from ibl_pipeline import subject, ephys, histology
+        from ibl_pipeline.analyses import behavior as behavior_ana
+        regionlabeled = (histology.ProbeTrajectory
+                         & 'insertion_data_source = "Ephys aligned histology track"')
+        ses = (subject.Subject * subject.SubjectProject * ephys.acquisition.Session
+               * regionlabeled * behavior_ana.SessionTrainingStatus)
+        bwm_sess = (ses & 'subject_project = "ibl_neuropixel_brainwide_01"'
+                    & 'good_enough_for_brainwide_map = "1"')
+        sessions = [info for info in bwm_sess]
+    elif selection == 'resolved-behavior':
+        from ibl_pipeline import subject, ephys, histology
+        from ibl_pipeline.analyses import behavior as behavior_ana
+        regionlabeled = (histology.ProbeTrajectory
+                         & 'insertion_data_source = "Ephys aligned histology track"')
+        ses = (subject.Subject * subject.SubjectProject * ephys.acquisition.Session
+               * regionlabeled * behavior_ana.SessionTrainingStatus)
+        bwm_sess = (ses & 'subject_project = "ibl_neuropixel_brainwide_01"'
+                    & 'good_enough_for_brainwide_map = "1"')
+        aligned_ses = one.alyx.rest('insertions', 'list',
+                                    provenance='Ephys aligned histology track',
+                                    django='json__extended_qc__alignment_resolved,True')
+        aligned_eids = [i['session'] for i in aligned_ses]
+        sessions = [info for info in bwm_sess if str(info['session_uuid']) in aligned_eids]
+
     return sessions
 
 
@@ -112,4 +128,40 @@ def combine_layers_cortex(regions, delete_duplicates=False):
     if delete_duplicates:
         regions = list(set(regions))
     return regions
+
+
+def get_parent_region_name(acronyms):
+    brainregions = regions_from_allen_csv()
+    parent_region_names = []
+    for i, acronym in enumerate(acronyms):
+        try:
+            regid = brainregions.id[np.argwhere(brainregions.acronym == acronym)]
+            ancestors = brainregions.ancestors(regid)
+            targetlevel = 6
+            if sum(ancestors.level == targetlevel) == 0:
+                parent_region_names.append(ancestors.name[-1])
+            else:
+                parent_region_names.append(ancestors.name[np.argwhere(
+                                                ancestors.level == targetlevel)[0, 0]])
+        except IndexError:
+            parent_region_names.append(acronym)
+    if len(parent_region_names) == 1:
+        return parent_region_names[0]
+    else:
+        return parent_region_names
+
+
+def get_full_region_name(acronyms):
+    brainregions = regions_from_allen_csv()
+    full_region_names = []
+    for i, acronym in enumerate(acronyms):
+        try:
+            regname = brainregions.name[np.argwhere(brainregions.acronym == acronym).flatten()][0]
+            full_region_names.append(regname)
+        except IndexError:
+            full_region_names.append(acronym)
+    if len(full_region_names) == 1:
+        return full_region_names[0]
+    else:
+        return full_region_names
 

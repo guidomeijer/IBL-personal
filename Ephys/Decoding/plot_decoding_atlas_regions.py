@@ -13,23 +13,30 @@ from brainbox.atlas import plot_atlas
 from ephys_functions import paths, figure_style, combine_layers_cortex
 
 # Settings
-TARGET = 'reward'
+TARGET = 'choice'
 DECODER = 'bayes'
-MIN_REC = 1
-MINMAX = 30
+MIN_REC = 2
+MINMAX = 40
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Decoding')
 INCL_NEURONS = 'all'  # all or no_drift
-INCL_SESSIONS = 'behavior_crit'  # all or aligned
+INCL_SESSIONS = 'aligned-behavior'  # all or aligned
+CHANCE_LEVEL = 'phase-rand'
+"""
+ML = -0.5  # in mm
+AP = 1.5  # in mm
+DV = -2  # in mm
+"""
 ML = -2  # in mm
-AP = 2  # in mm
-DV = -3  # in mm
+AP = -1  # in mm
+DV = -3.5  # in mm
 
 
 # %% Plot
 # Load in data
 decoding_result = pd.read_pickle(join(SAVE_PATH,
-       ('decode_%s_%s_%s_neurons_%s_sessions.p' % (TARGET, DECODER, INCL_NEURONS, INCL_SESSIONS))))
+       ('decode_%s_%s_%s_%s_neurons_%s_sessions.p' % (TARGET, DECODER, CHANCE_LEVEL,
+                                                      INCL_NEURONS, INCL_SESSIONS))))
 
 # Exclude root
 decoding_result = decoding_result.reset_index()
@@ -59,7 +66,7 @@ for i, region in enumerate(decoding_result['region'].unique()):
 f, axs1 = plt.subplots(1, 3, figsize=(30, 6))
 figure_style(font_scale=2)
 plot_atlas(np.array(decode_regions), np.array(accuracy), ML, AP, DV, color_palette='RdBu_r',
-           minmax=[-MINMAX, MINMAX], axs=axs1, custom_region_list=all_regions)
+           hemisphere='left', minmax=[-MINMAX, MINMAX], axs=axs1, custom_region_list=all_regions)
 
 if TARGET == 'stim_side':
     f.suptitle('Decoding of stimulus side')
@@ -74,7 +81,7 @@ elif TARGET == 'reward':
 elif TARGET == 'choice':
     f.suptitle('Decoding of choice')
 
-plt.savefig(join(FIG_PATH, 'atlas_decode_%s_%s_%s_neurons_%s_sessions_ML%.2f_AP%.2f_DV%.2f.png' % (
-                        TARGET, DECODER, INCL_NEURONS, INCL_SESSIONS, ML, AP, DV)))
+plt.savefig(join(FIG_PATH, 'atlas_decode_%s_%s_%s_%s_neurons_%s_sessions_ML%.2f_AP%.2f_DV%.2f.png' % (
+                        TARGET, DECODER, CHANCE_LEVEL, INCL_NEURONS, INCL_SESSIONS, ML, AP, DV)))
 
 
