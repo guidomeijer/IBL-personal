@@ -17,9 +17,9 @@ from ephys_functions import paths, figure_style, combine_layers_cortex
 
 # Settings
 REGION = 'MOs'
-ML = -0.5  # in mm
-AP = 2  # in mm
-DV = -2  # in mm
+ML = -2  # in mm
+AP = -1  # in mm
+DV = -3.6  # in mm
 COMBINE_LAYERS_CORTEX = True
 
 # Remove cortical layers from brain region map
@@ -31,7 +31,7 @@ else:
 
 # Highlight region
 fill_region = np.zeros(all_regions.shape)
-fill_region[all_regions == REGION] = 0.5
+fill_region[all_regions == REGION] = 1
 
 # Plot atlas
 plot_atlas(all_regions, fill_region, ML, AP, DV, color_palette='bright',

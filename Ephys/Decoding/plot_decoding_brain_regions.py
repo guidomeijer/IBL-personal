@@ -14,24 +14,26 @@ import seaborn as sns
 from ephys_functions import paths, figure_style, get_full_region_name, get_parent_region_name
 
 # Settings
-TARGET = 'block'
+TARGET = 'block-stim'
 DECODER = 'bayes'
-MIN_PERF = 10
-YLIM = 40
+MIN_PERF = 3
+YLIM = 15
 MIN_REC = 2
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Decoding')
 INCL_NEURONS = 'all'  # all or no_drift
 INCL_SESSIONS = 'aligned-behavior'  # all or aligned
-CHANCE_LEVEL = 'phase-rand'
+CHANCE_LEVEL = 'shuffle'
+VALIDATION = 'kfold'
 FULL_NAME = True
 PARENT_REGIONS = False
+SAVE_FIG = True
 
 # %% Plot
 # Load in data
 decoding_result = pd.read_pickle(join(SAVE_PATH,
-       ('decode_%s_%s_%s_%s_neurons_%s_sessions.p' % (TARGET, DECODER, CHANCE_LEVEL,
-                                                      INCL_NEURONS, INCL_SESSIONS))))
+       ('%s_%s_%s_%s_%s_%s_cells.p' % (DECODER, TARGET, CHANCE_LEVEL, VALIDATION,
+                                          INCL_SESSIONS, INCL_NEURONS))))
 
 # Exclude root
 decoding_result = decoding_result.reset_index(drop=True)
@@ -61,7 +63,7 @@ for i, region in enumerate(decoding_result['region'].unique()):
 
 # %%
 figure_style(font_scale=1.8)
-f, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10), dpi=150)
+f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(25, 10), dpi=150)
 decoding_plot = decoding_result[(decoding_result['acc_mean'] >= MIN_PERF)
                                 & (decoding_result['n_rec'] >= MIN_REC)]
 if FULL_NAME:
@@ -92,8 +94,12 @@ elif TARGET == 'choice':
 ax2.hist(decoding_result['acc_over_chance'])
 ax2.set(ylabel='Recordings', xlabel='Decoding improvement over chance (% correct)')
 
+ax3.hist(decoding_result['chance_accuracy'])
+ax3.set(ylabel='Recordings', xlabel='Chance level decoding (% correct)')
+
 plt.tight_layout()
 sns.despine(trim=False)
 
-plt.savefig(join(FIG_PATH, 'decode_%s_%s_%s_%s_neurons_%s_sessions_acc' % (
-                            TARGET, DECODER, CHANCE_LEVEL, INCL_NEURONS, INCL_SESSIONS)))
+if SAVE_FIG:
+    plt.savefig(join(FIG_PATH, '%s_%s_%s_%s_%s_%s_cells' % (
+                    DECODER, TARGET, CHANCE_LEVEL, VALIDATION, INCL_SESSIONS, INCL_NEURONS)))

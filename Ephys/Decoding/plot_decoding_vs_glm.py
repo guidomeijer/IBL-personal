@@ -15,13 +15,14 @@ from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
 
 # Settings
-TARGET = 'block'
+TARGET = 'choice'
 DECODER = 'bayes'
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Decoding')
 INCL_NEURONS = 'all'  # all or no_drift
 INCL_SESSIONS = 'aligned-behavior'  # all or aligned
-CHANCE_LEVEL = 'phase-rand'
+CHANCE_LEVEL = 'shuffle'
+VALIDATION = 'kfold-interleaved'
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 # GLM_PATH = '/home/guido/Data/Ephys/berk_glm_fits/completefits_2020-10-26.p'
 GLM_PATH = '/home/guido/Data/Ephys/berk_glm_fits/completefits_2020-11-09.p'
@@ -33,18 +34,19 @@ def drop_subzero_max(row):
         row.tag_0 = 'None'
     return row
 
+
 # Get GLM target names
 if TARGET == 'block':
     YLIM = [-0.001, 0.002]
     XLIM = [-20, 20]
     glm_target = 'pLeft'
-elif TARGET == 'stim_side':
+elif TARGET == 'stim-side':
     glm_target = 'stimonR'
-    XLIM = [-10, 30]
+    XLIM = [-10, 40]
     YLIM = [-0.002, 0.006]
 elif TARGET == 'reward':
-    YLIM = [-0.02, 0.06]
-    XLIM = [-50, 50]
+    YLIM = [-0.01, 0.06]
+    XLIM = [-10, 70]
     glm_target = 'correct'
 elif TARGET == 'choice':
     glm_target = 'wheel'
@@ -65,8 +67,8 @@ pleft_nosub = nosub_raw.groupby('nolayer_name').agg({'value':'median'}).squeeze(
 
 # Load in decoding data
 decoding_result = pd.read_pickle(join(SAVE_PATH,
-       ('decode_%s_%s_%s_%s_neurons_%s_sessions.p' % (TARGET, DECODER, CHANCE_LEVEL,
-                                                      INCL_NEURONS, INCL_SESSIONS))))
+       ('%s_%s_%s_%s_%s_%s_cells.p' % (DECODER, TARGET, CHANCE_LEVEL, VALIDATION,
+                                          INCL_SESSIONS, INCL_NEURONS))))
 
 # Exclude root
 decoding_result = decoding_result.reset_index(drop=True)
@@ -91,6 +93,9 @@ acc_over_chance = decoding_result.groupby('full_region').mean()['acc_over_chance
 pleft = pleft[pleft.index.isin(acc_over_chance.index)]
 acc_over_chance = acc_over_chance[acc_over_chance.index.isin(pleft.index)]
 
+# Take exponent
+#pleft = np.log(np.exp(pleft))
+
 # Create merged dataframe
 merged_df = pd.concat((acc_over_chance, pleft), axis=1)
 merged_df = merged_df.sort_values(by=['value', 'acc_over_chance'], ascending=(False, False))
@@ -102,7 +107,7 @@ merged_df = merged_df[merged_df['acc_over_chance'] > 0]
 
 if TARGET == 'block':
     fig_title = 'Stimulus prior decoding compared to pLeft kernel'
-elif TARGET == 'stim_side':
+elif TARGET == 'stim-side':
     fig_title = 'Stimulus side decoding compared to stimonR kernel'
 elif TARGET == 'reward':
     fig_title = 'Reward vs ommission decoding compared to correct kernel'
@@ -113,7 +118,7 @@ figure_style(font_scale=1.5)
 f, ax1 = plt.subplots(1, 1, figsize=(6, 5), dpi=150, sharey=True)
 ax1.scatter(acc_over_chance, pleft)
 m, b = np.polyfit(acc_over_chance, pleft, 1)
-ax1.plot(np.arange(-50, 50, 0.1), m*np.arange(-50, 50, 0.1) + b, color='r')
+# ax1.plot(np.arange(-50, 100, 0.1), m*np.arange(-50, 100, 0.1) + b, color='r')
 r, p = pearsonr(acc_over_chance, pleft)
 ax1.set(xlabel='Decoding improvement over chance (% correct)',
         ylabel='Delta D squared of GLM fit',

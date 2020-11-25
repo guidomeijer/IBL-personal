@@ -25,19 +25,20 @@ PRE_TIME = 0.6
 POST_TIME = -0.1
 DECODER = 'bayes'
 ITERATIONS = 1000
-CROSS_VALIDATION = 'kfold'
+VALIDATION = 'kfold-interleaved'
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Decoding', 'Single sessions', 'block_stim')
 INCL_NEURONS = 'all'  # all or no_drift
 INCL_SESSIONS = 'aligned-behavior'  # all or aligned
-CHANCE_LEVEL = 'phase-rand'
+CHANCE_LEVEL = 'pseudo-blocks'
 N_SESSIONS = 10
 METRIC = 'accuracy'
 
+
 # %%
 decoding_result = pd.read_pickle(join(SAVE_PATH,
-           ('decode_block_stim_%s_%s_%s_neurons_%s_sessions.p' % (DECODER, CHANCE_LEVEL,
-                                                                  INCL_NEURONS, INCL_SESSIONS))))
+       ('%s_%s_%s_%s_%s_%s_cells.p' % (DECODER, TARGET, CHANCE_LEVEL, VALIDATION,
+                                          INCL_SESSIONS, INCL_NEURONS))))
 
 # Exclude root
 decoding_result = decoding_result.reset_index(drop=True)
