@@ -13,28 +13,28 @@ from brainbox.atlas import plot_atlas
 from ephys_functions import paths, figure_style, combine_layers_cortex
 
 # Settings
-TARGET = 'block'
-DECODER = 'bayes'
+DECODER = 'bayes-multinomial'
 MIN_REC = 2
 MINMAX = 12
+VALIDATION = 'kfold'
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Decoding')
 INCL_NEURONS = 'all'  # all or no_drift
-INCL_SESSIONS = 'aligned_behavior'
+INCL_SESSIONS = 'aligned-behavior'
 
-ML = [-0.5, -3]  # in mm
+ML = [-0.5, -2]  # in mm
 AP = [1.5, -2.5]  # in mm
 DV = [-2, -3.5]  # in mm
 
 
 # %% Plot
 # Load in data
-decoding_pre = pd.read_pickle(join(SAVE_PATH,
-       ('decode_%s_%s_%s_neurons_%s_sessions.p' % ('block', DECODER,
-                                                   INCL_NEURONS, INCL_SESSIONS))))
-decoding_stim = pd.read_pickle(join(SAVE_PATH,
-        ('decode_%s_%s_%s_neurons_%s_sessions.p' % ('block_stim', DECODER,
-                                                    INCL_NEURONS, INCL_SESSIONS))))
+decoding_pre = pd.read_pickle(join(SAVE_PATH, DECODER,
+       ('%s_%s_%s_%s_%s_cells.p' % ('block', 'pseudo-blocks', VALIDATION,
+                                    INCL_SESSIONS, INCL_NEURONS))))
+decoding_stim = pd.read_pickle(join(SAVE_PATH, DECODER,
+       ('%s_%s_%s_%s_%s_cells.p' % ('block-stim', 'shuffle', VALIDATION,
+                                    INCL_SESSIONS, INCL_NEURONS))))
 
 # Exclude root
 decoding_pre = decoding_pre.reset_index(drop=True)
@@ -92,5 +92,5 @@ for i in range(len(ML)):
     axs2[1].set(title='Stimulus evoked')
     axs2[2].set(title='')
     f.suptitle('Decoding of stimulus prior')
-    plt.savefig(join(FIG_PATH, 'atlas_decode_pre_vs_stim_%s_ML%.2f_AP%.2f_DV%.2f.png' % (
-                            DECODER, ML[i], AP[i], DV[i])))
+    plt.savefig(join(FIG_PATH, DECODER, 'atlas_decode_pre_vs_stim_%s_%d.png' % (
+                            DECODER, i + 1)))

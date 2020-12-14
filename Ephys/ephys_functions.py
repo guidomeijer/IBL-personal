@@ -66,46 +66,52 @@ def query_sessions(selection='all'):
 
     if selection == 'all':
         # Query all ephysChoiceWorld sessions with histology
-        sessions = one.alyx.rest('sessions', 'list',
-                                 task_protocol='_iblrig_tasks_ephysChoiceWorld',
-                                 project='ibl_neuropixel_brainwide',
-                                 dataset_types=['spikes.times', 'trials.probabilityLeft'],
-                                 histology=True)
+        trajectories = one.alyx.rest(
+                            'trajectories', 'list', provenance='Histology track',
+                            django=('probe_insertion__session__project__name__icontains,'
+                                    'ibl_neuropixel_brainwide_01,'
+                                    'probe_insertion__session__qc__lt,50,'))
     elif selection == 'aligned':
         # Query all sessions with resolved alignment
-        sessions = one.alyx.rest('trajectories', 'list',
-                                 provenance='Ephys aligned histology track')
+        trajectories = one.alyx.rest(
+                            'trajectories', 'list', provenance='Ephys aligned histology track',
+                            django=('probe_insertion__session__project__name__icontains,'
+                                    'ibl_neuropixel_brainwide_01,'
+                                    'probe_insertion__session__qc__lt,50,'))
     elif selection == 'resolved':
         # Query all sessions with resolved alignment
-        sessions = one.alyx.rest('insertions', 'list',
-                                 provenance='Ephys aligned histology track',
-                                 django='json__extended_qc__alignment_resolved,True')
+        trajectories = one.alyx.rest(
+                            'trajectories', 'list', provenance='Ephys aligned histology track',
+                            django=('probe_insertion__session__project__name__icontains,'
+                                    'ibl_neuropixel_brainwide_01,'
+                                    'probe_insertion__session__qc__lt,50,'
+                                    'probe_insertion__json__extended_qc__alignment_resolved,True'))
     elif selection == 'aligned-behavior':
-        from ibl_pipeline import subject, ephys, histology
-        from ibl_pipeline.analyses import behavior as behavior_ana
-        regionlabeled = (histology.ProbeTrajectory
-                         & 'insertion_data_source = "Ephys aligned histology track"')
-        ses = (subject.Subject * subject.SubjectProject * ephys.acquisition.Session
-               * regionlabeled * behavior_ana.SessionTrainingStatus)
-        bwm_sess = (ses & 'subject_project = "ibl_neuropixel_brainwide_01"'
-                    & 'good_enough_for_brainwide_map = "1"')
-        sessions = [info for info in bwm_sess]
+        trajectories = one.alyx.rest(
+                            'trajectories', 'list', provenance='Ephys aligned histology track',
+                            django=('probe_insertion__session__project__name__icontains,'
+                                    'ibl_neuropixel_brainwide_01,'
+                                    'probe_insertion__session__qc__lt,50,'
+                                    'probe_insertion__session__extended_qc__behavior,1'))
     elif selection == 'resolved-behavior':
-        from ibl_pipeline import subject, ephys, histology
-        from ibl_pipeline.analyses import behavior as behavior_ana
-        regionlabeled = (histology.ProbeTrajectory
-                         & 'insertion_data_source = "Ephys aligned histology track"')
-        ses = (subject.Subject * subject.SubjectProject * ephys.acquisition.Session
-               * regionlabeled * behavior_ana.SessionTrainingStatus)
-        bwm_sess = (ses & 'subject_project = "ibl_neuropixel_brainwide_01"'
-                    & 'good_enough_for_brainwide_map = "1"')
-        aligned_ses = one.alyx.rest('insertions', 'list',
-                                    provenance='Ephys aligned histology track',
-                                    django='json__extended_qc__alignment_resolved,True')
-        aligned_eids = [i['session'] for i in aligned_ses]
-        sessions = [info for info in bwm_sess if str(info['session_uuid']) in aligned_eids]
+        trajectories = one.alyx.rest(
+                            'trajectories', 'list', provenance='Ephys aligned histology track',
+                            django=('probe_insertion__session__project__name__icontains,'
+                                    'ibl_neuropixel_brainwide_01,'
+                                    'probe_insertion__session__qc__lt,50,'
+                                    'probe_insertion__json__extended_qc__alignment_resolved,True,'
+                                    'probe_insertion__session__extended_qc__behavior,1'))
+    else:
+        trajectories = []
 
-    return sessions
+    # Get list of eids and probes
+    all_eids = np.array([i['session']['id'] for i in trajectories])
+    all_probes = np.array([i['probe_name'] for i in trajectories])
+    eids = np.unique(all_eids)
+    probes = []
+    for i, eid in enumerate(eids):
+        probes.append(all_probes[[s == eid for s in all_eids]])
+    return eids, probes
 
 
 def sessions_with_region(brain_region):
@@ -164,4 +170,20 @@ def get_full_region_name(acronyms):
         return full_region_names[0]
     else:
         return full_region_names
+
+
+def get_eid_list():
+    eids = np.array([
+            '465c44bd-2e67-4112-977b-36e1ac7e3f8c', 'db4df448-e449-4a6f-a0e7-288711e7a75a',
+            '158d5d35-a2ab-4a76-87b0-51048c5d5283', '4b7fbad4-f6de-43b4-9b15-c7c7ef44db4b',
+            'dfd8e7df-dc51-4589-b6ca-7baccfeb94b4', '36280321-555b-446d-9b7d-c2e17991e090',
+            'bb6a5aae-2431-401d-8f6a-9fdd6de655a9', 'a71175be-d1fd-47a3-aa93-b830ea3634a1',
+            '2199306e-488a-40ab-93cb-2d2264775578', '4d8c7767-981c-4347-8e5e-5d5fffe38534',
+            '30e5937e-e86a-47e6-93ae-d2ae3877ff8e', 'e535fb62-e245-4a48-b119-88ce62a6fe67',
+            '8435e122-c0a4-4bea-a322-e08e8038478f', 'b39752db-abdb-47ab-ae78-e8608bbf50ed',
+            'fa704052-147e-46f6-b190-a65b837e605e', '3dd347df-f14e-40d5-9ff2-9c49f84d2157',
+            'e5fae088-ed96-4d9b-82f9-dfd13c259d52', 'e49d8ee7-24b9-416a-9d04-9be33b655f40',
+            'f9860a11-24d3-452e-ab95-39e199f20a93', 'b658bc7d-07cd-4203-8a25-7b16b549851b',
+            '7622da34-51b6-4661-98ae-a57d40806008', 'bd456d8f-d36e-434a-8051-ff3997253802'])
+    return eids
 

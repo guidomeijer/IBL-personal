@@ -9,7 +9,6 @@ Decode from all brain regions
 from os.path import join
 import numpy as np
 from brainbox.population import decode
-from brainbox.task import differentiate_units
 import pandas as pd
 from sklearn.naive_bayes import MultinomialNB
 import alf
@@ -20,14 +19,15 @@ one = ONE()
 
 # Settings
 TARGET = 'block'  # block, stim-side. reward or choice
-MIN_NEURONS = 5  # min neurons per region
+MIN_NEURONS = 10  # min neurons per region
+N_NEURONS = 10  # number of neurons to use for decoding
 DECODER = 'bayes-multinomial'
 VALIDATION = 'kfold-interleaved'
-INCL_NEURONS = 'all'  # all or no_drift
 INCL_SESSIONS = 'aligned-behavior'  # all, aligned, resolved, aligned-behavior or resolved-behavior
 NUM_SPLITS = 5
 CHANCE_LEVEL = 'pseudo-blocks'  # pseudo-blocks, phase-rand, shuffle or none
-ITERATIONS = 1000  # for null distribution estimation
+ITERATIONS = 500  # for null distribution estimation
+N_NEURON_PICK = 100  # number of times to randomly subselect neurons
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
 DOWNLOAD_TRIALS = False
@@ -154,78 +154,92 @@ for i in range(len(eids)):
             clus_region = spikes[probe].clusters[np.isin(spikes[probe].clusters,
                                                          clusters_in_region)]
 
-            # Exclude neurons that drift over the session
-            if INCL_NEURONS == 'no_drift':
-                trial_half = np.zeros(trial_times.shape[0])
-                trial_half[int(trial_half.shape[0]/2):] = 1
-                drift_neurons = differentiate_units(spks_region, clus_region, trial_times,
-                                                    trial_half, pre_time=PRE_TIME,
-                                                    post_time=POST_TIME)[0]
-                print('%d out of %d drift neurons detected' % (drift_neurons.shape[0],
-                                                               np.unique(clus_region).shape[0]))
-                spks_region = spks_region[~np.isin(clus_region, drift_neurons)]
-                clus_region = clus_region[~np.isin(clus_region, drift_neurons)]
-
             # Check if there are enough neurons in this brain region
-            if np.unique(clus_region).shape[0] < MIN_NEURONS:
+            region_clusters = np.unique(clus_region)
+            if region_clusters.shape[0] < MIN_NEURONS:
                 continue
 
-            # Decode
-            decode_result = decode(spks_region, clus_region, trial_times, trial_ids,
-                                   pre_time=PRE_TIME, post_time=POST_TIME, classifier=clf,
-                                   cross_validation=VALIDATION, num_splits=NUM_SPLITS)
+            # Loop over neuron subsets
+            decode_subselects = pd.DataFrame()
+            for j in range(N_NEURON_PICK):
 
-            # Estimate chance level
-            if CHANCE_LEVEL == 'phase-rand':
-                decode_chance = decode(spks_region, clus_region, trial_times, trial_ids,
-                                       pre_time=PRE_TIME, post_time=POST_TIME, classifier=clf,
-                                       cross_validation=VALIDATION, num_splits=NUM_SPLITS,
-                                       phase_rand=True, iterations=ITERATIONS)
-            elif CHANCE_LEVEL == 'shuffle':
-                decode_chance = decode(spks_region, clus_region, trial_times, trial_ids,
-                                       pre_time=PRE_TIME, post_time=POST_TIME, classifier=clf,
-                                       cross_validation=VALIDATION, num_splits=NUM_SPLITS,
-                                       shuffle=True, iterations=ITERATIONS)
-            elif CHANCE_LEVEL == 'pseudo-blocks':
-                decode_chance = decode(spks_region, clus_region, trial_times, trial_ids,
-                                       pre_time=PRE_TIME, post_time=POST_TIME, classifier=clf,
-                                       cross_validation=VALIDATION, num_splits=NUM_SPLITS,
-                                       pseudo_blocks=True, iterations=ITERATIONS)
-            elif CHANCE_LEVEL == 'none':
-                decode_chance = []
-            else:
-                raise Exception('CHANCE_LEVEL must be phase_rand, shuffle or none')
+                # Subselect neurons
+                use_neurons = np.random.choice(region_clusters, N_NEURONS, replace=False)
 
-            # Calculate p-values
-            p_accuracy = (np.sum(decode_chance['accuracy'] > decode_result['accuracy'])
-                          / decode_chance['accuracy'].shape[0])
-            p_f1 = (np.sum(decode_chance['f1'] > decode_result['f1'])
-                          / decode_chance['f1'].shape[0])
-            p_auroc = (np.sum(decode_chance['auroc'] > decode_result['auroc'])
-                          / decode_chance['auroc'].shape[0])
+                # Decode with subselecting neurons
+                decode_result = decode(spks_region[np.isin(clus_region, use_neurons)],
+                                       clus_region[np.isin(clus_region, use_neurons)],
+                                       trial_times, trial_ids,
+                                       pre_time=PRE_TIME, post_time=POST_TIME,
+                                       classifier=clf, cross_validation=VALIDATION,
+                                       num_splits=NUM_SPLITS)
+
+                # Estimate chance level
+                if CHANCE_LEVEL == 'phase-rand':
+                    decode_chance = decode(spks_region[np.isin(clus_region, use_neurons)],
+                                           clus_region[np.isin(clus_region, use_neurons)],
+                                           trial_times, trial_ids,
+                                           pre_time=PRE_TIME, post_time=POST_TIME, classifier=clf,
+                                           cross_validation=VALIDATION, num_splits=NUM_SPLITS,
+                                           phase_rand=True, iterations=ITERATIONS)
+                elif CHANCE_LEVEL == 'shuffle':
+                    decode_chance = decode(spks_region[np.isin(clus_region, use_neurons)],
+                                           clus_region[np.isin(clus_region, use_neurons)],
+                                           trial_times, trial_ids,
+                                           pre_time=PRE_TIME, post_time=POST_TIME, classifier=clf,
+                                           cross_validation=VALIDATION, num_splits=NUM_SPLITS,
+                                           shuffle=True, iterations=ITERATIONS)
+                elif CHANCE_LEVEL == 'pseudo-blocks':
+                    decode_chance = decode(spks_region[np.isin(clus_region, use_neurons)],
+                                           clus_region[np.isin(clus_region, use_neurons)],
+                                           trial_times, trial_ids,
+                                           pre_time=PRE_TIME, post_time=POST_TIME, classifier=clf,
+                                           cross_validation=VALIDATION, num_splits=NUM_SPLITS,
+                                           pseudo_blocks=True, iterations=ITERATIONS)
+                elif CHANCE_LEVEL == 'none':
+                    decode_chance = []
+                else:
+                    raise Exception('CHANCE_LEVEL must be phase_rand, shuffle or none')
+
+                # Calculate p-values
+                p_accuracy = (np.sum(decode_chance['accuracy'] > decode_result['accuracy'])
+                              / decode_chance['accuracy'].shape[0])
+                p_f1 = (np.sum(decode_chance['f1'] > decode_result['f1'])
+                        / decode_chance['f1'].shape[0])
+                p_auroc = (np.sum(decode_chance['auroc'] > decode_result['auroc'])
+                           / decode_chance['auroc'].shape[0])
+
+                # Add to dataframe
+                decode_subselects = decode_subselects.append(pd.DataFrame(
+                    index=[decoding_result.shape[0] + 1], data={
+                                'p_accuracy': p_accuracy, 'p_f1': p_f1, 'p_auroc': p_auroc,
+                                'accuracy': decode_result['accuracy'],
+                                'f1': decode_result['f1'],
+                                'auroc': decode_result['auroc'],
+                                'chance_accuracy': decode_chance['accuracy'].mean(),
+                                'chance_f1': decode_chance['f1'].mean(),
+                                'chance_auroc': decode_chance['auroc'].mean()}))
 
             # Add to dataframe
             decoding_result = decoding_result.append(pd.DataFrame(
                 index=[decoding_result.shape[0] + 1], data={'subject': subject,
-                                 'date': date,
-                                 'eid': eid,
-                                 'probe': probe,
-                                 'region': region,
-                                 'f1': decode_result['f1'].mean(),
-                                 'accuracy': decode_result['accuracy'].mean(),
-                                 'auroc': decode_result['auroc'].mean(),
-                                 'chance_accuracy': decode_chance['accuracy'].mean(),
-                                 'chance_f1': decode_chance['f1'].mean(),
-                                 'chance_auroc': decode_chance['auroc'].mean(),
-                                 'p_accuracy': p_accuracy,
-                                 'p_f1': p_f1,
-                                 'p_auroc': p_auroc,
+                                 'date': date, 'eid': eid, 'probe': probe, 'region': region,
+                                 'f1': decode_subselects['f1'].mean(),
+                                 'accuracy': decode_subselects['accuracy'].mean(),
+                                 'auroc': decode_subselects['auroc'].mean(),
+                                 'chance_accuracy': decode_subselects['accuracy'].mean(),
+                                 'chance_f1': decode_subselects['f1'].mean(),
+                                 'chance_auroc': decode_subselects['auroc'].mean(),
+                                 'p_accuracy': decode_subselects['p_accuracy'].mean(),
+                                 'p_f1': decode_subselects['p_f1'].mean(),
+                                 'p_auroc': decode_subselects['p_auroc'].mean(),
                                  'n_trials': trial_ids.shape[0],
-                                 'n_neurons': np.unique(clus_region).shape[0]}))
+                                 'iterations': ITERATIONS,
+                                 'n_neuron_pick': N_NEURON_PICK}))
 
     decoding_result.to_pickle(join(SAVE_PATH, DECODER,
                     ('%s_%s_%s_%s_%s_cells.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
-                                                 INCL_SESSIONS, INCL_NEURONS))))
+                                                 INCL_SESSIONS, N_NEURONS))))
 
 # Exclude root
 decoding_result = decoding_result.reset_index()

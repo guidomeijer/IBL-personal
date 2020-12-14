@@ -15,8 +15,8 @@ from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
 
 # Settings
-TARGET = 'choice'
-DECODER = 'bayes'
+TARGET = 'block'
+DECODER = 'bayes-multinomial'
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Decoding')
 INCL_NEURONS = 'all'  # all or no_drift
@@ -38,11 +38,11 @@ def drop_subzero_max(row):
 # Get GLM target names
 if TARGET == 'block':
     YLIM = [-0.001, 0.002]
-    XLIM = [-20, 20]
+    XLIM = [-10, 20]
     glm_target = 'pLeft'
 elif TARGET == 'stim-side':
     glm_target = 'stimonR'
-    XLIM = [-10, 40]
+    XLIM = [-10, 50]
     YLIM = [-0.002, 0.006]
 elif TARGET == 'reward':
     YLIM = [-0.01, 0.06]
@@ -50,7 +50,7 @@ elif TARGET == 'reward':
     glm_target = 'correct'
 elif TARGET == 'choice':
     glm_target = 'wheel'
-    XLIM = [-40, 40]
+    XLIM = [-10, 50]
     YLIM = [-0.004, 0.016]
 
 # Load in GLM fit data
@@ -66,9 +66,9 @@ nosub_raw = nosub_raw[nosub_raw['covname'] == glm_target]
 pleft_nosub = nosub_raw.groupby('nolayer_name').agg({'value':'median'}).squeeze()
 
 # Load in decoding data
-decoding_result = pd.read_pickle(join(SAVE_PATH,
-       ('%s_%s_%s_%s_%s_%s_cells.p' % (DECODER, TARGET, CHANCE_LEVEL, VALIDATION,
-                                          INCL_SESSIONS, INCL_NEURONS))))
+decoding_result = pd.read_pickle(join(SAVE_PATH, DECODER,
+                       ('%s_%s_%s_%s_%s_cells.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
+                                                    INCL_SESSIONS, INCL_NEURONS))))
 
 # Exclude root
 decoding_result = decoding_result.reset_index(drop=True)
@@ -117,9 +117,10 @@ elif TARGET == 'choice':
 figure_style(font_scale=1.5)
 f, ax1 = plt.subplots(1, 1, figsize=(6, 5), dpi=150, sharey=True)
 ax1.scatter(acc_over_chance, pleft)
-m, b = np.polyfit(acc_over_chance, pleft, 1)
-# ax1.plot(np.arange(-50, 100, 0.1), m*np.arange(-50, 100, 0.1) + b, color='r')
 r, p = pearsonr(acc_over_chance, pleft)
+m, b = np.polyfit(acc_over_chance, pleft, 1)
+if p < 0.05:
+    ax1.plot(np.arange(-50, 100, 0.1), m*np.arange(-50, 100, 0.1) + b, color='r')
 ax1.set(xlabel='Decoding improvement over chance (% correct)',
         ylabel='Delta D squared of GLM fit',
         title='%s\n(r=%.2f, p=%.2f)' % (fig_title, r, p),
@@ -127,4 +128,4 @@ ax1.set(xlabel='Decoding improvement over chance (% correct)',
 
 plt.tight_layout()
 sns.despine(trim=True)
-plt.savefig(join(FIG_PATH, 'Decoding', 'decoding_vs_glm_%s' % TARGET))
+plt.savefig(join(FIG_PATH, 'Decoding', DECODER, 'decoding_vs_glm_%s' % TARGET))

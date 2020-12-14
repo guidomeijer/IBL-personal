@@ -16,10 +16,10 @@ from brainbox.atlas import plot_atlas
 from ephys_functions import paths, figure_style, combine_layers_cortex
 
 # Settings
-REGION = 'MOs'
+REGION = 'NPC'
 ML = -2  # in mm
-AP = -1  # in mm
-DV = -3.6  # in mm
+AP = -2.5  # in mm
+DV = -3.5  # in mm
 COMBINE_LAYERS_CORTEX = True
 
 # Remove cortical layers from brain region map

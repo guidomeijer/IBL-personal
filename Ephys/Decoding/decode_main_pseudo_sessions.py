@@ -2,14 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Feb  6 10:56:57 2020
-Decode from all brain regions
+Decode left/right block identity from all brain regions
 @author: Guido Meijer
 """
 
 from os.path import join
 import numpy as np
 from brainbox.population import decode
-from brainbox.task import differentiate_units
+from brainbox.task import differentiate_units, generate_pseudo_session
 import pandas as pd
 from sklearn.naive_bayes import MultinomialNB
 import alf
@@ -19,15 +19,15 @@ from oneibl.one import ONE
 one = ONE()
 
 # Settings
-TARGET = 'block'  # block, stim-side. reward or choice
+TARGET = 'choice'  # block, stim-side. reward or choice
 MIN_NEURONS = 5  # min neurons per region
 DECODER = 'bayes-multinomial'
 VALIDATION = 'kfold-interleaved'
 INCL_NEURONS = 'all'  # all or no_drift
 INCL_SESSIONS = 'aligned-behavior'  # all, aligned, resolved, aligned-behavior or resolved-behavior
 NUM_SPLITS = 5
-CHANCE_LEVEL = 'pseudo-blocks'  # pseudo-blocks, phase-rand, shuffle or none
-ITERATIONS = 1000  # for null distribution estimation
+CHANCE_LEVEL = 'pseudo-sessions'  # pseudo-blocks, phase-rand, shuffle or none
+ITERATIONS = 100  # for null distribution estimation
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
 DOWNLOAD_TRIALS = False
@@ -53,7 +53,17 @@ elif TARGET == 'choice':
     POST_TIME = 0
 
 # Query session list
-eids, probes = query_sessions(selection=INCL_SESSIONS)
+sessions = query_sessions(selection=INCL_SESSIONS)
+
+# Detect data format
+if type(sessions) == pd.DataFrame:
+    ses_type = 'datajoint'
+elif type(sessions[0]) == str:
+    ses_type = 'eids'
+elif 'model' in sessions[0]:
+    ses_type = 'insertions'
+else:
+    ses_type = 'sessions'
 
 # Initialize classifier
 if DECODER == 'bayes-multinomial-no-prior':
@@ -61,13 +71,55 @@ if DECODER == 'bayes-multinomial-no-prior':
 else:
     clf = DECODER
 
+
+def trial_vectors(trials, decoding_target):
+    # Get trial vectors based on decoding target
+    if decoding_target == 'block':
+        incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
+        trial_times = trials.stimOn_times[incl_trials]
+        trial_ids = (trials.probabilityLeft[incl_trials] == 0.2).astype(int)
+    elif decoding_target == 'block-first':
+        incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
+        trial_times = trials.stimOn_times[incl_trials]
+        trial_ids = (trials.probabilityLeft[incl_trials] == 0.2).astype(int)
+    elif decoding_target == 'block-last':
+        incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
+        trial_times = trials.stimOn_times[incl_trials]
+        trial_ids = (trials.probabilityLeft[incl_trials] == 0.2).astype(int)
+    elif decoding_target == 'stim-side':
+        incl_trials = (((trials.contrastLeft > MIN_CONTRAST)
+                        | (trials.contrastRight > MIN_CONTRAST))
+                       & (trials.probabilityLeft != 0.5))
+        trial_times = trials.stimOn_times[incl_trials]
+        trial_ids = np.isnan(trials.contrastLeft[incl_trials]).astype(int)
+    elif decoding_target == 'reward':
+        incl_trials = (trials.choice != 0) & (trials.probabilityLeft != 0.5)
+        trial_times = trials.feedback_times[incl_trials]
+        trial_ids = (trials.feedbackType[incl_trials] == -1).astype(int)
+    elif decoding_target == 'choice':
+        incl_trials = (((trials.choice != 0) & (~np.isnan(trials.feedback_times)))
+                       & (trials.probabilityLeft != 0.5))
+        trial_times = trials.feedback_times[incl_trials]
+        trial_ids = (trials.choice[incl_trials] == 1).astype(int)
+    return trial_times, trial_ids
+
+
 # %% MAIN
 decoding_result = pd.DataFrame()
-for i in range(len(eids)):
-    print('\nProcessing session %d of %d' % (i+1, len(eids)))
+for i in range(len(sessions)):
+    print('\nProcessing session %d of %d' % (i+1, len(sessions)))
+
+    # Extract eid based on data format
+    if ses_type == 'insertions':
+        eid = sessions[i]['session']
+    elif ses_type == 'eids':
+        eid = sessions[i]
+    elif ses_type == 'datajoint':
+        eid = sessions.loc[i, 'session_eid']
+    elif ses_type == 'sessions':
+        eid = sessions[i]['url'][-36:]
 
     # Load in data
-    eid = eids[i]
     try:
         spikes, clusters, channels = bbone.load_spike_sorting_with_channel(
                                                                     eid, aligned=True, one=one)
@@ -88,47 +140,33 @@ for i in range(len(eids)):
         continue
 
     # Extract session data depending on whether input is a list of sessions or insertions
-    ses_info = one.get_details(eid)
-    subject = ses_info['subject']
-    date = ses_info['start_time'][:10]
-    probes_to_use = probes[i]
+    if ses_type == 'insertions':
+        subject = sessions[i]['session_info']['subject']
+        date = sessions[i]['session_info']['start_time'][:10]
+        probes_to_use = [sessions[i]['name']]
+    elif ses_type == 'eids':
+        ses_info = one.get_details(eid)
+        subject = ses_info['subject']
+        date = ses_info['start_time'][:10]
+        probes_to_use = spikes.keys()
+    elif ses_type == 'datajoint':
+        subject = sessions.loc[i, 'subject_nickname']
+        date = str(sessions.loc[i, 'session_end_time'].date())
+        probes_to_use = spikes.keys()
+    else:
+        subject = sessions[i]['subject']
+        date = sessions[i]['start_time'][:10]
+        probes_to_use = spikes.keys()
 
-    # Get trial vectors based on decoding target
-    if TARGET == 'block':
-        incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
-        trial_times = trials.stimOn_times[incl_trials]
-        probability_left = trials.probabilityLeft[incl_trials]
-        trial_ids = (trials.probabilityLeft[incl_trials] == 0.2).astype(int)
-    elif TARGET == 'block-first':
-        incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
-        trial_times = trials.stimOn_times[incl_trials]
-        probability_left = trials.probabilityLeft[incl_trials]
-        trial_ids = (trials.probabilityLeft[incl_trials] == 0.2).astype(int)
-    elif TARGET == 'block-last':
-        incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
-        trial_times = trials.stimOn_times[incl_trials]
-        probability_left = trials.probabilityLeft[incl_trials]
-        trial_ids = (trials.probabilityLeft[incl_trials] == 0.2).astype(int)
-    elif TARGET == 'stim-side':
-        incl_trials = (((trials.contrastLeft > MIN_CONTRAST)
-                        | (trials.contrastRight > MIN_CONTRAST))
-                       & (trials.probabilityLeft != 0.5))
-        trial_times = trials.stimOn_times[incl_trials]
-        trial_ids = np.isnan(trials.contrastLeft[incl_trials]).astype(int)
-    elif TARGET == 'reward':
-        incl_trials = (trials.choice != 0) & (trials.probabilityLeft != 0.5)
-        trial_times = trials.feedback_times[incl_trials]
-        trial_ids = (trials.feedbackType[incl_trials] == -1).astype(int)
-    elif TARGET == 'choice':
-        incl_trials = (((trials.choice != 0) & (~np.isnan(trials.feedback_times)))
-                       & (trials.probabilityLeft != 0.5))
-        trial_times = trials.feedback_times[incl_trials]
-        trial_ids = (trials.choice[incl_trials] == 1).astype(int)
-        choice_ratio = ((np.sum(trial_ids == 0) - np.sum(trial_ids == 1))
-                        / (np.sum(trial_ids == 0) + np.sum(trial_ids == 1)))
-        if (choice_ratio > 0.95) or (choice_ratio < -0.95):
-            print('Choices too biased, skipping session')
-            continue
+    # Get trial vectors
+    trial_times, trial_ids = trial_vectors(trials, TARGET)
+
+    # Skip sessions with super biased behavior
+    choice_ratio = ((np.sum(trial_ids == 0) - np.sum(trial_ids == 1))
+                    / (np.sum(trial_ids == 0) + np.sum(trial_ids == 1)))
+    if (choice_ratio > 0.95) or (choice_ratio < -0.95):
+        print('Choices too biased, skipping session')
+        continue
 
     # Decode per brain region
     for p, probe in enumerate(probes_to_use):
@@ -154,18 +192,6 @@ for i in range(len(eids)):
             clus_region = spikes[probe].clusters[np.isin(spikes[probe].clusters,
                                                          clusters_in_region)]
 
-            # Exclude neurons that drift over the session
-            if INCL_NEURONS == 'no_drift':
-                trial_half = np.zeros(trial_times.shape[0])
-                trial_half[int(trial_half.shape[0]/2):] = 1
-                drift_neurons = differentiate_units(spks_region, clus_region, trial_times,
-                                                    trial_half, pre_time=PRE_TIME,
-                                                    post_time=POST_TIME)[0]
-                print('%d out of %d drift neurons detected' % (drift_neurons.shape[0],
-                                                               np.unique(clus_region).shape[0]))
-                spks_region = spks_region[~np.isin(clus_region, drift_neurons)]
-                clus_region = clus_region[~np.isin(clus_region, drift_neurons)]
-
             # Check if there are enough neurons in this brain region
             if np.unique(clus_region).shape[0] < MIN_NEURONS:
                 continue
@@ -176,25 +202,15 @@ for i in range(len(eids)):
                                    cross_validation=VALIDATION, num_splits=NUM_SPLITS)
 
             # Estimate chance level
-            if CHANCE_LEVEL == 'phase-rand':
-                decode_chance = decode(spks_region, clus_region, trial_times, trial_ids,
+            decode_chance = pd.DataFrame()
+            for j in range(ITERATIONS):
+                # Decode from pseudo session
+                pseudo_trials = generate_pseudo_session(trials)
+                pseudo_times, pseudo_trial_ids = trial_vectors(pseudo_trials, TARGET)
+                decode_pseudo = decode(spks_region, clus_region, pseudo_times, pseudo_trial_ids,
                                        pre_time=PRE_TIME, post_time=POST_TIME, classifier=clf,
-                                       cross_validation=VALIDATION, num_splits=NUM_SPLITS,
-                                       phase_rand=True, iterations=ITERATIONS)
-            elif CHANCE_LEVEL == 'shuffle':
-                decode_chance = decode(spks_region, clus_region, trial_times, trial_ids,
-                                       pre_time=PRE_TIME, post_time=POST_TIME, classifier=clf,
-                                       cross_validation=VALIDATION, num_splits=NUM_SPLITS,
-                                       shuffle=True, iterations=ITERATIONS)
-            elif CHANCE_LEVEL == 'pseudo-blocks':
-                decode_chance = decode(spks_region, clus_region, trial_times, trial_ids,
-                                       pre_time=PRE_TIME, post_time=POST_TIME, classifier=clf,
-                                       cross_validation=VALIDATION, num_splits=NUM_SPLITS,
-                                       pseudo_blocks=True, iterations=ITERATIONS)
-            elif CHANCE_LEVEL == 'none':
-                decode_chance = []
-            else:
-                raise Exception('CHANCE_LEVEL must be phase_rand, shuffle or none')
+                                       cross_validation=VALIDATION, num_splits=NUM_SPLITS)
+                decode_chance = decode_chance.append(decode_pseudo, ignore_index=True)
 
             # Calculate p-values
             p_accuracy = (np.sum(decode_chance['accuracy'] > decode_result['accuracy'])

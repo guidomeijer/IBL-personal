@@ -14,7 +14,7 @@ from ephys_functions import paths, figure_style, combine_layers_cortex
 
 # Settings
 TARGET = 'block-stim'
-DECODER = 'bayes'
+DECODER = 'bayes-multinomial'
 MIN_REC = 2
 MINMAX = None
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
@@ -24,20 +24,18 @@ INCL_SESSIONS = 'aligned-behavior'  # all or aligned
 CHANCE_LEVEL = 'shuffle'
 VALIDATION = 'kfold'
 CENTERED = True
-
 """
-ML = -2  # in mm
-AP = -1  # in mm
+ML = -0.5  # in mm
+AP = -2.5  # in mm
 DV = -3.5  # in mm
 
 ML = -0.5  # in mm
 AP = -1  # in mm
 DV = -3.6  # in mm
-
 """
 
 ML = -2  # in mm
-AP = -1 # in mm
+AP = -2.5 # in mm
 DV = -3.5  # in mm
 """
 ML = -3  # in mm
@@ -47,9 +45,9 @@ DV = -3.5  # in mm
 
 # %% Plot
 # Load in data
-decoding_result = pd.read_pickle(join(SAVE_PATH,
-       ('%s_%s_%s_%s_%s_%s_cells.p' % (DECODER, TARGET, CHANCE_LEVEL, VALIDATION,
-                                          INCL_SESSIONS, INCL_NEURONS))))
+decoding_result = pd.read_pickle(join(SAVE_PATH, DECODER,
+       ('%s_%s_%s_%s_%s_cells.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
+                                    INCL_SESSIONS, INCL_NEURONS))))
 
 # Exclude root
 decoding_result = decoding_result.reset_index()
@@ -80,14 +78,14 @@ f, axs1 = plt.subplots(1, 3, figsize=(30, 6))
 figure_style(font_scale=2)
 if CENTERED:
     plot_atlas(np.array(decode_regions), np.array(accuracy), ML, AP, DV, color_palette='RdBu_r',
-               hemisphere='left', minmax=None, axs=axs1,
+               hemisphere='left', minmax=MINMAX, axs=axs1,
                custom_region_list=all_regions)
 else:
     plot_atlas(np.array(decode_regions), np.array(accuracy), ML, AP, DV, color_palette='hot_r',
-               hemisphere='left', minmax=None, axs=axs1,
+               hemisphere='left', minmax=MINMAX, axs=axs1,
                custom_region_list=all_regions)
 
-if TARGET == 'stim_side':
+if TARGET == 'stim-side':
     f.suptitle('Decoding of stimulus side')
 elif TARGET == 'block':
     f.suptitle('Decoding of stimulus prior from pre-stim activity')
@@ -98,9 +96,9 @@ elif TARGET == 'block_stim':
 elif TARGET == 'reward':
     f.suptitle('Decoding of reward or ommission')
 elif TARGET == 'choice':
-    f.suptitle('Decoding of choice')
+    f.suptitle('Decoding of motor response')
 
-plt.savefig(join(FIG_PATH, 'atlas_%s_%s_%s_%s_%s_%s_cells.png' % (
-        DECODER, TARGET, CHANCE_LEVEL, VALIDATION, INCL_SESSIONS, INCL_NEURONS)))
+plt.savefig(join(FIG_PATH, DECODER, 'atlas_%s_%s_%s_%s_%s_cells.png' % (
+        TARGET, CHANCE_LEVEL, VALIDATION, INCL_SESSIONS, INCL_NEURONS)))
 
 

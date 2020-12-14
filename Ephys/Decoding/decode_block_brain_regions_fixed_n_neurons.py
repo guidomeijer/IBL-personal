@@ -64,7 +64,6 @@ for i in range(len(ses_with_hist)):
     if trial_times.shape[0] < MIN_TRIALS:
         continue
 
-
     # Decode per brain region
     for p, probe in enumerate(spikes.keys()):
 
