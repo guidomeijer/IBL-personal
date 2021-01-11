@@ -18,12 +18,12 @@ from oneibl.one import ONE
 one = ONE()
 
 # Settings
-REGION = 'ACAv'
+REGION = 'BLA'
 TEST_PRE_TIME = 0.6
 TEST_POST_TIME = -0.1
 PLOT_PRE_TIME = 0.5
 PLOT_POST_TIME = 1
-ALPHA = 0.2
+ALPHA = 0.1
 FIG_PATH = paths()[1]
 
 # Query sessions with at least one channel in the region of interest
@@ -57,9 +57,13 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
     trial_times = trials.stimOn_times[incl_trials]
     probability_left = trials.probabilityLeft[incl_trials]
     trial_blocks = (trials.probabilityLeft[incl_trials] == 0.2).astype(int)
+    if np.sum(np.isnan(trial_times)) > 0:
+        continue
 
     # Loop over probes
     for p, probe in enumerate(spikes.keys()):
+        if 'acronym' not in clusters[probe]:
+            continue
 
         # Get clusters in region of interest
         clusters_in_region = clusters[probe].metrics.cluster_id[

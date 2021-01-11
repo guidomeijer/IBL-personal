@@ -19,14 +19,14 @@ from oneibl.one import ONE
 one = ONE()
 
 # Settings
-TARGET = 'block'  # block, stim-side. reward or choice
+TARGET = 'reward'  # block, stim-side. reward or choice
 MIN_NEURONS = 5  # min neurons per region
 DECODER = 'bayes-multinomial'
 VALIDATION = 'kfold-interleaved'
 INCL_NEURONS = 'all'  # all or no_drift
 INCL_SESSIONS = 'aligned-behavior'  # all, aligned, resolved, aligned-behavior or resolved-behavior
 NUM_SPLITS = 5
-CHANCE_LEVEL = 'pseudo-blocks'  # pseudo-blocks, phase-rand, shuffle or none
+CHANCE_LEVEL = 'shuffle'  # pseudo-blocks, phase-rand, shuffle or none
 ITERATIONS = 1000  # for null distribution estimation
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
@@ -87,7 +87,7 @@ for i in range(len(eids)):
     if check_trials(trials) is False:
         continue
 
-    # Extract session data depending on whether input is a list of sessions or insertions
+    # Extract session data
     ses_info = one.get_details(eid)
     subject = ses_info['subject']
     date = ses_info['start_time'][:10]
@@ -95,16 +95,6 @@ for i in range(len(eids)):
 
     # Get trial vectors based on decoding target
     if TARGET == 'block':
-        incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
-        trial_times = trials.stimOn_times[incl_trials]
-        probability_left = trials.probabilityLeft[incl_trials]
-        trial_ids = (trials.probabilityLeft[incl_trials] == 0.2).astype(int)
-    elif TARGET == 'block-first':
-        incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
-        trial_times = trials.stimOn_times[incl_trials]
-        probability_left = trials.probabilityLeft[incl_trials]
-        trial_ids = (trials.probabilityLeft[incl_trials] == 0.2).astype(int)
-    elif TARGET == 'block-last':
         incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
         trial_times = trials.stimOn_times[incl_trials]
         probability_left = trials.probabilityLeft[incl_trials]
@@ -133,6 +123,10 @@ for i in range(len(eids)):
     # Decode per brain region
     for p, probe in enumerate(probes_to_use):
         print('Processing %s (%d of %d)' % (probe, p + 1, len(probes_to_use)))
+
+        # Check if data is available for this probe
+        if probe not in clusters.keys():
+            continue
 
         # Check if histology is available for this probe
         if not hasattr(clusters[probe], 'acronym'):

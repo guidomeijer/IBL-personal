@@ -19,7 +19,7 @@ from oneibl.one import ONE
 one = ONE()
 
 # Settings
-TARGET = 'choice'  # block, stim-side. reward or choice
+TARGET = 'stim-side'  # block, stim-side. reward or choice
 MIN_NEURONS = 5  # min neurons per region
 DECODER = 'bayes-multinomial'
 VALIDATION = 'kfold-interleaved'
@@ -53,17 +53,7 @@ elif TARGET == 'choice':
     POST_TIME = 0
 
 # Query session list
-sessions = query_sessions(selection=INCL_SESSIONS)
-
-# Detect data format
-if type(sessions) == pd.DataFrame:
-    ses_type = 'datajoint'
-elif type(sessions[0]) == str:
-    ses_type = 'eids'
-elif 'model' in sessions[0]:
-    ses_type = 'insertions'
-else:
-    ses_type = 'sessions'
+eids, probes = query_sessions(selection=INCL_SESSIONS)
 
 # Initialize classifier
 if DECODER == 'bayes-multinomial-no-prior':
@@ -106,20 +96,11 @@ def trial_vectors(trials, decoding_target):
 
 # %% MAIN
 decoding_result = pd.DataFrame()
-for i in range(len(sessions)):
-    print('\nProcessing session %d of %d' % (i+1, len(sessions)))
-
-    # Extract eid based on data format
-    if ses_type == 'insertions':
-        eid = sessions[i]['session']
-    elif ses_type == 'eids':
-        eid = sessions[i]
-    elif ses_type == 'datajoint':
-        eid = sessions.loc[i, 'session_eid']
-    elif ses_type == 'sessions':
-        eid = sessions[i]['url'][-36:]
+for i in range(len(eids)):
+    print('\nProcessing session %d of %d' % (i+1, len(eids)))
 
     # Load in data
+    eid = eids[i]
     try:
         spikes, clusters, channels = bbone.load_spike_sorting_with_channel(
                                                                     eid, aligned=True, one=one)
@@ -139,24 +120,11 @@ for i in range(len(sessions)):
     if check_trials(trials) is False:
         continue
 
-    # Extract session data depending on whether input is a list of sessions or insertions
-    if ses_type == 'insertions':
-        subject = sessions[i]['session_info']['subject']
-        date = sessions[i]['session_info']['start_time'][:10]
-        probes_to_use = [sessions[i]['name']]
-    elif ses_type == 'eids':
-        ses_info = one.get_details(eid)
-        subject = ses_info['subject']
-        date = ses_info['start_time'][:10]
-        probes_to_use = spikes.keys()
-    elif ses_type == 'datajoint':
-        subject = sessions.loc[i, 'subject_nickname']
-        date = str(sessions.loc[i, 'session_end_time'].date())
-        probes_to_use = spikes.keys()
-    else:
-        subject = sessions[i]['subject']
-        date = sessions[i]['start_time'][:10]
-        probes_to_use = spikes.keys()
+    # Extract session data
+    ses_info = one.get_details(eid)
+    subject = ses_info['subject']
+    date = ses_info['start_time'][:10]
+    probes_to_use = probes[i]
 
     # Get trial vectors
     trial_times, trial_ids = trial_vectors(trials, TARGET)

@@ -157,8 +157,6 @@ for i in range(len(eids)):
 
             if 'metrics' not in clusters[probe]:
                 continue
-            if clusters[probe]['acronym'].shape[0] != clusters[probe].metrics.cluster_id.shape[0]:
-                continue
 
             # Get clusters in this brain region
             region_clusters = combine_layers_cortex(clusters[probe]['acronym'])

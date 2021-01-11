@@ -65,35 +65,6 @@ if VALIDATION == 'kfold-interleaved':
     cv = KFold(n_splits=NUM_SPLITS, shuffle=True)
 
 
-def trial_vectors(trials, target):
-    # Get trial vectors based on decoding target
-    if target == 'block':
-        all_trial_times = trials.stimOn_times
-        incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
-        trial_ids = (trials.probabilityLeft[incl_trials] == 0.2).astype(int)
-    elif target == 'stim-side':
-        all_trial_times = trials.stimOn_times
-        incl_trials = (((trials.contrastLeft > MIN_CONTRAST)
-                        | (trials.contrastRight > MIN_CONTRAST))
-                       & (trials.probabilityLeft != 0.5))
-        trial_ids = np.isnan(trials.contrastLeft[incl_trials]).astype(int)
-    elif target == 'reward':
-        all_trial_times = trials.feedback_times
-        incl_trials = (trials.choice != 0) & (trials.probabilityLeft != 0.5)
-        trial_ids = (trials.feedbackType[incl_trials] == -1).astype(int)
-    elif target == 'choice':
-        all_trial_times = trials.feedback_times[incl_trials]
-        incl_trials = (((trials.choice != 0) & (~np.isnan(trials.feedback_times)))
-                       & (trials.probabilityLeft != 0.5))
-        trial_ids = (trials.choice[incl_trials] == 1).astype(int)
-        choice_ratio = ((np.sum(trial_ids == 0) - np.sum(trial_ids == 1))
-                        / (np.sum(trial_ids == 0) + np.sum(trial_ids == 1)))
-        if (choice_ratio > 0.95) or (choice_ratio < -0.95):
-            print('Choices too biased, skipping session')
-            all_trial_times = []
-    return all_trial_times, incl_trials, trial_ids
-
-
 # %% MAIN
 decoding_result = pd.DataFrame()
 for i in range(len(eids)):
@@ -128,9 +99,10 @@ for i in range(len(eids)):
     probes_to_use = probes[i]
 
     # Get trial times and ids
-    all_trial_times, incl_trials, trial_ids = trial_vectors(trials, TARGET)
-    if len(all_trial_times) == 0:
-        continue
+    incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
+    trial_times = trials.stimOn_times[incl_trials]
+    probability_left = trials.probabilityLeft[incl_trials]
+    trial_ids = (trials.probabilityLeft[incl_trials] == 0.2).astype(int)
 
     # Decode per brain region
     for p, probe in enumerate(probes_to_use):
@@ -174,52 +146,35 @@ for i in range(len(eids)):
                 continue
 
             # Get population response matrix of all trials
-            times = np.column_stack(((all_trial_times - PRE_TIME), (all_trial_times + POST_TIME)))
-            pop_vector, cluster_ids = _get_spike_counts_in_bins(spks_region, clus_region, times)
-            pop_vector = pop_vector.T
+            dlc_matrix = []  ## INPUT MATRIX HERE
 
-            # Loop over neuron subsets
-            decode_subselects = np.empty(N_NEURON_PICK)
-            null_subselects = np.empty(N_NEURON_PICK)
-            for j in range(N_NEURON_PICK):
+            # Decode
+            accuracy = classify(dlc_matric, trial_ids, clf, cv)[0]
 
-                # Subselect neurons
-                use_neurons = np.random.choice(clusters_in_region, N_NEURONS, replace=False)
-
-                # Decode with subselecting neurons
-                decode_subselects[j] = classify(
-                        pop_vector[np.ix_(incl_trials, np.isin(cluster_ids, use_neurons))],
-                        trial_ids, clf, cv)[0]
-
-                null_iterations = np.empty(ITERATIONS)
-                for k in range(ITERATIONS):
-                    # Estimate chance level
-                    if CHANCE_LEVEL == 'shuffle':
-                        null_iterations[k] = classify(
-                            pop_vector[np.ix_(incl_trials, np.isin(cluster_ids, use_neurons))],
-                            sklearn_shuffle(trial_ids), clf, cv)[0]
-                    elif CHANCE_LEVEL == 'pseudo-session':
-                        pseudo_trials = generate_pseudo_session(trials)
-                        _, pseudo_incl_trials, pseudo_trial_ids = trial_vectors(pseudo_trials,
-                                                                                TARGET)
-                        null_iterations[k] = classify(
-                            pop_vector[np.ix_(pseudo_incl_trials, np.isin(cluster_ids,
-                                                                          use_neurons))],
-                            pseudo_trial_ids, clf, cv)[0]
-                    elif CHANCE_LEVEL == 'none':
-                        null_iterations = []
-                    else:
-                        raise Exception('CHANCE_LEVEL must be phase_rand, shuffle or none')
-
-                # Get mean over iterations
-                null_subselects[j] = np.mean(null_iterations)
+            null_iterations = np.empty(ITERATIONS)
+            for k in range(ITERATIONS):
+                # Estimate chance level
+                if CHANCE_LEVEL == 'shuffle':
+                    null_iterations[k] = classify(dlc_matrix, sklearn_shuffle(trial_ids),
+                                                  clf, cv)[0]
+                elif CHANCE_LEVEL == 'pseudo-session':
+                    pseudo_trials = generate_pseudo_session(trials)
+                    pseudo_incl = (pseudo_trials.probabilityLeft == 0.8) | (pseudo_trials.probabilityLeft == 0.2)
+                    trial_times = pseudo_trials.stimOn_times[pseudo_incl]
+                    probability_left = pseudo_trials.probabilityLeft[pseudo_incl]
+                    pseudo_trial_ids = (pseudo_trials.probabilityLeft[pseudo_incl] == 0.2).astype(int)
+                    null_iterations[k] = classify(dlc_matrix, pseudo_trial_ids, clf, cv)[0]
+                elif CHANCE_LEVEL == 'none':
+                    null_iterations = []
+                else:
+                    raise Exception('CHANCE_LEVEL must be phase_rand, shuffle or none')
 
             # Add to dataframe
             decoding_result = decoding_result.append(pd.DataFrame(
                 index=[decoding_result.shape[0] + 1], data={'subject': subject,
                                  'date': date, 'eid': eid, 'probe': probe, 'region': region,
-                                 'accuracy': decode_subselects.mean(),
-                                 'chance_accuracy': null_subselects.mean(),
+                                 'accuracy': accuracy,
+                                 'chance_accuracy': null_iterations.mean(),
                                  'n_trials': np.sum(incl_trials),
                                  'iterations': ITERATIONS,
                                  'n_neuron_pick': N_NEURON_PICK}))

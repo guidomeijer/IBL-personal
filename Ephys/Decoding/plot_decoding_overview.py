@@ -14,25 +14,22 @@ import seaborn as sns
 from ephys_functions import paths, figure_style, get_full_region_name, get_parent_region_name
 
 # Settings
-TARGET = 'block'
-DECODER = 'bayes'
-MIN_PERF = 4
-YLIM = 16
-MIN_REC = 2
+TARGET = 'reward'
+DECODER = 'bayes-multinomial'
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Decoding')
 INCL_NEURONS = 'all'  # all or no_drift
 INCL_SESSIONS = 'aligned-behavior'  # all or aligned
-CHANCE_LEVEL = 'pseudo-blocks'
-VALIDATION = 'kfold'
+CHANCE_LEVEL = 'shuffle'
+VALIDATION = 'kfold-interleaved'
 FULL_NAME = True
 PARENT_REGIONS = False
 
 # %% Plot
 # Load in data
-decoding_result = pd.read_pickle(join(SAVE_PATH,
-       ('%s_%s_%s_%s_%s_%s_cells.p' % (DECODER, TARGET, CHANCE_LEVEL, VALIDATION,
-                                          INCL_SESSIONS, INCL_NEURONS))))
+decoding_result = pd.read_pickle(join(SAVE_PATH, DECODER,
+       ('%s_%s_%s_%s_%s_cells.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
+                                    INCL_SESSIONS, INCL_NEURONS))))
 
 # Exclude root
 decoding_result = decoding_result.reset_index(drop=True)

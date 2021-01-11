@@ -13,7 +13,7 @@ from brainbox.atlas import plot_atlas
 from ephys_functions import paths, figure_style, combine_layers_cortex
 
 # Settings
-TARGET = 'block-stim'
+TARGET = 'block'
 DECODER = 'bayes-multinomial'
 MIN_REC = 2
 MINMAX = None
@@ -21,7 +21,7 @@ DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Decoding')
 INCL_NEURONS = 'all'  # all or no_drift
 INCL_SESSIONS = 'aligned-behavior'  # all or aligned
-CHANCE_LEVEL = 'shuffle'
+CHANCE_LEVEL = 'pseudo-session'
 VALIDATION = 'kfold'
 CENTERED = True
 """

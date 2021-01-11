@@ -23,10 +23,10 @@ REGION = 'SNr'
 PROBE = 'probe01'
 PRE_TIME = 0.6
 POST_TIME = -0.1
-DECODER = 'bayes'
+DECODER = 'bayes-multinomial'
 ITERATIONS = 1000
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
-FIG_PATH = join(FIG_PATH, 'Decoding', 'Single sessions', DECODER)
+FIG_PATH = join(FIG_PATH, 'Decoding', 'Sessions', DECODER)
 
 # %%
 # Load in data
@@ -52,20 +52,21 @@ clus_region = spikes[PROBE].clusters[np.isin(spikes[PROBE].clusters,
 # Decode block identity
 decode_block = decode(spks_region, clus_region, trial_times, trial_blocks,
                       pre_time=PRE_TIME, post_time=POST_TIME,
-                      classifier=DECODER, cross_validation='kfold',
+                      classifier=DECODER, cross_validation='kfold-interleaved',
                       num_splits=5)
-
-phase_block = decode(spks_region, clus_region, trial_times, trial_blocks,
-                     pre_time=PRE_TIME, post_time=POST_TIME,
-                     classifier=DECODER, cross_validation='kfold',
-                     num_splits=5, phase_rand=True, iterations=ITERATIONS)
 
 shuffle_block = decode(spks_region, clus_region, trial_times, trial_blocks,
                        pre_time=PRE_TIME, post_time=POST_TIME,
-                       classifier=DECODER, cross_validation='kfold',
-                       num_splits=5, pseudo_blocks=True, iterations=ITERATIONS)
+                       classifier=DECODER, cross_validation='kfold-interleaved',
+                       num_splits=5, shuffle=True, iterations=ITERATIONS)
+
+pseudo_block = decode(spks_region, clus_region, trial_times, trial_blocks,
+                      pre_time=PRE_TIME, post_time=POST_TIME,
+                      classifier=DECODER, cross_validation='kfold-interleaved',
+                      num_splits=5, pseudo_blocks=True, iterations=ITERATIONS)
 
 # %%
+"""
 figure_style()
 f, (ax1, ax2) = plt.subplots(1, 2, figsize=(25, 10), dpi=150)
 ax1.bar(np.arange(7), [decode_block['accuracy'], phase_block['accuracy'].mean(),
@@ -95,4 +96,4 @@ ax2.set(xlim=[0, 200], ylim=[-0.05, 1.05],
 
 
 # plt.savefig(join(FIG_PATH, '%s_%s' % (REGION, DECODER)))
-
+"""

@@ -9,6 +9,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib
 import matplotlib.pyplot as plt
+from sklearn.metrics import accuracy_score
 from os.path import join
 import pathlib
 from ibllib.atlas import regions_from_allen_csv
@@ -60,53 +61,95 @@ def check_trials(trials):
     return True
 
 
+def classify(population_activity, trial_labels, classifier, cross_validation=None):
+    """
+    Classify trial identity (e.g. stim left/right) from neural population activity.
+
+    Parameters
+    ----------
+    population_activity : 2D array (trials x neurons)
+        population activity of all neurons in the population for each trial.
+    trial_labels : 1D or 2D array
+        identities of the trials, can be any number of groups, accepts integers and strings
+    classifier : scikit-learn object
+        which decoder to use, for example Gaussian with Multinomial likelihood:
+                    from sklearn.naive_bayes import MultinomialNB
+                    classifier = MultinomialNB()
+    cross_validation : None or scikit-learn object
+        which cross-validation method to use, for example 5-fold:
+                    from sklearn.model_selection import KFold
+                    cross_validation = KFold(n_splits=5)
+
+    Returns
+    -------
+
+    """
+
+    # Check input
+    assert population_activity.shape[0] == trial_labels.shape[0]
+
+    if cross_validation is None:
+        # Fit the model on all the data
+        classifier.fit(population_activity, trial_labels)
+        pred = classifier.predict(population_activity)
+        prob = classifier.predict_proba(population_activity)
+        prob = prob[:, 1]
+    else:
+        pred = np.empty(trial_labels.shape[0])
+        prob = np.empty(trial_labels.shape[0])
+        for train_index, test_index in cross_validation.split(population_activity):
+            # Fit the model to the training data and predict the held-out test data
+            classifier.fit(population_activity[train_index], trial_labels[train_index])
+            pred[test_index] = classifier.predict(population_activity[test_index])
+            proba = classifier.predict_proba(population_activity[test_index])
+            prob[test_index] = proba[:, 1]
+
+    # Calcualte accuracy
+    accuracy = accuracy_score(trial_labels, pred)
+    return accuracy, pred, prob
+
+
 def query_sessions(selection='all'):
     from oneibl.one import ONE
     one = ONE()
 
     if selection == 'all':
-        # Query all ephysChoiceWorld sessions with histology
-        trajectories = one.alyx.rest(
-                            'trajectories', 'list', provenance='Histology track',
-                            django=('probe_insertion__session__project__name__icontains,'
-                                    'ibl_neuropixel_brainwide_01,'
-                                    'probe_insertion__session__qc__lt,50,'))
+        # Query all ephysChoiceWorld sessions
+        ins = one.alyx.rest('insertions', 'list',
+                        django='session__project__name__icontains,ibl_neuropixel_brainwide_01,'
+                               'session__qc__lt,50')
     elif selection == 'aligned':
-        # Query all sessions with resolved alignment
-        trajectories = one.alyx.rest(
-                            'trajectories', 'list', provenance='Ephys aligned histology track',
-                            django=('probe_insertion__session__project__name__icontains,'
-                                    'ibl_neuropixel_brainwide_01,'
-                                    'probe_insertion__session__qc__lt,50,'))
+        # Query all sessions with at least one alignment
+        ins = one.alyx.rest('insertions', 'list',
+                        django='session__project__name__icontains,ibl_neuropixel_brainwide_01,'
+                               'session__qc__lt,50,'
+                               'json__extended_qc__alignment_count__gt,0')
     elif selection == 'resolved':
         # Query all sessions with resolved alignment
-        trajectories = one.alyx.rest(
-                            'trajectories', 'list', provenance='Ephys aligned histology track',
-                            django=('probe_insertion__session__project__name__icontains,'
-                                    'ibl_neuropixel_brainwide_01,'
-                                    'probe_insertion__session__qc__lt,50,'
-                                    'probe_insertion__json__extended_qc__alignment_resolved,True'))
+         ins = one.alyx.rest('insertions', 'list',
+                        django='session__project__name__icontains,ibl_neuropixel_brainwide_01,'
+                               'session__qc__lt,50,'
+                               'json__extended_qc__alignment_resolved,True')
     elif selection == 'aligned-behavior':
-        trajectories = one.alyx.rest(
-                            'trajectories', 'list', provenance='Ephys aligned histology track',
-                            django=('probe_insertion__session__project__name__icontains,'
-                                    'ibl_neuropixel_brainwide_01,'
-                                    'probe_insertion__session__qc__lt,50,'
-                                    'probe_insertion__session__extended_qc__behavior,1'))
+        # Query sessions with at least one alignment and that meet behavior criterion
+        ins = one.alyx.rest('insertions', 'list',
+                        django='session__project__name__icontains,ibl_neuropixel_brainwide_01,'
+                               'session__qc__lt,50,'
+                               'json__extended_qc__alignment_count__gt,0,'
+                               'session__extended_qc__behavior,1')
     elif selection == 'resolved-behavior':
-        trajectories = one.alyx.rest(
-                            'trajectories', 'list', provenance='Ephys aligned histology track',
-                            django=('probe_insertion__session__project__name__icontains,'
-                                    'ibl_neuropixel_brainwide_01,'
-                                    'probe_insertion__session__qc__lt,50,'
-                                    'probe_insertion__json__extended_qc__alignment_resolved,True,'
-                                    'probe_insertion__session__extended_qc__behavior,1'))
+        # Query sessions with resolved alignment and that meet behavior criterion
+        ins = one.alyx.rest('insertions', 'list',
+                        django='session__project__name__icontains,ibl_neuropixel_brainwide_01,'
+                               'session__qc__lt,50,'
+                               'json__extended_qc__alignment_resolved,True,'
+                               'session__extended_qc__behavior,1')
     else:
-        trajectories = []
+        ins = []
 
     # Get list of eids and probes
-    all_eids = np.array([i['session']['id'] for i in trajectories])
-    all_probes = np.array([i['probe_name'] for i in trajectories])
+    all_eids = np.array([i['session'] for i in ins])
+    all_probes = np.array([i['name'] for i in ins])
     eids = np.unique(all_eids)
     probes = []
     for i, eid in enumerate(eids):
