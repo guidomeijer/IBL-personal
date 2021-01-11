@@ -21,39 +21,17 @@ from oneibl.one import ONE
 one = ONE()
 
 # Settings
-TARGET = 'block'  # block, stim-side. reward or choice
-MIN_NEURONS = 15  # min neurons per region
-N_NEURONS = 15  # number of neurons to use for decoding
 DECODER = 'bayes-multinomial'
 VALIDATION = 'kfold-interleaved'
 INCL_SESSIONS = 'aligned-behavior'  # all, aligned, resolved, aligned-behavior or resolved-behavior
 NUM_SPLITS = 5
 CHANCE_LEVEL = 'pseudo-session'  # pseudo-session, phase-rand, shuffle or none
-ITERATIONS = 5  # for null distribution estimation
-N_NEURON_PICK = 100  # number of times to randomly subselect neurons
+ITERATIONS = 1000  # for null distribution estimation
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
 DOWNLOAD_TRIALS = True
 
 # %% Initialize
-
-# Time windows
-if (TARGET == 'block') | (TARGET == 'block-first') | (TARGET == 'block-last'):
-    PRE_TIME = 0.6
-    POST_TIME = 0.1
-elif TARGET == 'block-stim':
-    PRE_TIME = 0
-    POST_TIME = 0.3
-elif TARGET == 'stim-side':
-    MIN_CONTRAST = 0.2
-    PRE_TIME = 0
-    POST_TIME = 0.3
-elif TARGET == 'reward':
-    PRE_TIME = 0
-    POST_TIME = 0.5
-elif TARGET == 'choice':
-    PRE_TIME = 0.2
-    POST_TIME = 0
 
 # Query session list
 eids, probes = query_sessions(selection=INCL_SESSIONS)
