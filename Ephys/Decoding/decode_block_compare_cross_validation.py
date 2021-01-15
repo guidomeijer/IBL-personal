@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from brainbox.population import decode
 import alf
-from ephys_functions import paths, combine_layers_cortex, figure_style
+from functions import paths, combine_layers_cortex, figure_style
 import brainbox.io.one as bbone
 from oneibl.one import ONE
 one = ONE()

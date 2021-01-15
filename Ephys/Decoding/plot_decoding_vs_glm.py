@@ -8,7 +8,7 @@ Created on Wed Nov 18 09:37:05 2020
 
 import numpy as np
 from os.path import join
-from ephys_functions import paths, figure_style, get_full_region_name
+from my_functions import paths, figure_style, get_full_region_name
 import pandas as pd
 import seaborn as sns
 from scipy.stats import pearsonr

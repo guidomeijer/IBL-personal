@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from scipy.stats import ttest_rel
-from ephys_functions import paths, figure_style, get_full_region_name, get_parent_region_name
+from my_functions import paths, figure_style, get_full_region_name, get_parent_region_name
 
 # Settings
 TARGET = 'prior'
@@ -35,15 +35,6 @@ SAVE_FIG = False
 decoding_result = pd.read_pickle(join(SAVE_PATH, DECODER,
        ('%s_%s_%s_%s_%s_cells.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
                                     INCL_SESSIONS, INCL_NEURONS))))
-
-# Exclude root
-decoding_result = decoding_result.reset_index(drop=True)
-incl_regions = [i for i, j in enumerate(decoding_result['region']) if not j.islower()]
-decoding_result = decoding_result.loc[incl_regions]
-
-# Drop duplicates
-decoding_result = decoding_result[decoding_result.duplicated(subset=['region', 'eid', 'probe'])
-                                  == False]
 
 # Get decoding performance over chance
 decoding_result['r_over_chance_infer'] = (decoding_result['r_infer']

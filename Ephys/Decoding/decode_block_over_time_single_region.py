@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 from os.path import join
 import matplotlib.pyplot as plt
-from ephys_functions import paths, check_trials
+from my_functions import paths, check_trials
 import brainbox.io.one as bbone
 from brainbox.population import decode
 from oneibl.one import ONE
@@ -36,33 +36,33 @@ ses = one.alyx.rest('sessions', 'list', atlas_acronym=REGION,
 # Loop over sessions
 for i, eid in enumerate([j['url'][-36:] for j in ses]):
     print('Processing session %d of %d' % (i+1, len(ses)))
-    
+
     # Load in data
     try:
         spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, one=one)
         trials = one.load_object(eid, 'trials')
     except:
         continue
-    
+
     # Check data integrity
     if check_trials(trials) is False:
-        continue    
-    
+        continue
+
     # Get stim on times
     incl_trials = (trials.probabilityLeft == 0.8) | (trials.probabilityLeft == 0.2)
     stimon_blocks = (trials.probabilityLeft[incl_trials] == 0.8).astype(int)
     stimon_times = trials.stimOn_times[incl_trials]
-    
+
     # Loop over probes
     for p, probe in enumerate(spikes.keys()):
-                
+
         # Get clusters in brain region of interest
         region_clusters = [ind for ind, s in enumerate(clusters[probe]['acronym']) if REGION in s]
         spks_region = spikes[probe].times[np.isin(spikes[probe].clusters, region_clusters)]
         clus_region = spikes[probe].clusters[np.isin(spikes[probe].clusters, region_clusters)]
         if len(region_clusters) <= N_NEURONS:
             continue
-    
+
         # Decode over time
         decode_time = pd.DataFrame()
         shuffle_time = pd.DataFrame()
@@ -88,7 +88,7 @@ for i, eid in enumerate([j['url'][-36:] for j in ses]):
                         'auroc': shuffle_result['auroc'], 'win_center': win_center,
                         'session': '%s_%s' % (ses[i]['subject'], ses[i]['start_time'][:10])}),
                         sort=False)
-            
+
 # %% Plot
 
 over_chance = pd.DataFrame()
@@ -121,4 +121,3 @@ sns.despine()
 plt.tight_layout(pad=2)
 plt.savefig(join(FIG_PATH, 'decoding_block_time_%s' % REGION))
 
-    

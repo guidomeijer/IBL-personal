@@ -8,12 +8,18 @@ Created on Wed Jan 22 16:22:01 2020
 import numpy as np
 import seaborn as sns
 import matplotlib
+import statsmodels.api as sm
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score
+from scipy.stats import sem
+import pandas as pd
+import alf
 from os.path import join
 import pathlib
 from ibllib.atlas import regions_from_allen_csv
 from paths import DATA_PATH, FIG_PATH
+from oneibl.one import ONE
+one = ONE()
 
 
 def paths():
@@ -229,4 +235,154 @@ def get_eid_list():
             'f9860a11-24d3-452e-ab95-39e199f20a93', 'b658bc7d-07cd-4203-8a25-7b16b549851b',
             '7622da34-51b6-4661-98ae-a57d40806008', 'bd456d8f-d36e-434a-8051-ff3997253802'])
     return eids
+
+
+def load_opto_trials(eid, download=False):
+    if download:
+        _ = one.load(eid, dataset_types=['trials.probabilityLeft', 'trials.contrastLeft',
+                                         'trials.contrastRight', 'trials.feedbackType',
+                                         'trials.choice', '_ibl_trials.laser_stimulation'],
+                     download_only=True, clobber=True)
+    ses_path = one.path_from_eid(eid)
+    trials = pd.DataFrame(alf.io.load_object(join(ses_path, 'alf'), 'trials'))
+    trials['signed_contrast'] = trials['contrastRight']
+    trials.loc[trials['signed_contrast'].isnull(), 'signed_contrast'] = -trials['contrastLeft']
+    trials['correct'] = trials['feedbackType']
+    trials.loc[trials['correct'] == -1, 'correct'] = 0
+    trials['right_choice'] = -trials['choice']
+    trials.loc[trials['right_choice'] == -1, 'right_choice'] = 0
+    return trials
+
+
+def fit_psychfunc(stim_levels, n_trials, proportion):
+    # Fit a psychometric function with two lapse rates
+    #
+    # Returns vector pars with [threshold, bias, lapselow, lapsehigh]
+    from ibl_pipeline.utils import psychofit as psy
+    assert(stim_levels.shape == n_trials.shape == proportion.shape)
+
+    pars, _ = psy.mle_fit_psycho(np.vstack((stim_levels, n_trials, proportion)),
+                                 P_model='erf_psycho_2gammas',
+                                 parstart=np.array([0, 20, 0.05, 0.05]),
+                                 parmin=np.array([-100, 2, 0, 0]),
+                                 parmax=np.array([100, 100., 1, 1]))
+    return pars
+
+
+def plot_psychometric(trials, ax, **kwargs):
+    from ibl_pipeline.utils import psychofit as psy
+    if trials['signed_contrast'].max() <= 1:
+        trials['signed_contrast'] = trials['signed_contrast'] * 100
+
+    stim_levels = np.sort(trials['signed_contrast'].unique())
+    pars = fit_psychfunc(stim_levels, trials.groupby('signed_contrast').size(),
+                         trials.groupby('signed_contrast').mean()['right_choice'])
+
+    # plot psychfunc
+    sns.lineplot(x=np.arange(-27, 27), y=psy.erf_psycho_2gammas(pars, np.arange(-27, 27)),
+                 ax=ax, **kwargs)
+
+    # plot psychfunc: -100, +100
+    sns.lineplot(x=np.arange(-36, -31), y=psy.erf_psycho_2gammas(pars, np.arange(-103, -98)),
+                 ax=ax, **kwargs)
+    sns.lineplot(x=np.arange(31, 36), y=psy.erf_psycho_2gammas(pars, np.arange(98, 103)),
+                 ax=ax, **kwargs)
+
+    # now break the x-axis
+    trials['signed_contrast'].replace(-100, -35)
+    trials['signed_contrast'].replace(100, 35)
+
+    # plot datapoints with errorbars on top
+    sns.lineplot(x=trials['signed_contrast'], y=trials['right_choice'], ax=ax,
+                     **{**{'err_style':"bars",
+                     'linewidth':0, 'linestyle':'None', 'mew':0.5,
+                     'marker':'o', 'ci':68}, **kwargs})
+
+    ax.set(xticks=[-35, -25, -12.5, 0, 12.5, 25, 35], xlim=[-40, 40], ylim=[0, 1.02],
+           yticks=[0, 0.25, 0.5, 0.75, 1], yticklabels=['0', '25', '50', '75', '100'],
+           ylabel='Right choices', xlabel='Contrast (%)')
+    ax.set_xticklabels(['-100', '-25', '-12.5', '0', '12.5', '25', '100'],
+                       size='small', rotation=60)
+    break_xaxis()
+
+
+def break_xaxis(y=-0.004, **kwargs):
+
+    # axisgate: show axis discontinuities with a quick hack
+    # https://twitter.com/StevenDakin/status/1313744930246811653?s=19
+    # first, white square for discontinuous axis
+    plt.text(-30, y, '-', fontsize=14, fontweight='bold',
+             horizontalalignment='center', verticalalignment='center',
+             color='w')
+    plt.text(30, y, '-', fontsize=14, fontweight='bold',
+             horizontalalignment='center', verticalalignment='center',
+             color='w')
+
+    # put little dashes to cut axes
+    plt.text(-30, y, '/ /', horizontalalignment='center',
+             verticalalignment='center', fontsize=12, fontweight='bold')
+    plt.text(30, y, '/ /', horizontalalignment='center',
+             verticalalignment='center', fontsize=12, fontweight='bold')
+
+
+def fit_prob_choice_model(trials, previous_trials=6):
+
+    data = trials.copy()
+    data = data[['choice', 'correct', 'signed_contrast', 'probabilityLeft']]
+
+    # Rewardeded choices:
+    data.loc[(data['choice'] == 0) & (data['correct'].isnull()), 'rchoice'] = 0  # NoGo trials
+    data.loc[(data['choice'] == -1) & (data['correct'] == 0), 'rchoice'] = 0
+    data.loc[(data['choice'] == -1) & (data['correct'] == 1), 'rchoice'] = 1
+    data.loc[(data['choice'] == 1) & (data['correct'] == 1), 'rchoice'] = -1
+    data.loc[(data['choice'] == 0) & (data['correct'].isnull()), 'rchoice'] = 0  # NoGo trials
+    data.loc[(data['choice'] == 1) & (data['correct'] == 0), 'rchoice'] = 0
+
+    # Unrewarded choices:
+    data.loc[(data['choice'] == 0) & (data['correct'].isnull()), 'uchoice'] = 0  # NoGo trials
+    data.loc[(data['choice'] == -1) & (data['correct'] == 0), 'uchoice'] = 1
+    data.loc[(data['choice'] == -1) & (data['correct'] == 1), 'uchoice'] = 0
+    data.loc[(data['choice'] == 1) & (data['correct'] == 1), 'uchoice'] = 0
+    data.loc[(data['choice'] == 0) & (data['correct'].isnull()), 'uchoice'] = 0  # NoGo trials
+    data.loc[(data['choice'] == 1) & (data['correct'] == 0), 'uchoice'] = -1
+
+    # Shift rewarded and unrewarded predictors by one
+    for i in range(previous_trials):
+        data.loc[:, 'rchoice-%s' % str(i+1)] = data['rchoice'].shift(
+                                                    periods=i+1, fill_value=0).to_numpy()
+        data.loc[:, 'uchoice-%s' % str(i+1)] = data['uchoice'].shift(
+                                                    periods=i+1, fill_value=0).to_numpy()
+
+    # Drop any nan trials
+    data.dropna(inplace=True)
+
+    # Make sensory predictors (no 0 predictor)
+    contrasts = [.25, 1, .125, .0625]
+    for i in contrasts:
+        data.loc[(data['signed_contrast'].abs() == i), i] = np.sign(
+                    data.loc[(data['signed_contrast'].abs() == i), 'signed_contrast'].to_numpy())
+        data[i].fillna(0,  inplace=True)
+
+    # Add block probability predictor
+    data.loc[(data['probabilityLeft'] == 0.5), 'block'] = 0
+    data.loc[(data['probabilityLeft'] == 0.2), 'block'] = 1
+    data.loc[(data['probabilityLeft'] == 0.8), 'block'] = -1
+
+    # Make choice in between 0 and 1 -> 1 for right and 0 for left
+    data.loc[data['choice'] == 1, 'choice'] = 0
+    data.loc[data['choice'] == -1, 'choice'] = 1
+
+    # Create predictor matrix
+    exog = data.copy()
+    exog.drop(columns=['correct', 'signed_contrast', 'choice', 'probabilityLeft',
+                       'rchoice', 'uchoice'],
+              inplace=True)
+    exog = sm.add_constant(exog)
+
+    # Fit model
+    logit_model = sm.Logit(data['choice'], exog)
+    result = logit_model.fit()
+    weights = result.params.rename(index=str)
+    return weights
+
 

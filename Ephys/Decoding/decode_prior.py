@@ -15,7 +15,7 @@ import alf
 from scipy.stats import pearsonr
 import warnings
 from prior_funcs import perform_inference
-from ephys_functions import paths, query_sessions, check_trials, combine_layers_cortex
+from my_functions import paths, query_sessions, check_trials, combine_layers_cortex
 import brainbox.io.one as bbone
 from oneibl.one import ONE
 one = ONE()

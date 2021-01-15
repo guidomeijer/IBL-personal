@@ -14,7 +14,7 @@ import pandas as pd
 from matplotlib.patches import Rectangle
 import seaborn as sns
 import alf
-from ephys_functions import paths, combine_layers_cortex, figure_style
+from my_functions import paths, combine_layers_cortex, figure_style
 import brainbox.io.one as bbone
 from oneibl.one import ONE
 one = ONE()

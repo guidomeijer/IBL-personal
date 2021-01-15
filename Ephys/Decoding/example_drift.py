@@ -15,7 +15,7 @@ from brainbox.population import decode, _get_spike_counts_in_bins
 import seaborn as sns
 import alf
 import scipy as sp
-from ephys_functions import paths, combine_layers_cortex, figure_style
+from my_functions import paths, combine_layers_cortex, figure_style
 import brainbox.io.one as bbone
 from oneibl.one import ONE
 one = ONE()

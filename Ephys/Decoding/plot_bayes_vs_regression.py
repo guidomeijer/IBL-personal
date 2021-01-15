@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from ephys_functions import paths, figure_style
+from my_functions import paths, figure_style
 
 # Settings
 TARGET = 'block'

@@ -16,7 +16,7 @@ from scipy.stats import pearsonr
 import seaborn as sns
 from prior_funcs import perform_inference
 import alf
-from ephys_functions import paths, combine_layers_cortex, figure_style
+from my_functions import paths, combine_layers_cortex, figure_style
 import brainbox.io.one as bbone
 from oneibl.one import ONE
 one = ONE()

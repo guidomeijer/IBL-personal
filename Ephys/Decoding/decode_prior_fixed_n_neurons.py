@@ -15,7 +15,7 @@ from sklearn.naive_bayes import MultinomialNB
 from sklearn.model_selection import KFold
 from sklearn.utils import shuffle as sklearn_shuffle
 import alf
-from ephys_functions import paths, query_sessions, check_trials, combine_layers_cortex, classify
+from my_functions import paths, query_sessions, check_trials, combine_layers_cortex, classify
 import brainbox.io.one as bbone
 from oneibl.one import ONE
 one = ONE()

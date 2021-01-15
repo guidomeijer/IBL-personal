@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from ibllib import atlas
 from brainbox.atlas import plot_atlas
-from ephys_functions import paths, figure_style, combine_layers_cortex
+from my_functions import paths, figure_style, combine_layers_cortex
 
 # Settings
 TARGET = 'block'

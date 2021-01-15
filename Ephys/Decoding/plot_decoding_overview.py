@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from ephys_functions import paths, figure_style, get_full_region_name, get_parent_region_name
+from my_functions import paths, figure_style, get_full_region_name, get_parent_region_name
 
 # Settings
 TARGET = 'reward'

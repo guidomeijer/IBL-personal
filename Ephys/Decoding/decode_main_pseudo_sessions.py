@@ -13,7 +13,7 @@ from brainbox.task import differentiate_units, generate_pseudo_session
 import pandas as pd
 from sklearn.naive_bayes import MultinomialNB
 import alf
-from ephys_functions import paths, query_sessions, check_trials, combine_layers_cortex
+from my_functions import paths, query_sessions, check_trials, combine_layers_cortex
 import brainbox.io.one as bbone
 from oneibl.one import ONE
 one = ONE()
