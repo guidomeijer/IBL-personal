@@ -147,6 +147,9 @@ for i in range(len(eids)):
                 else:
                     raise Exception('CHANCE_LEVEL must be phase_rand, shuffle or none')
 
+            # Calculate p-value
+            p_value = np.sum(null_iterations > accuracy) / null_iterations.shape[0]
+
             # Add to dataframe
             decoding_result = decoding_result.append(pd.DataFrame(
                 index=[decoding_result.shape[0] + 1], data={'subject': subject,
@@ -155,6 +158,7 @@ for i in range(len(eids)):
                                  'chance_accuracy': null_iterations.mean(),
                                  'n_trials': np.sum(incl_trials),
                                  'iterations': ITERATIONS,
+                                 'p_value': p_value,
                                  'n_neuron_pick': N_NEURON_PICK}))
 
     decoding_result.to_pickle(join(SAVE_PATH, DECODER,
