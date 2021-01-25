@@ -14,3 +14,5 @@ dj_local_conf.json
 Ephys/paths.py
 
 .vscode/
+
+__pycache__/
