@@ -10,16 +10,16 @@ import brainbox.behavior.training as training
 from oneibl.one import ONE
 one = ONE()
 
-traj_id = '8dd5a883-e4d3-41b5-aa8f-84b903dee255'
+traj_id = '84bb830f-b9ff-4e6b-9296-f458fb41d160'
 
-traj = one.alyx.rest('trajectories', 'list', id=traj_id)
+traj = one.alyx.rest('trajectories', 'list', probe_insertion=traj_id)
 eid = traj[0]['session']['id']
 trials_all = one.load_object(eid, 'trials')
 trials = dict()
 trials['temp_key'] = trials_all
 perf_easy, n_trials, _, _, _ = training.compute_bias_info(trials, trials_all)
 print('Performance: %.1f%%, Number of trials: %d' % (perf_easy * 100, n_trials))
-fail_behav = one.alyx.rest('trajectories', 'list', provenance='Planned', id=traj_id,
+fail_behav = one.alyx.rest('trajectories', 'list', provenance='Planned', probe_insertion=traj_id,
                            django='probe_insertion__session__extended_qc__behavior,0')
 if len(fail_behav) > 0:
     print("Behavior criterion FAILED")

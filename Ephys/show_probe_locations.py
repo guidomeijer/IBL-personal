@@ -16,7 +16,7 @@ import os
 from oneibl.one import ONE
 one = ONE()
 
-SUBJECT = 'ZM_3003'
+SUBJECT = 'ZM_3001'
 
 trajs = one.alyx.rest('trajectories', 'list', provenance='micro-manipulator')
 traj = pd.DataFrame(list(trajs))
