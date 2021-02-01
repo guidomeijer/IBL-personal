@@ -9,6 +9,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib
 import statsmodels.api as sm
+from psytrack.hyperOpt import hyperOpt
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score
 from scipy.stats import sem
@@ -386,3 +387,57 @@ def fit_prob_choice_model(trials, previous_trials=6):
     return weights
 
 
+def fit_psytrack(trials, previous_trials=0):
+
+    # Load data
+    contrast_l = trials['contrastLeft'].values
+    contrast_r = trials['contrastRight'].values
+    prob_l = trials['probabilityLeft'].values
+    correct = trials['correct'].values
+    choice = trials['choice'].values
+    day_length = trials.groupby('probabilityLeft').size().values
+
+    # Change values to what the model input
+    choice[choice == 1] = 2
+    choice[choice == -1] = 1
+    correct[correct == -1] = 0
+    contrast_l[np.isnan(contrast_l)] = 0
+    contrast_r[np.isnan(contrast_r)] = 0
+
+    # Transform visual contrast
+    p = 3.5
+    contrast_l_transform = np.tanh(contrast_l * p) / np.tanh(p)
+    contrast_r_transform = np.tanh(contrast_r * p) / np.tanh(p)
+
+    # Reformat the stimulus vectors to matrices which include previous trials
+    s1_trans = contrast_l_transform
+    s2_trans = contrast_r_transform
+    for i in range(1, 10):
+        s1_trans = np.column_stack((s1_trans, np.append([contrast_l_transform[0]]*(i+i),
+                                                        contrast_l_transform[i:-i])))
+        s2_trans = np.column_stack((s2_trans, np.append([contrast_r_transform[0]]*(i+i),
+                                                        contrast_r_transform[i:-i])))
+
+    # Create input dict
+    D = {'name': '',
+         'y': choice,
+         'correct': correct,
+         'dayLength': day_length,
+         'inputs': {'s1': s1_trans, 's2': s2_trans}
+         }
+
+    # Model parameters
+    weights = {'bias': 1,
+               's1': previous_trials+1,
+               's2': previous_trials+1}
+    K = np.sum([weights[i] for i in weights.keys()])
+    hyper = {'sigInit': 2**4.,
+             'sigma': [2**-4.]*K,
+             'sigDay': [2**-4.]*K}
+    optList = ['sigInit', 'sigma', 'sigDay']
+
+    # Fit model
+    print('Fitting model..')
+    hyp, evd, wMode, hess = hyperOpt(D, hyper, weights, optList)
+
+    return wMode, prob_l, hyp
