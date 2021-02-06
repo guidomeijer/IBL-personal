@@ -12,7 +12,6 @@ import statsmodels.api as sm
 from psytrack.hyperOpt import hyperOpt
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score
-from scipy.stats import sem
 import pandas as pd
 import alf
 from os.path import join
@@ -252,6 +251,12 @@ def load_opto_trials(eid, download=False):
     trials.loc[trials['correct'] == -1, 'correct'] = 0
     trials['right_choice'] = -trials['choice']
     trials.loc[trials['right_choice'] == -1, 'right_choice'] = 0
+    trials['stim_side'] = (trials['signed_contrast'] > 0).astype(int)
+    trials.loc[trials['stim_side'] == 0, 'stim_side'] = -1
+    trials.loc[(trials['signed_contrast'] == 0) & (trials['contrastLeft'].isnull()),
+               'stim_side'] = 1
+    trials.loc[(trials['signed_contrast'] == 0) & (trials['contrastRight'].isnull()),
+               'stim_side'] = -1
     return trials
 
 

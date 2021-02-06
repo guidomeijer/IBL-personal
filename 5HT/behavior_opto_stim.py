@@ -50,10 +50,6 @@ for i, nickname in enumerate(subjects['subject']):
     weights_no_stim = fit_prob_choice_model(trials[trials['laser_stimulation'] == 0],
                                             previous_trials=1)
 
-    # Fit psytrack model
-    #psytrack_stim = fit_psytrack(trials[trials['laser_stimulation'] == 1])
-    #psytrack_no_stim = fit_psytrack(trials[trials['laser_stimulation'] == 0])
-
     # Get bias at block change points
     block_trans = pd.DataFrame()
     transitions = np.array(np.where(np.diff(trials['probabilityLeft']) != 0)[0]) + 1

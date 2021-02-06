@@ -10,7 +10,7 @@ import brainbox.behavior.training as training
 from oneibl.one import ONE
 one = ONE()
 
-traj_id = '84bb830f-b9ff-4e6b-9296-f458fb41d160'
+traj_id = 'f06d6cd9-a6b8-49a4-90d1-7905d04c2f8b'
 
 traj = one.alyx.rest('trajectories', 'list', probe_insertion=traj_id)
 eid = traj[0]['session']['id']
