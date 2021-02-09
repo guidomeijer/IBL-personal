@@ -12,6 +12,7 @@ import statsmodels.api as sm
 from psytrack.hyperOpt import hyperOpt
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score
+from sklearn.linear_model import LinearRegression
 import pandas as pd
 import alf
 from os.path import join
@@ -113,6 +114,46 @@ def classify(population_activity, trial_labels, classifier, cross_validation=Non
     # Calcualte accuracy
     accuracy = accuracy_score(trial_labels, pred)
     return accuracy, pred, prob
+
+
+def regress(population_activity, trial_targets, cross_validation=None):
+    """
+    Perform linear regression to predict a continuous variable from neural data
+
+    Parameters
+    ----------
+    population_activity : 2D array (trials x neurons)
+        population activity of all neurons in the population for each trial.
+    trial_targets : 1D or 2D array
+        the decoding target per trial as a continuous variable
+    pre_time : float
+        time (in seconds) preceding the event times
+    post_time : float
+        time (in seconds) following the event times
+    cross_validation : None or scikit-learn object
+        which cross-validation method to use, for example 5-fold:
+                    from sklearn.model_selection import KFold
+                    cross_validation = KFold(n_splits=5)
+
+    Returns
+    -------
+    pred : 1D array
+        array with predictions
+    """
+
+    reg = LinearRegression()
+
+    if cross_validation is None:
+        # Fit the model on all the data
+        reg.fit(population_activity, trial_targets)
+        pred = reg.predict(population_activity)
+    else:
+        pred = np.empty(trial_targets.shape[0])
+        for train_index, test_index in cross_validation.split(population_activity):
+            # Fit the model to the training data and predict the held-out test data
+            reg.fit(population_activity[train_index], trial_targets[train_index])
+            pred[test_index] = reg.predict(population_activity[test_index])
+    return pred
 
 
 def query_sessions(selection='all'):

@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from models.expSmoothing_stimside import expSmoothing_stimside as exp_stimside
+from models.expSmoothing_prevAction import expSmoothing_prevAction as exp_prev_action
 from my_functions import load_opto_trials, paths
 from oneibl.one import ONE
 one = ONE()
@@ -24,6 +25,7 @@ fig_path = join(fig_path, '5HT', 'opto-behavior')
 
 subjects = pd.read_csv('subjects.csv')
 
+results_df = pd.DataFrame()
 for i, nickname in enumerate(subjects['subject']):
 
     # Query sessions
@@ -76,29 +78,42 @@ for i, nickname in enumerate(subjects['subject']):
     session_uuids = np.array(session_uuids)
 
     # Fit models
-    model_ns = exp_stimside('./results/', session_uuids, '%s_no_stim' % nickname,
+    model = exp_stimside('./model_fit_results/', session_uuids, '%s_no_stim' % nickname,
                          actions_ns, stimuli_ns, stim_side_ns)
-    model_ns.load_or_train(nb_steps=2000, remove_old=False) # put 2000 steps for biasedBayesian and smooth_stimside and 1000 for all others
-    param_ns = model_ns.get_parameters(parameter_type='all') # if you want the parameters
-    # compute prior (actions,  stimuli and stim_side have been passed as arguments to allow pseudo blocks)
-    priors_ns, llk_ns, accuracy_ns = model_ns.compute_prior(actions_ns, stimuli_ns, stim_side_ns)
+    model.load_or_train(nb_steps=2000, remove_old=False)
+    param_ss = model.get_parameters(parameter_type='posterior_mean')
+    model = exp_prev_action('./model_fit_results/', session_uuids, '%s_no_stim' % nickname,
+                            actions_ns, stimuli_ns, stim_side_ns)
+    model.load_or_train(nb_steps=2000, remove_old=False)
+    param_pa = model.get_parameters(parameter_type='posterior_mean')
+    results_df = results_df.append(pd.DataFrame(index=[len(results_df)],
+                                                data={'tau_ss': 1/param_ss[0],
+                                                      'tau_pa': 1/param_pa[0],
+                                                      'opto_stim': 'no stim',
+                                                      'sert-cre': subjects.loc[i, 'sert-cre']}))
 
 
-    model_s = exp_stimside('./results/', session_uuids, '%s_stim' % nickname,
+    model = exp_stimside('./model_fit_results/', session_uuids, '%s_stim' % nickname,
                          actions_s, stimuli_s, stim_side_s)
-    model_s.load_or_train(nb_steps=2000, remove_old=False) # put 2000 steps for biasedBayesian and smooth_stimside and 1000 for all others
-    param_s = model_s.get_parameters(parameter_type='all') # if you want the parameters
-    # compute prior (actions,  stimuli and stim_side have been passed as arguments to allow pseudo blocks)
-    priors_s, llk_s, accuracy_s = model_s.compute_prior(actions_s, stimuli_s, stim_side_s)
+    model.load_or_train(nb_steps=2000, remove_old=False)
+    param_ss = model.get_parameters(parameter_type='posterior_mean')
+    model = exp_prev_action('./model_fit_results/', session_uuids, '%s_stim' % nickname,
+                            actions_s, stimuli_s, stim_side_s)
+    model.load_or_train(nb_steps=2000, remove_old=False)
+    param_pa = model.get_parameters(parameter_type='posterior_mean')
+    results_df = results_df.append(pd.DataFrame(index=[len(results_df)],
+                                                data={'tau_ss': 1/param_ss[0],
+                                                      'tau_pa': 1/param_pa[0],
+                                                      'opto_stim': 'stim',
+                                                      'sert-cre': subjects.loc[i, 'sert-cre']}))
 
+# Plot
+sns.set(context='talk', style='ticks', font_scale=1.5)
+f, ax1 = plt.subplots(1, 1, figsize=(10, 10))
 
+sns.lineplot(x='opto_stim', y='tau_pa', hue='sert-cre', estimator=None, data=results_df)
+ax1.set(xlabel='', ylabel='Lenght of integration window (tau)')
 
-    # Plot
-    sns.set(context='talk', style='ticks', font_scale=1.5)
-    f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(30, 30))
-
-
-
-    sns.despine(trim=True)
-    plt.tight_layout()
-    plt.savefig(join(fig_path, '%s_opto_behavior' % nickname))
+sns.despine(trim=True)
+plt.tight_layout()
+plt.savefig(join(fig_path, 'model_opto_behavior'))
