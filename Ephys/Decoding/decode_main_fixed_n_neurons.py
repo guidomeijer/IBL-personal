@@ -8,7 +8,7 @@ Decode from all brain regions
 
 from os.path import join
 import numpy as np
-from brainbox.population import _get_spike_counts_in_bins
+from brainbox.population import get_spike_counts_in_bins
 from brainbox.task import generate_pseudo_session
 import pandas as pd
 from sklearn.naive_bayes import MultinomialNB
@@ -175,7 +175,7 @@ for i in range(len(eids)):
 
             # Get population response matrix of all trials
             times = np.column_stack(((all_trial_times - PRE_TIME), (all_trial_times + POST_TIME)))
-            pop_vector, cluster_ids = _get_spike_counts_in_bins(spks_region, clus_region, times)
+            pop_vector, cluster_ids = get_spike_counts_in_bins(spks_region, clus_region, times)
             pop_vector = pop_vector.T
 
             # Loop over neuron subsets

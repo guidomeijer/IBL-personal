@@ -17,6 +17,7 @@ from my_functions import load_opto_trials
 import statsmodels.api as sm
 from ibl_pipeline.utils import psychofit as psy
 from models.expSmoothing_prevAction import expSmoothing_prevAction as exp_prev_action
+from models.expSmoothing_stimside import expSmoothing_stimside as exp_stimside
 
 
 def paths():
@@ -51,17 +52,17 @@ def load_session_one(nickname, date):
     return contrast_l, contrast_r, prob_l, correct, choice
 
 
-def fit_running_avg_model(nickname, date):
+def fit_running_avg_model(nickname, date, remove_old_fit=False):
     one = ONE()
     eid = one.search(subject=nickname, date_range=date, task_protocol='biased')
     if len(eid) != 1:
         raise Exception('Error loading session')
-    trials = load_opto_trials(eid[0], True)
-    model = exp_prev_action('./model_fit_results/', eid, '%s_%s' % (nickname, date),
-                            np.array(trials['choice'].values),
-                            np.array(trials['signed_contrast'].values),
-                            np.array(trials['stim_side'].values))
-    model.load_or_train(nb_steps=2000, remove_old=False)
+    trials = load_opto_trials(eid[0], download=True, invert_choice=True)
+    model = exp_stimside('./model_fit_results/', eid, '%s_%s' % (nickname, date),
+                         np.array(trials['choice'].values),
+                         np.array(trials['signed_contrast'].values),
+                         np.array(trials['stim_side'].values))
+    model.load_or_train(nb_steps=2000, remove_old=remove_old_fit)
     params = model.get_parameters(parameter_type='posterior_mean')
     return 1 / params[0]  # tau parameter
 

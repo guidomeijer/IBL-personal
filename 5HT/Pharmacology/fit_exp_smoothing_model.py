@@ -14,9 +14,9 @@ sessions = sessions[sessions['Week'] == 1]
 
 results_df = pd.DataFrame()
 for i in range(len(sessions)):
-    tau_pre = fit_running_avg_model(sessions.loc[i, 'Nickname'], sessions.loc[i, 'Pre-vehicle'])
-    tau_drug = fit_running_avg_model(sessions.loc[i, 'Nickname'], sessions.loc[i, 'Drug'])
-    tau_post = fit_running_avg_model(sessions.loc[i, 'Nickname'], sessions.loc[i, 'Post-vehicle'])
+    tau_pre = fit_running_avg_model(sessions.loc[i, 'Nickname'], sessions.loc[i, 'Pre-vehicle'], remove_old_fit=True)
+    tau_drug = fit_running_avg_model(sessions.loc[i, 'Nickname'], sessions.loc[i, 'Drug'], remove_old_fit=True)
+    tau_post = fit_running_avg_model(sessions.loc[i, 'Nickname'], sessions.loc[i, 'Post-vehicle'], remove_old_fit=True)
     results_df = results_df.append(pd.DataFrame(data={'tau': [tau_pre, tau_drug, tau_post],
                                                       'Subject': sessions.loc[i, 'Nickname'],
                                                       'condition': ['Pre-vehicle', 'Drug', 'Post-vehicle']}))

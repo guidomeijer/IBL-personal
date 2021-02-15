@@ -8,21 +8,23 @@ Decode from all brain regions
 
 from os.path import join
 import numpy as np
-from my_functions import linear_regression
 from brainbox.task import generate_pseudo_session
+from brainbox.population import regress
 import pandas as pd
 import alf
 from scipy.stats import pearsonr
 import warnings
 from prior_funcs import perform_inference
-from my_functions import paths, query_sessions, check_trials, combine_layers_cortex
+from my_functions import paths, query_sessions, check_trials, combine_layers_cortex, figure_style
 from models.expSmoothing_prevAction import expSmoothing_prevAction as exp_prev_action
+from models.expSmoothing_stimside import expSmoothing_stimside as exp_stimside
 import brainbox.io.one as bbone
 from oneibl.one import ONE
 one = ONE()
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 # Settings
+REMOVE_OLD_FIT = True
 TARGET = 'exp-smoothing'  # block, stim-side. reward or choice
 MIN_NEURONS = 5  # min neurons per region
 DECODER = 'linear-regression'
@@ -40,7 +42,7 @@ DOWNLOAD_TRIALS = False
 
 # Time windows
 PRE_TIME = 0.6
-POST_TIME = 0.1
+POST_TIME = -0.1
 
 # Query session list
 eids, probes = query_sessions(selection=INCL_SESSIONS)
@@ -78,13 +80,22 @@ for i in range(len(eids)):
     probes_to_use = probes[i]
 
     # Fit exponential smoothing model
+    actions = trials['choice'] + 2
+    actions[actions == 3] = -1
+    signed_contrast = trials['contrastRight'].copy()
+    signed_contrast[np.isnan(signed_contrast)] = -trials['contrastLeft'][
+                                                            ~np.isnan(trials['contrastLeft'])]
+    stim_side = (signed_contrast > 0).astype(int)
+    stim_side[stim_side == 0]= -1
+    stim_side[(signed_contrast == 0) & (np.isnan(trials['contrastLeft']))] = 1
+    stim_side[(signed_contrast == 0) & (np.isnan(trials['contrastRight']))] = 1
+    model = exp_prev_action(join(SAVE_PATH, 'Ephys', 'behavior_model_results/'), [eid],
+                         eid, actions, signed_contrast, stim_side)
+    model.load_or_train(nb_steps=2000, remove_old=REMOVE_OLD_FIT)
+    params = model.get_parameters(parameter_type='posterior_mean')
+    priors, llk, accuracy = model.compute_prior(actions, signed_contrast, stim_side)
+
     sdf
-
-    model = exp_prev_action('./model_fit_results/', eid, '%s_%s' % (subject, date),
-                           np.array(trials['choice'].values),
-                           np.array(trials['signed_contrast'].values),
-                           np.array(trials['stim_side'].values))
-
 
     stim_side = (np.array(np.isnan(trials.contrastLeft)==False) * -1
                  + np.array(np.isnan(trials.contrastRight)==False)) * 1
@@ -128,6 +139,13 @@ for i in range(len(eids)):
                 continue
 
             # Decode inferred pLeft
+            times = np.column_stack(((trials.goCue_times - PRE_TIME),
+                                     (trials.goCue_times + POST_TIME)))
+            population_activity, cluster_ids = get_spike_counts_in_bins(spks_region,
+                                                                        clus_region, times)
+            population_activity = population_activity.T
+            regress()
+
             pred_pleft = linear_regression(spks_region, clus_region, trials['stimOn_times'],
                                            infer_p_left, pre_time=PRE_TIME, post_time=POST_TIME,
                                            cross_validation='kfold-interleaved')

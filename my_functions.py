@@ -16,11 +16,7 @@ from sklearn.linear_model import LinearRegression
 import pandas as pd
 import alf
 from os.path import join
-import pathlib
 from ibllib.atlas import regions_from_allen_csv
-from paths import DATA_PATH, FIG_PATH
-from oneibl.one import ONE
-one = ONE()
 
 
 def paths():
@@ -29,10 +25,11 @@ def paths():
 
     DATA_PATH = '/path/to/Flatiron/data'
     FIG_PATH = '/path/to/save/figures'
+    SAVE_PATH = '/path/to/save/data'
 
     """
-    save_path = join(pathlib.Path(__file__).parent.absolute(), 'Data')
-    return DATA_PATH, FIG_PATH, save_path
+    from paths import DATA_PATH, FIG_PATH, SAVE_PATH
+    return DATA_PATH, FIG_PATH, SAVE_PATH
 
 
 def figure_style(font_scale=2, despine=False, trim=True):
@@ -156,7 +153,7 @@ def regress(population_activity, trial_targets, cross_validation=None):
     return pred
 
 
-def query_sessions(selection='all'):
+def query_sessions(selection='all', return_subjects=False):
     from oneibl.one import ONE
     one = ONE()
 
@@ -197,11 +194,16 @@ def query_sessions(selection='all'):
     # Get list of eids and probes
     all_eids = np.array([i['session'] for i in ins])
     all_probes = np.array([i['name'] for i in ins])
-    eids = np.unique(all_eids)
+    all_subjects = np.array([i['session_info']['subject'] for i in ins])
+    eids, ind_unique = np.unique(all_eids, return_index=True)
+    subjects = all_subjects[ind_unique]
     probes = []
     for i, eid in enumerate(eids):
         probes.append(all_probes[[s == eid for s in all_eids]])
-    return eids, probes
+    if return_subjects:
+        return eids, probes, subjects
+    else:
+        return eids, probes
 
 
 def sessions_with_region(brain_region):
@@ -278,7 +280,9 @@ def get_eid_list():
     return eids
 
 
-def load_opto_trials(eid, download=False):
+def load_opto_trials(eid, download=False, invert_choice=False):
+    from oneibl.one import ONE
+    one = ONE()
     if download:
         _ = one.load(eid, dataset_types=['trials.probabilityLeft', 'trials.contrastLeft',
                                          'trials.contrastRight', 'trials.feedbackType',
@@ -298,6 +302,9 @@ def load_opto_trials(eid, download=False):
                'stim_side'] = 1
     trials.loc[(trials['signed_contrast'] == 0) & (trials['contrastRight'].isnull()),
                'stim_side'] = -1
+    if invert_choice:
+        trials['choice'] = trials['choice'] + 2
+        trials.loc[trials['choice'] == 3] = -1
     return trials
 
 
