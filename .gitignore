@@ -16,3 +16,5 @@ Ephys/paths.py
 .vscode/
 
 __pycache__/
+
+5HT/Pharmacology/model_fit_results/
