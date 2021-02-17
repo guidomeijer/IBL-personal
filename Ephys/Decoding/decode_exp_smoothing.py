@@ -26,6 +26,7 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 # Settings
 REMOVE_OLD_FIT = False
+OVERWRITE = True
 TARGET = 'prior-stimside'  # block, stim-side. reward or choice
 MIN_NEURONS = 5  # min neurons per region
 DECODER = 'linear-regression'
@@ -34,9 +35,10 @@ INCL_NEURONS = 'all'  # all or no_drift
 INCL_SESSIONS = 'aligned-behavior'  # all, aligned, resolved, aligned-behavior or resolved-behavior
 NUM_SPLITS = 5
 CHANCE_LEVEL = 'pseudo'  # pseudo, phase-rand, shuffle or none
-ITERATIONS = 100  # for null distribution estimation
+ITERATIONS = 50  # for null distribution estimation
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
+DATA_PATH = join(DATA_PATH, 'Ephys', 'Decoding', DECODER)
 DOWNLOAD_TRIALS = False
 
 # %% Initialize
@@ -50,7 +52,15 @@ eids, probes, subjects = query_sessions(selection=INCL_SESSIONS, return_subjects
 
 # %% MAIN
 
-decoding_result = pd.DataFrame()
+# Load in decoding done so far if required
+if OVERWRITE:
+    decoding_result = pd.DataFrame(columns=['subject', 'date', 'eid', 'probe', 'region'])
+else:
+    decoding_result = pd.read_pickle(join(SAVE_PATH, 'Ephys', 'Decoding', DECODER,
+                        ('%s_%s_%s_%s_%s_cells.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
+                                                     INCL_SESSIONS, INCL_NEURONS))))
+
+# Loop over subjects
 for i, subject in enumerate(np.unique(subjects)):
     print('\nStarting subject %s [%d of %d]\n' % (subject, i + 1, len(np.unique(subjects))))
 
@@ -136,9 +146,15 @@ for i, subject in enumerate(np.unique(subjects)):
 
             # Decode per brain region
             for r, region in enumerate(np.unique(regions)):
+
+                # Skip region if any of these conditions apply
                 if region.islower():
                     continue
                 if 'metrics' not in clusters[probe]:
+                    continue
+                if np.sum((decoding_result['eid'] == eid)
+                          & (decoding_result['region'] == region)) != 0:
+                    print('Region %s already decoded, skipping..' % region)
                     continue
                 print('Decoding region %s (%d of %d)' % (region, r + 1, len(np.unique(regions))))
 
@@ -163,15 +179,17 @@ for i, subject in enumerate(np.unique(subjects)):
                 population_activity = population_activity.T
                 if VALIDATION == 'kfold-interleaved':
                     cv = KFold(n_splits=NUM_SPLITS, shuffle=True)
-                pred_prior = regress(population_activity, priors[j][:population_activity.shape[0]],
-                                     cross_validation=cv)
-                r_prior = pearsonr(priors[j][:population_activity.shape[0]],
-                                   pred_prior)[0]
+                if isinstance(priors[0], float):
+                    these_priors = priors
+                else:
+                    these_priors = priors[j][:population_activity.shape[0]]
+                pred_prior = regress(population_activity, these_priors, cross_validation=cv)
+                r_prior = pearsonr(these_priors, pred_prior)[0]
 
                 # Decode block identity
                 pred_block = regress(population_activity, trials['probabilityLeft'],
                                      cross_validation=cv)
-                r_block = pearsonr(priors[j][:population_activity.shape[0]], pred_block)[0]
+                r_block = pearsonr(trials['probabilityLeft'], pred_block)[0]
 
                 # Estimate chance level
                 r_prior_pseudo = np.empty(ITERATIONS)
@@ -198,11 +216,13 @@ for i, subject in enumerate(np.unique(subjects)):
                                                      p_all_stim_side)[0]
 
                     # Decode pseudo prior
-                    p_pred_prior = regress(population_activity,
-                                           p_priors[j][:population_activity.shape[0]],
-                                           cross_validation=cv)
-                    r_prior_pseudo[k] = pearsonr(p_priors[j][:population_activity.shape[0]],
-                                                 p_pred_prior)[0]
+                    if isinstance(p_priors[0], float):
+                        p_these_priors = p_priors
+                    else:
+                        p_these_priors = p_priors[j][:population_activity.shape[0]]
+
+                    p_pred_prior = regress(population_activity, p_these_priors, cross_validation=cv)
+                    r_prior_pseudo[k] = pearsonr(p_these_priors, p_pred_prior)[0]
 
                     # Decode pseudo block identity
                     p_pred_block = regress(population_activity, pseudo_trials['probabilityLeft'],
@@ -230,6 +250,6 @@ for i, subject in enumerate(np.unique(subjects)):
                                      'n_trials': trials.probabilityLeft.shape[0],
                                      'n_neurons': np.unique(clus_region).shape[0]}))
 
-        decoding_result.to_pickle(join(SAVE_PATH, DECODER,
+        decoding_result.to_pickle(join(SAVE_PATH, 'Ephys', 'Decoding', DECODER,
                         ('%s_%s_%s_%s_%s_cells.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
                                                      INCL_SESSIONS, INCL_NEURONS))))

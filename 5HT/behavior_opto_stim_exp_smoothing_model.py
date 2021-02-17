@@ -104,7 +104,7 @@ for i, nickname in enumerate(subjects['subject']):
                         'prior': priors_stimside[k][trans-PRE_TRIALS:trans+POST_TRIALS],
                         'trial': np.append(np.arange(-PRE_TRIALS, 0), np.arange(0, POST_TRIALS)),
                         'change_to': prob_left_ns[k][trans],
-                        'opto': 'stim',
+                        'opto': 'no stim',
                         'sert_cre': subjects.loc[i, 'sert-cre']}))
 
     model = exp_stimside('./model_fit_results/', session_uuids, '%s_stim' % nickname,
@@ -130,7 +130,7 @@ for i, nickname in enumerate(subjects['subject']):
                         'prior': priors_stimside[k][trans-PRE_TRIALS:trans+POST_TRIALS],
                         'trial': np.append(np.arange(-PRE_TRIALS, 0), np.arange(0, POST_TRIALS)),
                         'change_to': prob_left_s[k][trans],
-                        'opto': 'no stim',
+                        'opto': 'stim',
                         'sert_cre': subjects.loc[i, 'sert-cre']}))
 
 # %% Plot
@@ -148,7 +148,7 @@ sns.lineplot(x='trial', y='prior', data=block_switches[block_switches['sert_cre'
              hue='change_to', style='opto', palette='colorblind', ax=ax2, ci=68)
 #plt.plot([0, 0], [0, 1], color=[0.5, 0.5, 0.5], ls='--')
 handles, labels = ax2.get_legend_handles_labels()
-labels = ['', 'Change to R', 'Change to L', '', 'Stim', 'No stim']
+labels = ['', 'Change to R', 'Change to L', '', 'No stim', 'Stim']
 ax2.legend(handles, labels, frameon=False, prop={'size': 20})
 ax2.set(ylabel='Prior', xlabel='Trials relative to block switch',
         title='Exponential smoothed previous stimulus side model')

@@ -21,7 +21,9 @@ one = ONE()
 # Settings
 PRE_TRIALS = 1
 POST_TRIALS = 5
-DOWNLOAD_TRIALS = False
+DOWNLOAD_TRIALS = True
+MIN_PERF = 0.7
+MIN_TRIALS = 400
 _, fig_path, _ = paths()
 fig_path = join(fig_path, '5HT', 'opto-behavior')
 
@@ -30,7 +32,8 @@ subjects = pd.read_csv('subjects.csv')
 for i, nickname in enumerate(subjects['subject']):
 
     # Query sessions
-    eids = one.search(subject=nickname, task_protocol='_iblrig_tasks_opto_biasedChoiceWorld')
+    eids, info = one.search(subject=nickname, task_protocol='_iblrig_tasks_opto_biasedChoiceWorld',
+                            details=True)
 
     # Get trials DataFrame
     trials = pd.DataFrame()
@@ -39,7 +42,19 @@ for i, nickname in enumerate(subjects['subject']):
         try:
             these_trials = load_opto_trials(eid, DOWNLOAD_TRIALS)
             these_trials['session'] = ses_count
-            trials = trials.append(these_trials, ignore_index=True)
+
+            # Check if behavior is good
+            """
+            perf = (these_trials.loc[(these_trials['signed_contrast'] == 1)
+                                     | (these_trials['signed_contrast'] == -1), 'correct'].sum()
+                    / these_trials.loc[(these_trials['signed_contrast'] == 1)
+                                       | (these_trials['signed_contrast'] == -1),
+                                       'correct'].shape[0])
+            """
+            perf = these_trials['correct'].sum()/these_trials['correct'].shape[0]
+            print(perf)
+            if (perf > MIN_PERF) & (these_trials.shape[0] > MIN_TRIALS):
+                trials = trials.append(these_trials, ignore_index=True)
             ses_count = ses_count + 1
         except Exception:
             print('Could not load trials')
@@ -105,7 +120,6 @@ for i, nickname in enumerate(subjects['subject']):
     ax1.text(25, 0.25, '80:20', color='b')
     ax1.set(title='dashed line = opto stim')
 
-
     ax2.plot([1, 2], [weights_no_stim['0.0625'], weights_stim['0.0625']], color='gray', zorder=-1)
     ax2.scatter([1], [weights_no_stim['0.0625']], c=['k'], zorder=1, label='No stim')
     ax2.scatter([2], [weights_stim['0.0625']], c=['deepskyblue'], zorder=1, label='Stim')
@@ -142,3 +156,25 @@ for i, nickname in enumerate(subjects['subject']):
     sns.despine(trim=True)
     plt.tight_layout()
     plt.savefig(join(fig_path, '%s_opto_behavior' % nickname))
+
+    # Plot
+    sns.set(context='talk', style='ticks', font_scale=1.5)
+    f, ax1 = plt.subplots(1, 1, figsize=(15, 15))
+
+    # plot_psychometric(trials[trials['probabilityLeft'] == 0.5], ax=axs[i], color='k')
+    plot_psychometric(trials[(trials['probabilityLeft'] == 0.8)
+                             & (trials['laser_stimulation'] == 0)], ax=ax1, color='b')
+    plot_psychometric(trials[(trials['probabilityLeft'] == 0.8)
+                             & (trials['laser_stimulation'] == 1)], ax=ax1,
+                      color='b', linestyle='--')
+    plot_psychometric(trials[(trials['probabilityLeft'] == 0.2)
+                             & (trials['laser_stimulation'] == 0)], ax=ax1, color='r')
+    plot_psychometric(trials[(trials['probabilityLeft'] == 0.2)
+                             & (trials['laser_stimulation'] == 1)], ax=ax1,
+                      color='r', linestyle='--')
+    ax1.text(-25, 0.75, '20:80', color='r')
+    ax1.text(25, 0.25, '80:20', color='b')
+    ax1.set(title='dashed line = opto stim')
+    sns.despine(trim=True)
+    plt.tight_layout()
+    plt.savefig(join(fig_path, '%s_opto_behavior_psycurve' % nickname))

@@ -16,7 +16,7 @@ from sklearn.linear_model import LinearRegression
 import pandas as pd
 import alf
 from os.path import join
-from ibllib.atlas import regions_from_allen_csv
+from ibllib.atlas import BrainRegions
 
 
 def paths():
@@ -229,7 +229,7 @@ def combine_layers_cortex(regions, delete_duplicates=False):
 
 
 def get_parent_region_name(acronyms):
-    brainregions = regions_from_allen_csv()
+    brainregions = BrainRegions()
     parent_region_names = []
     for i, acronym in enumerate(acronyms):
         try:
@@ -250,7 +250,7 @@ def get_parent_region_name(acronyms):
 
 
 def get_full_region_name(acronyms):
-    brainregions = regions_from_allen_csv()
+    brainregions = BrainRegions()
     full_region_names = []
     for i, acronym in enumerate(acronyms):
         try:
