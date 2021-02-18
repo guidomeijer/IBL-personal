@@ -17,6 +17,8 @@ import pandas as pd
 import alf
 from os.path import join
 from ibllib.atlas import BrainRegions
+from oneibl.one import ONE
+one = ONE()
 
 
 def paths():
@@ -154,8 +156,6 @@ def regress(population_activity, trial_targets, cross_validation=None):
 
 
 def query_sessions(selection='all', return_subjects=False):
-    from oneibl.one import ONE
-    one = ONE()
 
     if selection == 'all':
         # Query all ephysChoiceWorld sessions
@@ -281,8 +281,6 @@ def get_eid_list():
 
 
 def load_opto_trials(eid, download=False, invert_choice=False):
-    from oneibl.one import ONE
-    one = ONE()
     if download:
         _ = one.load(eid, dataset_types=['trials.probabilityLeft', 'trials.contrastLeft',
                                          'trials.contrastRight', 'trials.feedbackType',
@@ -306,6 +304,26 @@ def load_opto_trials(eid, download=False, invert_choice=False):
         trials['choice'] = trials['choice'] + 2
         trials.loc[trials['choice'] == 3] = -1
     return trials
+
+
+def criteria_opto_eids(eids, download_trials=False, max_lapse=0.2, max_bias=0.2, min_trials=200):
+    use_eids = []
+    for j, eid in enumerate(eids):
+        try:
+            trials = load_opto_trials(eid, download_trials)
+            lapse_l = 1 - (np.sum(trials.loc[trials['signed_contrast'] == -1, 'choice'] == 1)
+                           / trials.loc[trials['signed_contrast'] == -1, 'choice'].shape[0])
+            lapse_r = 1 - (np.sum(trials.loc[trials['signed_contrast'] == 1, 'choice'] == -1)
+                           / trials.loc[trials['signed_contrast'] == 1, 'choice'].shape[0])
+            bias = np.abs(0.5 - (np.sum(trials.loc[trials['signed_contrast'] == 0, 'choice'] == 1)
+                                 / np.shape(trials.loc[trials['signed_contrast'] == 0, 'choice'] == 1)[0]))
+
+            if ((lapse_l < max_lapse) & (lapse_r < max_lapse) & (trials.shape[0] > min_trials)
+                    & (bias < max_bias) & ('laser_stimulation' in trials.columns)):
+                use_eids.append(eid)
+        except Exception:
+            print('Could not load session %s' % eid)
+    return use_eids
 
 
 def fit_psychfunc(stim_levels, n_trials, proportion):

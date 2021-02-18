@@ -26,7 +26,7 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 # Settings
 REMOVE_OLD_FIT = False
-OVERWRITE = True
+OVERWRITE = False
 TARGET = 'prior-stimside'  # block, stim-side. reward or choice
 MIN_NEURONS = 5  # min neurons per region
 DECODER = 'linear-regression'

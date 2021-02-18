@@ -15,7 +15,7 @@ import seaborn as sns
 from behavior_models import utils
 from models.expSmoothing_stimside import expSmoothing_stimside as exp_stimside
 from models.expSmoothing_prevAction import expSmoothing_prevAction as exp_prev_action
-from my_functions import load_opto_trials, paths
+from my_functions import load_opto_trials, paths, criteria_opto_eids
 from oneibl.one import ONE
 one = ONE()
 
@@ -35,6 +35,7 @@ for i, nickname in enumerate(subjects['subject']):
 
     # Query sessions
     eids = one.search(subject=nickname, task_protocol='_iblrig_tasks_opto_biasedChoiceWorld')
+    eids = criteria_opto_eids(eids, download_trials=DOWNLOAD_TRIALS)
 
     # Get trial data
     stimuli_arr_ns, actions_arr_ns, stim_sides_arr_ns, prob_left_ns, session_uuids = [], [], [], [], []
@@ -94,7 +95,8 @@ for i, nickname in enumerate(subjects['subject']):
                                                 data={'tau_ss': 1/param_ss[0],
                                                       'tau_pa': 1/param_pa[0],
                                                       'opto_stim': 'no stim',
-                                                      'sert-cre': subjects.loc[i, 'sert-cre']}))
+                                                      'sert-cre': subjects.loc[i, 'sert-cre'],
+                                                      'subject': nickname}))
 
     # Add prior around block switch
     for k in range(len(priors_stimside)):
@@ -105,7 +107,8 @@ for i, nickname in enumerate(subjects['subject']):
                         'trial': np.append(np.arange(-PRE_TRIALS, 0), np.arange(0, POST_TRIALS)),
                         'change_to': prob_left_ns[k][trans],
                         'opto': 'no stim',
-                        'sert_cre': subjects.loc[i, 'sert-cre']}))
+                        'sert_cre': subjects.loc[i, 'sert-cre'],
+                        'subject': nickname}))
 
     model = exp_stimside('./model_fit_results/', session_uuids, '%s_stim' % nickname,
                          actions_s, stimuli_s, stim_side_s)
@@ -120,31 +123,39 @@ for i, nickname in enumerate(subjects['subject']):
                                                 data={'tau_ss': 1/param_ss[0],
                                                       'tau_pa': 1/param_pa[0],
                                                       'opto_stim': 'stim',
-                                                      'sert-cre': subjects.loc[i, 'sert-cre']}))
+                                                      'sert-cre': subjects.loc[i, 'sert-cre'],
+                                                      'subject': nickname}))
 
     # Add prior around block switch
     for k in range(len(priors_stimside)):
         transitions = np.array(np.where(np.diff(prob_left_s[k]) != 0)[0]) + 1
         for t, trans in enumerate(transitions):
+            if PRE_TRIALS > trans:
+                pre_trials = PRE_TRIALS - trans
+            else:
+                pre_trials = PRE_TRIALS
+            if POST_TRIALS + trans > priors_stimside[k].shape[0]:
+                post_trials = POST_TRIALS - (priors_stimside[k].shape[0] - trans)
+            else:
+                post_trials = POST_TRIALS
             block_switches = block_switches.append(pd.DataFrame(data={
-                        'prior': priors_stimside[k][trans-PRE_TRIALS:trans+POST_TRIALS],
-                        'trial': np.append(np.arange(-PRE_TRIALS, 0), np.arange(0, POST_TRIALS)),
+                        'prior': priors_stimside[k][trans-pre_trials:trans+post_trials],
+                        'trial': np.append(np.arange(-pre_trials, 0), np.arange(0, post_trials)),
                         'change_to': prob_left_s[k][trans],
                         'opto': 'stim',
-                        'sert_cre': subjects.loc[i, 'sert-cre']}))
+                        'sert_cre': subjects.loc[i, 'sert-cre'],
+                        'subject': nickname}))
 
 # %% Plot
 sns.set(context='talk', style='ticks', font_scale=1.5)
 f, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
 
+sns.lineplot(x='opto_stim', y='tau_ss', hue='sert-cre', style='subject', estimator=None,
+             data=results_df, dashes=False, markers=['o']*int(results_df.shape[0]/2),
+             legend=False, ax=ax1)
+ax1.set(xlabel='', ylabel='Lenght of integration window (tau)')
 
-#results_df.groupby('sert-cre').plot(x='opto_stim', y='tau_ss', marker='o', ax=ax1)
-
-sns.lineplot(x='opto_stim', y='tau_ss', hue='sert-cre', style='sert-cre', estimator=None,
-             data=results_df, dashes=False, markers=True, ax=ax1)
-ax1.set(xlabel='', ylabel='Lenght of integration window (tau)', ylim=[4, 16])
-
-sns.lineplot(x='trial', y='prior', data=block_switches[block_switches['sert_cre'] == 1],
+sns.lineplot(x='trial', y='prior', data=block_switches[block_switches['subject'] == 'ZFM-01802'],
              hue='change_to', style='opto', palette='colorblind', ax=ax2, ci=68)
 #plt.plot([0, 0], [0, 1], color=[0.5, 0.5, 0.5], ls='--')
 handles, labels = ax2.get_legend_handles_labels()
