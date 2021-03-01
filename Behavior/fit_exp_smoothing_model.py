@@ -25,7 +25,7 @@ eids, probes, subjects = query_sessions(selection='aligned-behavior', return_sub
 results = pd.DataFrame()
 for i, subject in enumerate(np.unique(subjects)):
     print('\nStarting subject %s [%d of %d]\n' % (subject, i + 1, len(np.unique(subjects))))
-    stimuli_arr, actions_arr, stim_sides_arr, session_uuids = [], [], [], []
+    stimuli_arr, actions_arr, stim_sides_arr, pleft_arr, session_uuids = [], [], [], [], []
     for j, eid in enumerate(eids[subjects == subject]):
         data = utils.load_session(eid)
         if data['choice'] is not None and data['probabilityLeft'][0] == 0.5:
@@ -33,6 +33,7 @@ for i, subject in enumerate(np.unique(subjects)):
             stimuli_arr.append(stimuli)
             actions_arr.append(actions)
             stim_sides_arr.append(stim_side)
+            pleft_arr.append(pLeft_oracle)
             session_uuids.append(eid)
     print('\nLoaded data from %d sessions' % (j + 1))
 
@@ -67,14 +68,18 @@ for i, subject in enumerate(np.unique(subjects)):
     f, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 8), sharey=True)
     figure_style()
     if len(stimuli_arr) == 1:
+        ax1.plot(pleft_arr, lw=2)
         ax1.plot(priors_stimside, lw=2)
     else:
+        ax1.plot(pleft_arr[0][:len(stimuli_arr[0])], lw=2)
         ax1.plot(priors_stimside[0][:len(stimuli_arr[0])], lw=2)
     ax1.set(xlabel='Trials', ylabel='Prior',
             title='Stimulus side model (alpha: %.2f)' % params_stimside[0])
     if len(stimuli_arr) == 1:
+        ax2.plot(pleft_arr, lw=2)
         ax2.plot(priors_prevaction, lw=2)
     else:
+        ax2.plot(pleft_arr[0][:len(stimuli_arr[0])], lw=2)
         ax2.plot(priors_prevaction[0][:len(stimuli_arr[0])], lw=2)
     ax2.set(xlabel='Trials', ylabel='Prior',
             title='Actions model (alpha: %.2f)' % params_prevaction[0])

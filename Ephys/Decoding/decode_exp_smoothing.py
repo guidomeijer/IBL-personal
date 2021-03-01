@@ -6,42 +6,47 @@ Decode from all brain regions
 @author: Guido Meijer
 """
 
-from os.path import join
+from os.path import join, isfile
 import numpy as np
 from brainbox.task import generate_pseudo_session
 from brainbox.population import get_spike_counts_in_bins, regress
 import pandas as pd
-import alf
 from scipy.stats import pearsonr
-import warnings
 from behavior_models import utils
 from sklearn.model_selection import KFold
-from my_functions import paths, query_sessions, check_trials, combine_layers_cortex
+from my_functions import paths, query_sessions, check_trials, combine_layers_cortex, load_trials
 from models.expSmoothing_prevAction import expSmoothing_prevAction as exp_prev_action
 from models.expSmoothing_stimside import expSmoothing_stimside as exp_stimside
 import brainbox.io.one as bbone
 from oneibl.one import ONE
+from ibllib.atlas import BrainRegions
+from brainbox.numerical import ismember
+br = BrainRegions()
 one = ONE()
-warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 # Settings
 REMOVE_OLD_FIT = False
-OVERWRITE = False
+OVERWRITE = True
 TARGET = 'prior-stimside'  # block, stim-side. reward or choice
 MIN_NEURONS = 5  # min neurons per region
 DECODER = 'linear-regression'
-VALIDATION = 'kfold-interleaved'
-INCL_NEURONS = 'all'  # all or no_drift
+VALIDATION = 'kfold'
+INCL_NEURONS = 'all'  # all or pass-QC
 INCL_SESSIONS = 'aligned-behavior'  # all, aligned, resolved, aligned-behavior or resolved-behavior
+ATLAS = 'allen-atlas'
 NUM_SPLITS = 5
 CHANCE_LEVEL = 'pseudo'  # pseudo, phase-rand, shuffle or none
 ITERATIONS = 50  # for null distribution estimation
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
 DATA_PATH = join(DATA_PATH, 'Ephys', 'Decoding', DECODER)
-DOWNLOAD_TRIALS = False
+
 
 # %% Initialize
+
+def remap(ids, source='Allen', dest='Beryl'):
+    _, inds = ismember(ids, br.id[br.mappings[source]])
+    return br.id[br.mappings[dest][inds]]
 
 # Time windows
 PRE_TIME = 0.6
@@ -55,10 +60,14 @@ eids, probes, subjects = query_sessions(selection=INCL_SESSIONS, return_subjects
 # Load in decoding done so far if required
 if OVERWRITE:
     decoding_result = pd.DataFrame(columns=['subject', 'date', 'eid', 'probe', 'region'])
-else:
+elif isfile(join(SAVE_PATH, 'Ephys', 'Decoding', DECODER,
+                        ('%s_%s_%s_%s_%s_cells_%s.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
+                                                        INCL_SESSIONS, INCL_NEURONS, ATLAS)))):
     decoding_result = pd.read_pickle(join(SAVE_PATH, 'Ephys', 'Decoding', DECODER,
-                        ('%s_%s_%s_%s_%s_cells.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
-                                                     INCL_SESSIONS, INCL_NEURONS))))
+                        ('%s_%s_%s_%s_%s_cells_%s.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
+                                                        INCL_SESSIONS, INCL_NEURONS, ATLAS))))
+else:
+    decoding_result = pd.DataFrame(columns=['subject', 'date', 'eid', 'probe', 'region'])
 
 # Loop over subjects
 for i, subject in enumerate(np.unique(subjects)):
@@ -68,12 +77,11 @@ for i, subject in enumerate(np.unique(subjects)):
     stimuli_arr, actions_arr, stim_sides_arr, session_uuids = [], [], [], []
     for j, eid in enumerate(eids[subjects == subject]):
         data = utils.load_session(eid)
-        if data['choice'] is not None and data['probabilityLeft'][0] == 0.5:
-            stim_side, stimuli, actions, pLeft_oracle = utils.format_data(data)
-            stimuli_arr.append(stimuli)
-            actions_arr.append(actions)
-            stim_sides_arr.append(stim_side)
-            session_uuids.append(eid)
+        stim_side, stimuli, actions, pLeft_oracle = utils.format_data(data)
+        stimuli_arr.append(stimuli)
+        actions_arr.append(actions)
+        stim_sides_arr.append(stim_side)
+        session_uuids.append(eid)
     print('\nLoaded data from %d sessions' % (j + 1))
 
     # Get maximum number of trials across sessions
@@ -98,7 +106,7 @@ for i, subject in enumerate(np.unique(subjects)):
                                 session_uuids, subject, actions, stimuli, stim_side)
     model.load_or_train(nb_steps=2000, remove_old=REMOVE_OLD_FIT)
     params = model.get_parameters(parameter_type='posterior_mean')
-    priors = model.compute_prior(actions, stimuli, stim_side)[0]
+    priors = model.compute_prior(actions, stimuli, stim_side, parameter_type='posterior_mean')[0]
 
     # Now that we have the priors from the model fit, loop over sessions and decode
     for j, eid in enumerate(session_uuids):
@@ -107,14 +115,8 @@ for i, subject in enumerate(np.unique(subjects)):
         try:
             spikes, clusters, channels = bbone.load_spike_sorting_with_channel(
                                                                         eid, aligned=True, one=one)
-            ses_path = one.path_from_eid(eid)
-            if DOWNLOAD_TRIALS:
-                _ = one.load(eid, dataset_types=['trials.stimOn_times', 'trials.probabilityLeft',
-                                                 'trials.contrastLeft', 'trials.contrastRight',
-                                                 'trials.feedbackType', 'trials.choice',
-                                                 'trials.feedback_times'],
-                             download_only=True, clobber=True)
-            trials = alf.io.load_object(join(ses_path, 'alf'), 'trials')
+            trials = load_trials(eid)
+            skdfjh
         except Exception as error_message:
             print(error_message)
             continue
@@ -141,26 +143,39 @@ for i, subject in enumerate(np.unique(subjects)):
             if not hasattr(clusters[probe], 'acronym'):
                 continue
 
-            # Get brain regions and combine cortical layers
-            regions = combine_layers_cortex(np.unique(clusters[probe]['acronym']))
+            # Check if cluster metrics are available
+            if 'metrics' not in clusters[probe]:
+                continue
+
+            # Get list of brain regions
+            if ATLAS == 'beryl-atlas':
+                mapped_br = br.get(ids=remap(clusters[probe]['atlas_id']))
+                clusters_regions = mapped_br['acronym']
+            elif ATLAS == 'allen-atlas':
+                clusters_regions = combine_layers_cortex(clusters[probe]['acronym'])
+
+            # Get list of neurons that pass QC
+            if INCL_NEURONS == 'pass-QC':
+                clusters_pass = np.where(clusters[probe]['metrics']['label'] == 1)[0]
+            elif INCL_NEURONS == 'all':
+                clusters_pass = np.arange(clusters[probe]['metrics'].shape[0])
 
             # Decode per brain region
-            for r, region in enumerate(np.unique(regions)):
+            for r, region in enumerate(np.unique(clusters_regions)):
 
                 # Skip region if any of these conditions apply
                 if region.islower():
                     continue
-                if 'metrics' not in clusters[probe]:
-                    continue
-                if np.sum((decoding_result['eid'] == eid)
-                          & (decoding_result['region'] == region)) != 0:
+
+                if (OVERWRITE == False) and (np.sum((decoding_result['eid'] == eid)
+                                                    & (decoding_result['region'] == region)) != 0):
                     print('Region %s already decoded, skipping..' % region)
                     continue
-                print('Decoding region %s (%d of %d)' % (region, r + 1, len(np.unique(regions))))
+                print('Decoding region %s (%d of %d)' % (region, r + 1, len(np.unique(clusters_regions))))
 
                 # Get clusters in this brain region
-                region_clusters = combine_layers_cortex(clusters[probe]['acronym'])
-                clusters_in_region = clusters[probe].metrics.cluster_id[region_clusters == region]
+                clusters_in_region = [x for x, y in enumerate(clusters_regions)
+                                      if (region == y) and (x in clusters_pass)]
 
                 # Select spikes and clusters
                 spks_region = spikes[probe].times[np.isin(spikes[probe].clusters, clusters_in_region)]
@@ -179,6 +194,8 @@ for i, subject in enumerate(np.unique(subjects)):
                 population_activity = population_activity.T
                 if VALIDATION == 'kfold-interleaved':
                     cv = KFold(n_splits=NUM_SPLITS, shuffle=True)
+                elif VALIDATION == 'kfold':
+                    cv = KFold(n_splits=NUM_SPLITS, shuffle=False)
                 if isinstance(priors[0], float):
                     these_priors = priors
                 else:
@@ -195,39 +212,20 @@ for i, subject in enumerate(np.unique(subjects)):
                 r_prior_pseudo = np.empty(ITERATIONS)
                 r_block_pseudo = np.empty(ITERATIONS)
                 for k in range(ITERATIONS):
-                    pseudo_trials = generate_pseudo_session(trials)
-                    p_stim_side, p_stimuli, p_actions, _ = utils.format_data(pseudo_trials)
-                    p_all_actions = actions.copy()
-                    p_all_stimuli = stimuli.copy()
-                    p_all_stim_side = stim_side.copy()
-                    p_all_actions[j][:p_actions.shape[0]] = p_actions
-                    p_all_stimuli[j][:p_stimuli.shape[0]] = p_stimuli
-                    p_all_stim_side[j][:p_stim_side.shape[0]] = p_stim_side
-                    if TARGET == 'prior-stimside':
-                        p_model = exp_stimside(join(SAVE_PATH, 'Behavior', 'exp_smoothing_model_fits/'),
-                                               session_uuids, subject, p_all_actions,
-                                               p_all_stimuli, p_all_stim_side)
-                    elif TARGET == 'prior-prevaction':
-                        p_model = exp_prev_action(join(SAVE_PATH, 'Behavior', 'exp_smoothing_model_fits/'),
-                                                  session_uuids, subject, p_all_actions,
-                                                  p_all_stimuli, p_all_stim_side)
-                    p_model.load_or_train(nb_steps=2000, remove_old=REMOVE_OLD_FIT)
-                    p_priors = p_model.compute_prior(p_all_actions, p_all_stimuli,
-                                                     p_all_stim_side)[0]
+                    pseudo_trials = generate_pseudo_session(trials, generate_choices=False)
+                    pseudo_trials['choice'] = np.nan
+                    stim_side, stimuli, actions, prob_left = utils.format_data(pseudo_trials)
+                    p_priors = model.compute_prior(np.array(actions), np.array(stimuli),
+                                                   np.array(stim_side),
+                                                   parameter_type='posterior_mean')[0]
 
-                    # Decode pseudo prior
-                    if isinstance(p_priors[0], float):
-                        p_these_priors = p_priors
-                    else:
-                        p_these_priors = p_priors[j][:population_activity.shape[0]]
-
-                    p_pred_prior = regress(population_activity, p_these_priors, cross_validation=cv)
-                    r_prior_pseudo[k] = pearsonr(p_these_priors, p_pred_prior)[0]
+                    # Decode prior
+                    p_pred_prior = regress(population_activity, p_priors, cross_validation=cv)
+                    r_prior_pseudo[k] = pearsonr(p_priors, p_pred_prior)[0]
 
                     # Decode pseudo block identity
-                    p_pred_block = regress(population_activity, pseudo_trials['probabilityLeft'],
-                                           cross_validation=cv)
-                    r_block_pseudo[k] = pearsonr(pseudo_trials['probabilityLeft'], p_pred_block)[0]
+                    p_pred_block = regress(population_activity, prob_left, cross_validation=cv)
+                    r_block_pseudo[k] = pearsonr(prob_left, p_pred_block)[0]
 
                 # Calculate p values
                 p_prior = np.sum(r_prior_pseudo > r_prior) / r_prior_pseudo.shape[0]
@@ -251,5 +249,5 @@ for i, subject in enumerate(np.unique(subjects)):
                                      'n_neurons': np.unique(clus_region).shape[0]}))
 
         decoding_result.to_pickle(join(SAVE_PATH, 'Ephys', 'Decoding', DECODER,
-                        ('%s_%s_%s_%s_%s_cells.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
-                                                     INCL_SESSIONS, INCL_NEURONS))))
+                        ('%s_%s_%s_%s_%s_cells_%s.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
+                                                        INCL_SESSIONS, INCL_NEURONS, ATLAS))))

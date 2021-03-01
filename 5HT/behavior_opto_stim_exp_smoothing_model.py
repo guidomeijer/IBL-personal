@@ -15,12 +15,11 @@ import seaborn as sns
 from behavior_models import utils
 from models.expSmoothing_stimside import expSmoothing_stimside as exp_stimside
 from models.expSmoothing_prevAction import expSmoothing_prevAction as exp_prev_action
-from my_functions import load_opto_trials, paths, criteria_opto_eids
+from my_functions import paths, criteria_opto_eids
 from oneibl.one import ONE
 one = ONE()
 
 # Settings
-DOWNLOAD_TRIALS = False
 REMOVE_OLD_FIT = False
 PRE_TRIALS = 5
 POST_TRIALS = 11
@@ -35,7 +34,7 @@ for i, nickname in enumerate(subjects['subject']):
 
     # Query sessions
     eids = one.search(subject=nickname, task_protocol='_iblrig_tasks_opto_biasedChoiceWorld')
-    eids = criteria_opto_eids(eids, download_trials=DOWNLOAD_TRIALS)
+    eids = criteria_opto_eids(eids)
 
     # Get trial data
     stimuli_arr_ns, actions_arr_ns, stim_sides_arr_ns, prob_left_ns, session_uuids = [], [], [], [], []
@@ -44,18 +43,17 @@ for i, nickname in enumerate(subjects['subject']):
     for j, eid in enumerate(eids):
         try:
             data = utils.load_session(eid)
-            if data['choice'] is not None and data['probabilityLeft'][0] == 0.5:
-                laser_stimulation = one.load(eid, dataset_types=['_ibl_trials.laser_stimulation'])[0]
-                stim_side, stimuli, actions, pLeft_oracle = utils.format_data(data)
-                stimuli_arr_ns.append(stimuli[laser_stimulation == 0])
-                actions_arr_ns.append(actions[laser_stimulation == 0])
-                stim_sides_arr_ns.append(stim_side[laser_stimulation == 0])
-                prob_left_ns.append(data['probabilityLeft'][laser_stimulation == 0])
-                stimuli_arr_s.append(stimuli[laser_stimulation == 1])
-                actions_arr_s.append(actions[laser_stimulation == 1])
-                stim_sides_arr_s.append(stim_side[laser_stimulation == 1])
-                prob_left_s.append(data['probabilityLeft'][laser_stimulation == 1])
-                session_uuids.append(eid)
+            laser_stimulation = one.load(eid, dataset_types=['_ibl_trials.laser_stimulation'])[0]
+            stim_side, stimuli, actions, pLeft_oracle = utils.format_data(data)
+            stimuli_arr_ns.append(stimuli[laser_stimulation == 0])
+            actions_arr_ns.append(actions[laser_stimulation == 0])
+            stim_sides_arr_ns.append(stim_side[laser_stimulation == 0])
+            prob_left_ns.append(data['probabilityLeft'][laser_stimulation == 0])
+            stimuli_arr_s.append(stimuli[laser_stimulation == 1])
+            actions_arr_s.append(actions[laser_stimulation == 1])
+            stim_sides_arr_s.append(stim_side[laser_stimulation == 1])
+            prob_left_s.append(data['probabilityLeft'][laser_stimulation == 1])
+            session_uuids.append(eid)
         except Exception:
             print('Could not load trials for %s' % eid)
 
@@ -82,18 +80,18 @@ for i, nickname in enumerate(subjects['subject']):
     model = exp_stimside('./model_fit_results/', session_uuids, '%s_no_stim' % nickname,
                          actions_ns, stimuli_ns, stim_side_ns)
     model.load_or_train(nb_steps=2000, remove_old=REMOVE_OLD_FIT)
-    param_ss = model.get_parameters(parameter_type='posterior_mean')
+    param_ss_ns = model.get_parameters(parameter_type='posterior_mean')
     priors_stimside = model.compute_prior(actions_ns, stimuli_ns, stim_side_ns)[0]
     model = exp_prev_action('./model_fit_results/', session_uuids, '%s_no_stim' % nickname,
                             actions_ns, stimuli_ns, stim_side_ns)
     model.load_or_train(nb_steps=2000, remove_old=REMOVE_OLD_FIT)
-    param_pa = model.get_parameters(parameter_type='posterior_mean')
+    param_pa_ns = model.get_parameters(parameter_type='posterior_mean')
     priors_prevaction = model.compute_prior(actions_ns, stimuli_ns, stim_side_ns)[0]
 
     # Add tau to results dataframe
     results_df = results_df.append(pd.DataFrame(index=[len(results_df)],
-                                                data={'tau_ss': 1/param_ss[0],
-                                                      'tau_pa': 1/param_pa[0],
+                                                data={'tau_ss': 1/param_ss_ns[0],
+                                                      'tau_pa': 1/param_pa_ns[0],
                                                       'opto_stim': 'no stim',
                                                       'sert-cre': subjects.loc[i, 'sert-cre'],
                                                       'subject': nickname}))
@@ -113,15 +111,15 @@ for i, nickname in enumerate(subjects['subject']):
     model = exp_stimside('./model_fit_results/', session_uuids, '%s_stim' % nickname,
                          actions_s, stimuli_s, stim_side_s)
     model.load_or_train(nb_steps=2000, remove_old=REMOVE_OLD_FIT)
-    param_ss = model.get_parameters(parameter_type='posterior_mean')
+    param_ss_s = model.get_parameters(parameter_type='posterior_mean')
     priors_stimside = model.compute_prior(actions_s, stimuli_s, stim_side_s)[0]
     model = exp_prev_action('./model_fit_results/', session_uuids, '%s_stim' % nickname,
                             actions_s, stimuli_s, stim_side_s)
     model.load_or_train(nb_steps=2000, remove_old=REMOVE_OLD_FIT)
-    param_pa = model.get_parameters(parameter_type='posterior_mean')
+    param_pa_s = model.get_parameters(parameter_type='posterior_mean')
     results_df = results_df.append(pd.DataFrame(index=[len(results_df)],
-                                                data={'tau_ss': 1/param_ss[0],
-                                                      'tau_pa': 1/param_pa[0],
+                                                data={'tau_ss': 1/param_ss_s[0],
+                                                      'tau_pa': 1/param_pa_s[0],
                                                       'opto_stim': 'stim',
                                                       'sert-cre': subjects.loc[i, 'sert-cre'],
                                                       'subject': nickname}))
@@ -146,6 +144,21 @@ for i, nickname in enumerate(subjects['subject']):
                         'sert_cre': subjects.loc[i, 'sert-cre'],
                         'subject': nickname}))
 
+    # Plot for this animal
+    f, ax1 = plt.subplots(1, 1, figsize=(10, 10))
+    sns.lineplot(x='trial', y='prior', data=block_switches[block_switches['subject'] == nickname],
+             hue='change_to', style='opto', palette='colorblind', ax=ax1, ci=68)
+    #plt.plot([0, 0], [0, 1], color=[0.5, 0.5, 0.5], ls='--')
+    handles, labels = ax1.get_legend_handles_labels()
+    labels = ['', 'Change to R', 'Change to L', '', 'No stim', 'Stim']
+    ax1.legend(handles, labels, frameon=False, prop={'size': 20})
+    ax1.set(ylabel='Prior', xlabel='Trials relative to block switch',
+            title='Tau stim: %.2f, Tau no stim: %.2f' % (1/param_ss_s[0], 1/param_ss_ns[0]))
+    sns.despine(trim=True)
+    plt.tight_layout()
+    plt.savefig(join(fig_path, 'model_opto_behavior_%s' % nickname))
+
+
 # %% Plot
 sns.set(context='talk', style='ticks', font_scale=1.5)
 f, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
@@ -155,7 +168,7 @@ sns.lineplot(x='opto_stim', y='tau_ss', hue='sert-cre', style='subject', estimat
              legend=False, ax=ax1)
 ax1.set(xlabel='', ylabel='Lenght of integration window (tau)')
 
-sns.lineplot(x='trial', y='prior', data=block_switches[block_switches['subject'] == 'ZFM-01802'],
+sns.lineplot(x='trial', y='prior', data=block_switches,
              hue='change_to', style='opto', palette='colorblind', ax=ax2, ci=68)
 #plt.plot([0, 0], [0, 1], color=[0.5, 0.5, 0.5], ls='--')
 handles, labels = ax2.get_legend_handles_labels()
@@ -163,7 +176,6 @@ labels = ['', 'Change to R', 'Change to L', '', 'No stim', 'Stim']
 ax2.legend(handles, labels, frameon=False, prop={'size': 20})
 ax2.set(ylabel='Prior', xlabel='Trials relative to block switch',
         title='Exponential smoothed previous stimulus side model')
-
 
 sns.despine(trim=True)
 plt.tight_layout()

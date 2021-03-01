@@ -9,7 +9,6 @@ import numpy as np
 import seaborn as sns
 import matplotlib
 import statsmodels.api as sm
-from psytrack.hyperOpt import hyperOpt
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score
 from sklearn.linear_model import LinearRegression
@@ -46,10 +45,49 @@ def figure_style(font_scale=2, despine=False, trim=True):
         plt.tight_layout()
 
 
+def load_trials(eid, laser_stimulation=False, invert_choice=False):
+    trials = pd.DataFrame()
+    if laser_stimulation:
+        (trials['stimOn_times'], trials['feedback_times'], trials['goCue_times'],
+         trials['probabilityLeft'], trials['contrastLeft'], trials['contrastRight'],
+         trials['feedbackType'], trials['choice'], trials['laser_stimulation']) = one.load(
+                             eid, dataset_types=['trials.stimOn_times', 'trials.feedback_times',
+                                                 'trials.goCue_times', 'trials.probabilityLeft',
+                                                 'trials.contrastLeft', 'trials.contrastRight',
+                                                 'trials.feedbackType', 'trials.choice',
+                                                 '_ibl_trials.laser_stimulation'])
+        if trials.loc[0, 'laser_stimulation'] is None:
+            trials = trials.drop(columns=['laser_stimulation'])
+    else:
+       (trials['stimOn_times'], trials['feedback_times'], trials['goCue_times'],
+         trials['probabilityLeft'], trials['contrastLeft'], trials['contrastRight'],
+         trials['feedbackType'], trials['choice']) = one.load(
+                             eid, dataset_types=['trials.stimOn_times', 'trials.feedback_times',
+                                                 'trials.goCue_times', 'trials.probabilityLeft',
+                                                 'trials.contrastLeft', 'trials.contrastRight',
+                                                 'trials.feedbackType', 'trials.choice'])
+    trials['signed_contrast'] = trials['contrastRight']
+    trials.loc[trials['signed_contrast'].isnull(), 'signed_contrast'] = -trials['contrastLeft']
+    trials['correct'] = trials['feedbackType']
+    trials.loc[trials['correct'] == -1, 'correct'] = 0
+    trials['right_choice'] = -trials['choice']
+    trials.loc[trials['right_choice'] == -1, 'right_choice'] = 0
+    trials['stim_side'] = (trials['signed_contrast'] > 0).astype(int)
+    trials.loc[trials['stim_side'] == 0, 'stim_side'] = -1
+    trials.loc[(trials['signed_contrast'] == 0) & (trials['contrastLeft'].isnull()),
+               'stim_side'] = 1
+    trials.loc[(trials['signed_contrast'] == 0) & (trials['contrastRight'].isnull()),
+               'stim_side'] = -1
+    if invert_choice:
+        trials['choice'] = trials['choice'] + 2
+        trials.loc[trials['choice'] == 3] = -1
+    return trials
+
+
 def check_trials(trials):
 
     if trials is None:
-        print('trials Bunch is None type')
+        print('trials is None type')
         return False
     if trials.probabilityLeft is None:
         print('trials.probabilityLeft is None type')
@@ -60,99 +98,11 @@ def check_trials(trials):
     if trials.probabilityLeft[0] != 0.5:
         print('trials.probabilityLeft does not start with 0.5')
         return False
-    if ((not hasattr(trials, 'stimOn_times'))
+    if (('stimOn_times' not in trials.columns)
             or (len(trials.stimOn_times) != len(trials.probabilityLeft))):
         print('stimOn_times do not match with probabilityLeft')
         return False
     return True
-
-
-def classify(population_activity, trial_labels, classifier, cross_validation=None):
-    """
-    Classify trial identity (e.g. stim left/right) from neural population activity.
-
-    Parameters
-    ----------
-    population_activity : 2D array (trials x neurons)
-        population activity of all neurons in the population for each trial.
-    trial_labels : 1D or 2D array
-        identities of the trials, can be any number of groups, accepts integers and strings
-    classifier : scikit-learn object
-        which decoder to use, for example Gaussian with Multinomial likelihood:
-                    from sklearn.naive_bayes import MultinomialNB
-                    classifier = MultinomialNB()
-    cross_validation : None or scikit-learn object
-        which cross-validation method to use, for example 5-fold:
-                    from sklearn.model_selection import KFold
-                    cross_validation = KFold(n_splits=5)
-
-    Returns
-    -------
-
-    """
-
-    # Check input
-    assert population_activity.shape[0] == trial_labels.shape[0]
-
-    if cross_validation is None:
-        # Fit the model on all the data
-        classifier.fit(population_activity, trial_labels)
-        pred = classifier.predict(population_activity)
-        prob = classifier.predict_proba(population_activity)
-        prob = prob[:, 1]
-    else:
-        pred = np.empty(trial_labels.shape[0])
-        prob = np.empty(trial_labels.shape[0])
-        for train_index, test_index in cross_validation.split(population_activity):
-            # Fit the model to the training data and predict the held-out test data
-            classifier.fit(population_activity[train_index], trial_labels[train_index])
-            pred[test_index] = classifier.predict(population_activity[test_index])
-            proba = classifier.predict_proba(population_activity[test_index])
-            prob[test_index] = proba[:, 1]
-
-    # Calcualte accuracy
-    accuracy = accuracy_score(trial_labels, pred)
-    return accuracy, pred, prob
-
-
-def regress(population_activity, trial_targets, cross_validation=None):
-    """
-    Perform linear regression to predict a continuous variable from neural data
-
-    Parameters
-    ----------
-    population_activity : 2D array (trials x neurons)
-        population activity of all neurons in the population for each trial.
-    trial_targets : 1D or 2D array
-        the decoding target per trial as a continuous variable
-    pre_time : float
-        time (in seconds) preceding the event times
-    post_time : float
-        time (in seconds) following the event times
-    cross_validation : None or scikit-learn object
-        which cross-validation method to use, for example 5-fold:
-                    from sklearn.model_selection import KFold
-                    cross_validation = KFold(n_splits=5)
-
-    Returns
-    -------
-    pred : 1D array
-        array with predictions
-    """
-
-    reg = LinearRegression()
-
-    if cross_validation is None:
-        # Fit the model on all the data
-        reg.fit(population_activity, trial_targets)
-        pred = reg.predict(population_activity)
-    else:
-        pred = np.empty(trial_targets.shape[0])
-        for train_index, test_index in cross_validation.split(population_activity):
-            # Fit the model to the training data and predict the held-out test data
-            reg.fit(population_activity[train_index], trial_targets[train_index])
-            pred[test_index] = reg.predict(population_activity[test_index])
-    return pred
 
 
 def query_sessions(selection='all', return_subjects=False):
@@ -218,13 +168,16 @@ def sessions_with_region(brain_region):
     return sessions
 
 
-def combine_layers_cortex(regions, delete_duplicates=False):
+def combine_layers_cortex(regions):
+    """
+    Combine all layers of cortex
+    """
     remove = ['1', '2', '3', '4', '5', '6a', '6b', '/']
     for i, region in enumerate(regions):
+        if region[:2] == 'CA':
+            continue
         for j, char in enumerate(remove):
             regions[i] = regions[i].replace(char, '')
-    if delete_duplicates:
-        regions = list(set(regions))
     return regions
 
 
@@ -280,47 +233,26 @@ def get_eid_list():
     return eids
 
 
-def load_opto_trials(eid, download=False, invert_choice=False):
-    if download:
-        _ = one.load(eid, dataset_types=['trials.probabilityLeft', 'trials.contrastLeft',
-                                         'trials.contrastRight', 'trials.feedbackType',
-                                         'trials.choice', '_ibl_trials.laser_stimulation'],
-                     download_only=True, clobber=True)
-    ses_path = one.path_from_eid(eid)
-    trials = pd.DataFrame(alf.io.load_object(join(ses_path, 'alf'), 'trials'))
-    trials['signed_contrast'] = trials['contrastRight']
-    trials.loc[trials['signed_contrast'].isnull(), 'signed_contrast'] = -trials['contrastLeft']
-    trials['correct'] = trials['feedbackType']
-    trials.loc[trials['correct'] == -1, 'correct'] = 0
-    trials['right_choice'] = -trials['choice']
-    trials.loc[trials['right_choice'] == -1, 'right_choice'] = 0
-    trials['stim_side'] = (trials['signed_contrast'] > 0).astype(int)
-    trials.loc[trials['stim_side'] == 0, 'stim_side'] = -1
-    trials.loc[(trials['signed_contrast'] == 0) & (trials['contrastLeft'].isnull()),
-               'stim_side'] = 1
-    trials.loc[(trials['signed_contrast'] == 0) & (trials['contrastRight'].isnull()),
-               'stim_side'] = -1
-    if invert_choice:
-        trials['choice'] = trials['choice'] + 2
-        trials.loc[trials['choice'] == 3] = -1
-    return trials
-
-
-def criteria_opto_eids(eids, download_trials=False, max_lapse=0.2, max_bias=0.2, min_trials=200):
+def criteria_opto_eids(eids, max_lapse=0.2, max_bias=0.3, min_trials=200):
     use_eids = []
     for j, eid in enumerate(eids):
         try:
-            trials = load_opto_trials(eid, download_trials)
+            trials = load_trials(eid, laser_stimulation=True)
             lapse_l = 1 - (np.sum(trials.loc[trials['signed_contrast'] == -1, 'choice'] == 1)
                            / trials.loc[trials['signed_contrast'] == -1, 'choice'].shape[0])
             lapse_r = 1 - (np.sum(trials.loc[trials['signed_contrast'] == 1, 'choice'] == -1)
                            / trials.loc[trials['signed_contrast'] == 1, 'choice'].shape[0])
             bias = np.abs(0.5 - (np.sum(trials.loc[trials['signed_contrast'] == 0, 'choice'] == 1)
                                  / np.shape(trials.loc[trials['signed_contrast'] == 0, 'choice'] == 1)[0]))
-
+            details = one.get_details(eid)
             if ((lapse_l < max_lapse) & (lapse_r < max_lapse) & (trials.shape[0] > min_trials)
                     & (bias < max_bias) & ('laser_stimulation' in trials.columns)):
                 use_eids.append(eid)
+            elif 'laser_stimulation' not in trials.columns:
+                print('No laser_stimulation data for %s %s' % (details['subject'], details['start_time'][:10]))
+            else:
+                print('%s %s excluded (n_trials: %d, lapse_l: %.2f, lapse_r: %.2f, bias: %.2f)'
+                      % (details['subject'], details['start_time'][:10], trials.shape[0], lapse_l, lapse_r, bias))
         except Exception:
             print('Could not load session %s' % eid)
     return use_eids
@@ -459,6 +391,7 @@ def fit_prob_choice_model(trials, previous_trials=6):
 
 
 def fit_psytrack(trials, previous_trials=0):
+    from psytrack.hyperOpt import hyperOpt
 
     # Load data
     contrast_l = trials['contrastLeft'].values

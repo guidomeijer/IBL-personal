@@ -11,12 +11,11 @@ from os.path import join
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from my_functions import load_opto_trials, plot_psychometric, paths, criteria_opto_eids
+from my_functions import load_trials, plot_psychometric, paths, criteria_opto_eids
 from oneibl.one import ONE
 one = ONE()
 
 # Settings
-DOWNLOAD_TRIALS = False
 _, fig_path, _ = paths()
 fig_path = join(fig_path, '5HT', 'opto-behavior')
 
@@ -26,13 +25,13 @@ for i, nickname in enumerate(subjects['subject']):
 
     # Query sessions
     eids = one.search(subject=nickname, task_protocol='_iblrig_tasks_opto_biasedChoiceWorld')
-    eids = criteria_opto_eids(eids, download_trials=DOWNLOAD_TRIALS)
+    eids = criteria_opto_eids(eids)
 
     # Get trials DataFrame
     trials = pd.DataFrame()
     ses_count = 0
     for j, eid in enumerate(eids):
-        these_trials = load_opto_trials(eid, DOWNLOAD_TRIALS)
+        these_trials = load_trials(eid, laser_stimulation=True)
         these_trials['session'] = ses_count
         trials = trials.append(these_trials, ignore_index=True)
         ses_count = ses_count + 1
