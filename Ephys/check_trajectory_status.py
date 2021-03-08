@@ -12,14 +12,14 @@ one = ONE()
 
 traj_id = 'f06d6cd9-a6b8-49a4-90d1-7905d04c2f8b'
 
-traj = one.alyx.rest('trajectories', 'list', probe_insertion=traj_id)
+traj = one.alyx.rest('trajectories', 'list', id=traj_id)
 eid = traj[0]['session']['id']
 trials_all = one.load_object(eid, 'trials')
 trials = dict()
 trials['temp_key'] = trials_all
 perf_easy, n_trials, _, _, _ = training.compute_bias_info(trials, trials_all)
 print('Performance: %.1f%%, Number of trials: %d' % (perf_easy * 100, n_trials))
-fail_behav = one.alyx.rest('trajectories', 'list', provenance='Planned', probe_insertion=traj_id,
+fail_behav = one.alyx.rest('trajectories', 'list', provenance='Planned', id=traj_id,
                            django='probe_insertion__session__extended_qc__behavior,0')
 if len(fail_behav) > 0:
     print("Behavior criterion FAILED")
