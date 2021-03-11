@@ -26,8 +26,8 @@ one = ONE()
 
 # Settings
 REMOVE_OLD_FIT = False
-OVERWRITE = True
-TARGET = 'prior-stimside'  # block, stim-side. reward or choice
+OVERWRITE = False
+TARGET = 'prior-prevaction'  # block, stim-side. reward or choice
 MIN_NEURONS = 5  # min neurons per region
 DECODER = 'linear-regression'
 VALIDATION = 'kfold'
@@ -116,7 +116,6 @@ for i, subject in enumerate(np.unique(subjects)):
             spikes, clusters, channels = bbone.load_spike_sorting_with_channel(
                                                                         eid, aligned=True, one=one)
             trials = load_trials(eid)
-            skdfjh
         except Exception as error_message:
             print(error_message)
             continue
@@ -212,8 +211,11 @@ for i, subject in enumerate(np.unique(subjects)):
                 r_prior_pseudo = np.empty(ITERATIONS)
                 r_block_pseudo = np.empty(ITERATIONS)
                 for k in range(ITERATIONS):
-                    pseudo_trials = generate_pseudo_session(trials, generate_choices=False)
-                    pseudo_trials['choice'] = np.nan
+                    if TARGET == 'prior-stimside':
+                        pseudo_trials = generate_pseudo_session(trials, generate_choices=False)
+                        pseudo_trials['choice'] = np.nan
+                    elif TARGET == 'prior-prevaction':
+                        pseudo_trials = generate_pseudo_session(trials, generate_choices=True)
                     stim_side, stimuli, actions, prob_left = utils.format_data(pseudo_trials)
                     p_priors = model.compute_prior(np.array(actions), np.array(stimuli),
                                                    np.array(stim_side),

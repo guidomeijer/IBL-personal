@@ -15,6 +15,7 @@ from sklearn.linear_model import LinearRegression
 import pandas as pd
 import alf
 from os.path import join
+from brainbox.numerical import ismember
 from ibllib.atlas import BrainRegions
 from oneibl.one import ONE
 one = ONE()
@@ -50,14 +51,18 @@ def load_trials(eid, laser_stimulation=False, invert_choice=False):
     if laser_stimulation:
         (trials['stimOn_times'], trials['feedback_times'], trials['goCue_times'],
          trials['probabilityLeft'], trials['contrastLeft'], trials['contrastRight'],
-         trials['feedbackType'], trials['choice'], trials['laser_stimulation']) = one.load(
+         trials['feedbackType'], trials['choice'], trials['laser_stimulation'],
+         trials['laser_probability']) = one.load(
                              eid, dataset_types=['trials.stimOn_times', 'trials.feedback_times',
                                                  'trials.goCue_times', 'trials.probabilityLeft',
                                                  'trials.contrastLeft', 'trials.contrastRight',
                                                  'trials.feedbackType', 'trials.choice',
-                                                 '_ibl_trials.laser_stimulation'])
+                                                 '_ibl_trials.laser_stimulation',
+                                                 '_ibl_trials.laser_probability'])
         if trials.loc[0, 'laser_stimulation'] is None:
             trials = trials.drop(columns=['laser_stimulation'])
+        if trials.loc[0, 'laser_probability'] is None:
+            trials = trials.drop(columns=['laser_probability'])
     else:
        (trials['stimOn_times'], trials['feedback_times'], trials['goCue_times'],
          trials['probabilityLeft'], trials['contrastLeft'], trials['contrastRight'],
@@ -103,6 +108,12 @@ def check_trials(trials):
         print('stimOn_times do not match with probabilityLeft')
         return False
     return True
+
+
+def remap(ids, source='Allen', dest='Beryl'):
+    br = BrainRegions()
+    _, inds = ismember(ids, br.id[br.mappings[source]])
+    return br.id[br.mappings[dest][inds]]
 
 
 def query_sessions(selection='all', return_subjects=False):
@@ -306,7 +317,7 @@ def plot_psychometric(trials, ax, **kwargs):
            yticks=[0, 0.25, 0.5, 0.75, 1], yticklabels=['0', '25', '50', '75', '100'],
            ylabel='Right choices', xlabel='Contrast (%)')
     ax.set_xticklabels(['-100', '-25', '-12.5', '0', '12.5', '25', '100'],
-                       size='small', rotation=60)
+                       size='small')
     break_xaxis()
 
 
