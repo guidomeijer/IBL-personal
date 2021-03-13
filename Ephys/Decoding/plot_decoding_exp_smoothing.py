@@ -21,7 +21,7 @@ DECODER = 'linear-regression'
 INCL_NEURONS = 'all'
 INCL_SESSIONS = 'aligned-behavior'
 VALIDATION = 'kfold-interleaved'
-ATLAS = 'allen-atlas'
+ATLAS = 'beryl-atlas'
 SHOW_REGIONS = 40
 #SHOW_REGIONS = 'significant'
 MIN_REC = 5
@@ -52,7 +52,6 @@ if PARENT_REGIONS:
     decoding_result['full_region'] = get_parent_region_name(decoding_result['region'].values)
 else:
     decoding_result['full_region'] = get_full_region_name(decoding_result['region'].values)
-
 
 # Exclude ventricles
 decoding_result = decoding_result.reset_index(drop=True)
@@ -96,6 +95,17 @@ else:
 figure_style(font_scale=1.8)
 f = plt.figure(figsize=(30, 20), dpi=150)
 gs = f.add_gridspec(3, 4)
+if TARGET == 'prior-prevaction':
+    target_str = 'previous actions'
+elif TARGET == 'prior-stimsides':
+    target_str = 'stimulus sides'
+if VALIDATION == 'kfold':
+    val_str = 'continuous 5-fold'
+elif VALIDATION == 'kfold-interleaved':
+    val_str = 'interleaved 5-fold'
+f.suptitle('Decoding of %s using linear regression with %s cross-validation' % (
+    target_str, val_str), fontsize=25)
+
 ax1 = f.add_subplot(gs[:, 0])
 if FULL_NAME:
     sort_regions = decoding_plot.groupby('full_region').max().sort_values(
@@ -117,86 +127,91 @@ else:
 ax1.plot([0, 0], ax1.get_ylim(), color=[0.5, 0.5, 0.5], ls='--')
 ax1.set(xlabel='Decoding improvement over chance (r)', ylabel='',
         xlim=YLIM)
-if TARGET == 'prior-prevaction':
-    ax1.set(title='Decoding of stimulus prior (exp. smoothing actions model)')
-elif TARGET == 'prior-stimside':
-    ax1.set(title='Decoding of stimulus prior (exp. smoothing stimulus sides model)')
 
 ax2 = f.add_subplot(gs[0, 1])
 ax2.hist(decoding_result.groupby('region').mean()['r_prior'], bins=30)
-ax2.set(ylabel='Recordings', xlabel='Decoding performance (r)')
+ax2.set(ylabel='Recordings', xlabel='r', title='Decoding performance')
 
 ax3 = f.add_subplot(gs[0, 2])
 ax3.hist(decoding_result['r_prior_null'], bins=30)
-ax3.set(ylabel='Recordings', xlabel='Chance level decoding (r)')
+ax3.set(ylabel='Recordings', xlabel='r', title='Decoding of pseudo-sessions')
 
 ax4 = f.add_subplot(gs[0, 3])
 ax4.hist(decoding_result['r_mean_prior'], bins=30)
-ax4.set(ylabel='Recordings', xlabel='Decoding improvement over chance (r)')
+ax4.set(ylabel='Recordings', xlabel='r', title='Decoding improvement over pseudo-sessions')
 
 ax5 = f.add_subplot(gs[1, 1])
 tau = decoding_result.groupby('subject').mean()['tau']
 tau = tau[tau < 30]
 ax5.hist(tau, bins=30)
-ax5.set(ylabel='Mice', xlabel='Length of integration window (tau)', xlim=[0, 30])
+ax5.set(ylabel='Mice', xlabel='tau', title='Length of integration window', xlim=[0, 30])
 
 ax6 = f.add_subplot(gs[1, 2])
 ax6.scatter(decoding_result['r_mean_block'], decoding_result['r_mean_prior'])
 ax6.plot([-0.5, 0.5], [-0.5, 0.5], color='k', lw=2, ls='--')
 _, p = ttest_rel(decoding_result['r_mean_prior'].unique(), decoding_result['r_mean_block'].unique())
-ax6.set(ylabel='Prior decoding over chance (r)', xlabel='Block decoding over chance (r)',
-        title='Averaged over recordings (paired t-test, p=%.2f)' % p,
+ax6.set(ylabel='Decoding %s\n(r over chance)' % target_str, xlabel='Decoding actual prior (r over chance)',
+        title='Averaged per region\n(paired t-test, p=%.2f)' % p,
         xlim=[-0.2, 0.4], ylim=[-0.2, 0.4])
 
+"""
 ax7 = f.add_subplot(gs[1, 3])
 sns.kdeplot(x='r_over_chance_block', y='r_over_chance_prior', data=decoding_result, fill=True, ax=ax7)
 #ax7.scatter(decoding_result['r_over_chance_block'], decoding_result['r_over_chance_prior'])
 ax7.plot([-0.5, 0.5], [-0.5, 0.5], color='k', lw=2)
 _, p = ttest_rel(decoding_result['r_over_chance_prior'], decoding_result['r_over_chance_block'])
-ax7.set(ylabel='Prior decoding over chance (r)', xlabel='Block decoding over chance (r)',
-        xlim=[-0.2, 0.4], ylim=[-0.2, 0.4], title='r pior=%.3f, r block=%.3f, p=%.2f' % (
-            decoding_result['r_mean_prior'].unique().mean(), decoding_result['r_mean_block'].unique().mean(), p))
+ax7.set(ylabel='Decoding %s\n(r over chance)' % target_str, xlabel='Decoding actual prior (r over chance)',
+        xlim=[-0.2, 0.4], ylim=[-0.2, 0.4], title='All recordings per region\n(paired t-test, p=%.3f)' % p)
+"""
 
-ax8 = f.add_subplot(gs[2, 1])
-ax8.hist(decoding_result['n_neurons'], bins=100)
-ax8.set(ylabel='Recordings', xlabel='Number of neurons', xlim=[0, 300])
+ax7 = f.add_subplot(gs[1, 3])
+ax7.hist(decoding_result['n_neurons'], bins=100)
+ax7.set(ylabel='Recordings', title='Number of neurons per region', xlim=[0, 300])
 
 max_neurons = 150
-ax9 = f.add_subplot(gs[2, 2])
-# ax7.scatter(decoding_result.groupby('region')['n_neurons'].mean(),
-#             decoding_result.groupby('region')['r_over_chance_prior'].mean())
-# ax7.scatter(decoding_result['n_neurons'], decoding_result['r_over_chance_prior'])
-ax9.scatter(decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'n_neurons'],
-            decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_mean_prior'])
-# sns.kdeplot(x='n_neurons', y='r_over_chance_prior', data=decoding_result, fill=True)
-m, b = np.polyfit(decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'n_neurons'],
-                  decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_mean_prior'], 1)
-ax9.plot(np.arange(decoding_result['n_neurons'].max()),
-         m*np.arange(decoding_result['n_neurons'].max()) + b,
-         lw=2, color='k')
-r, p = pearsonr(decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'n_neurons'],
-                decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_mean_prior'])
-ax9.set(ylabel='Decoding improvement over chance (r)', xlabel='Number of neurons',
-        title='Averaged per area (r=%.3f, p=%.3f)' % (r, p), xlim=[0, max_neurons], ylim=[-0.4, 0.6])
-
-ax10 = f.add_subplot(gs[2, 3])
-# ax7.scatter(decoding_result.groupby('region')['n_neurons'].mean(),
-#             decoding_result.groupby('region')['r_over_chance_prior'].mean())
-# ax7.scatter(decoding_result['n_neurons'], decoding_result['r_over_chance_prior'])
-ax10.scatter(decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'n_neurons'],
-             decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_over_chance_prior'])
-# sns.kdeplot(x='n_neurons', y='r_over_chance_prior', data=decoding_result, fill=True)
+ax8 = f.add_subplot(gs[2, 1])
+ax8.scatter(decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'n_neurons'],
+            decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_over_chance_prior'])
 m, b = np.polyfit(decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'n_neurons'],
                   decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_over_chance_prior'], 1)
-ax10.plot(np.arange(decoding_result['n_neurons'].max()),
+ax8.plot(np.arange(decoding_result['n_neurons'].max()),
          m*np.arange(decoding_result['n_neurons'].max()) + b,
          lw=2, color='k')
 r, p = pearsonr(decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'n_neurons'],
                 decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_over_chance_prior'])
-ax10.set(ylabel='Decoding improvement over chance (r)', xlabel='Number of neurons',
-        title='All recordings per area (r=%.3f, p=%.3f)' % (r, p), xlim=[0, max_neurons], ylim=[-0.4, 0.6])
+ax8.set(ylabel='Decoding %s (r)' % target_str, xlabel='Number of neurons',
+        title='Decoding improvement over chance\n(Pearson, r=%.2f, p=%.2f)' % (r, p), xlim=[0, max_neurons],
+        ylim=[-0.5, 1])
 
-plt.tight_layout(pad=3)
+ax9 = f.add_subplot(gs[2, 2])
+ax9.scatter(decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'n_neurons'],
+            decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_prior'])
+m, b = np.polyfit(decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'n_neurons'],
+                  decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_prior'], 1)
+ax9.plot(np.arange(decoding_result['n_neurons'].max()),
+         m*np.arange(decoding_result['n_neurons'].max()) + b,
+         lw=2, color='k')
+r, p = pearsonr(decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'n_neurons'],
+                decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_prior'])
+ax9.set(ylabel='Decoding %s (r)' % target_str, xlabel='Number of neurons',
+        title='Decoding performance\n(Pearson, r=%.2f, p=%.2f)' % (r, p), xlim=[0, max_neurons],
+        ylim=[-0.5, 1])
+
+ax10 = f.add_subplot(gs[2, 3])
+ax10.scatter(decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'n_neurons'],
+             decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_prior_train'])
+m, b = np.polyfit(decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'n_neurons'],
+                  decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_prior_train'], 1)
+ax10.plot(np.arange(decoding_result['n_neurons'].max()),
+         m*np.arange(decoding_result['n_neurons'].max()) + b,
+         lw=2, color='k')
+r, p = pearsonr(decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'n_neurons'],
+                decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_prior_train'])
+ax10.set(ylabel='Decoding %s (r)' % target_str, xlabel='Number of neurons',
+        title='Decoding perf. on training set\n(Pearson, r=%.2f, p=%.2f)' % (r, p), xlim=[0, max_neurons],
+        ylim=[-0.5, 1])
+
+plt.tight_layout(pad=4)
 sns.despine(trim=False)
 
 if SAVE_FIG:

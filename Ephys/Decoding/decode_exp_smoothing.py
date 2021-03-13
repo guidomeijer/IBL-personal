@@ -21,8 +21,8 @@ import brainbox.io.one as bbone
 from oneibl.one import ONE
 from ibllib.atlas import BrainRegions
 from brainbox.numerical import ismember
-br = BrainRegions()
 one = ONE()
+br = BrainRegions()
 
 # Settings
 REMOVE_OLD_FIT = False
@@ -30,10 +30,10 @@ OVERWRITE = False
 TARGET = 'prior-prevaction'  # block, stim-side. reward or choice
 MIN_NEURONS = 5  # min neurons per region
 DECODER = 'linear-regression'
-VALIDATION = 'kfold'
+VALIDATION = 'kfold-interleaved'
 INCL_NEURONS = 'all'  # all or pass-QC
 INCL_SESSIONS = 'aligned-behavior'  # all, aligned, resolved, aligned-behavior or resolved-behavior
-ATLAS = 'allen-atlas'
+ATLAS = 'beryl-atlas'
 NUM_SPLITS = 5
 CHANCE_LEVEL = 'pseudo'  # pseudo, phase-rand, shuffle or none
 ITERATIONS = 50  # for null distribution estimation
@@ -199,8 +199,10 @@ for i, subject in enumerate(np.unique(subjects)):
                     these_priors = priors
                 else:
                     these_priors = priors[j][:population_activity.shape[0]]
-                pred_prior = regress(population_activity, these_priors, cross_validation=cv)
+                pred_prior, pred_prior_train = regress(population_activity, these_priors,
+                                                       cross_validation=cv, return_training=True)
                 r_prior = pearsonr(these_priors, pred_prior)[0]
+                r_prior_train = pearsonr(these_priors, pred_prior_train)[0]
 
                 # Decode block identity
                 pred_block = regress(population_activity, trials['probabilityLeft'],
@@ -209,6 +211,7 @@ for i, subject in enumerate(np.unique(subjects)):
 
                 # Estimate chance level
                 r_prior_pseudo = np.empty(ITERATIONS)
+                r_prior_train_pseudo = np.empty(ITERATIONS)
                 r_block_pseudo = np.empty(ITERATIONS)
                 for k in range(ITERATIONS):
                     if TARGET == 'prior-stimside':
@@ -222,8 +225,10 @@ for i, subject in enumerate(np.unique(subjects)):
                                                    parameter_type='posterior_mean')[0]
 
                     # Decode prior
-                    p_pred_prior = regress(population_activity, p_priors, cross_validation=cv)
+                    p_pred_prior, p_pred_prior_train = regress(population_activity, p_priors,
+                                                               cross_validation=cv, return_training=True)
                     r_prior_pseudo[k] = pearsonr(p_priors, p_pred_prior)[0]
+                    r_prior_train_pseudo[k] = pearsonr(p_priors, p_pred_prior_train)[0]
 
                     # Decode pseudo block identity
                     p_pred_block = regress(population_activity, prob_left, cross_validation=cv)
@@ -241,8 +246,10 @@ for i, subject in enumerate(np.unique(subjects)):
                                      'probe': probe,
                                      'region': region,
                                      'r_prior': r_prior,
+                                     'r_prior_train': r_prior_train,
                                      'r_block': r_block,
                                      'r_prior_null': r_prior_pseudo.mean(),
+                                     'r_prior_train_null': r_prior_train_pseudo.mean(),
                                      'r_block_null': r_block_pseudo.mean(),
                                      'p_prior': p_prior,
                                      'p_block': p_block,
