@@ -14,28 +14,20 @@ import brainbox as bb
 import pandas as pd
 import numpy as np
 import seaborn as sns
-from functions_5HT import download_data, paths, sessions
+from my_functions import paths, load_trials, sessions_with_region
 
-DOWNLOAD = False
-OVERWRITE = True
-FRONTAL_CONTROL = 'Frontal'
+REGION = 'SCm'
 TRIAL_CENTERS = np.arange(-10, 21, 3)
 TRIAL_WIN = 5
 PRE_TIME = 0.6
 POST_TIME = -0.1
 BASELINE_TRIAL_WIN = 10
 
-if FRONTAL_CONTROL == 'Frontal':
-    sessions, _ = sessions()
-elif FRONTAL_CONTROL == 'Control':
-    _, sessions = sessions()
+ses = sessions_with_region(REGION)
 
 DATA_PATH, FIG_PATH, _ = paths()
 FIG_PATH = join(FIG_PATH, 'PSTH', 'BlockSwitch')
-for i in range(sessions.shape[0]):
-    # Download data if required
-    if DOWNLOAD is True:
-        download_data(sessions.loc[i, 'subject'], sessions.loc[i, 'date'])
+for i in range(len(ses)):
 
     # Get paths
     ses_nr = listdir(join(DATA_PATH, sessions.loc[i, 'lab'], 'Subjects',

@@ -110,10 +110,14 @@ def check_trials(trials):
     return True
 
 
-def remap(ids, source='Allen', dest='Beryl'):
+def remap(ids, source='Allen', dest='Beryl', output='acronym'):
     br = BrainRegions()
     _, inds = ismember(ids, br.id[br.mappings[source]])
-    return br.id[br.mappings[dest][inds]]
+    ids = br.id[br.mappings[dest][inds]]
+    if output == 'id':
+        return br.id[br.mappings[dest][inds]]
+    elif output == 'acronym':
+        return br.get(br.id[br.mappings[dest][inds]])['acronym']
 
 
 def query_sessions(selection='all', return_subjects=False):
@@ -167,9 +171,13 @@ def query_sessions(selection='all', return_subjects=False):
         return eids, probes
 
 
-def sessions_with_region(brain_region):
+def sessions_with_region(acronym):
     from oneibl.one import ONE
     one = ONE()
+
+    traj = one.alyx.rest('trajectories', 'list',
+                        django='channels__brain_region__acronym,CP')
+
 
     # Query sessions with at least one channel in the specified region
     sessions = one.alyx.rest('sessions', 'list', atlas_acronym=brain_region,
