@@ -19,17 +19,17 @@ DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Ephys', 'Decoding')
 FULL_NAME = True
 PARENT_REGIONS = False
-LABEL_A = 'Stimulus sides'
-LABEL_B = 'Actions'
-TITLE_STR = 'Comparison of decoding of previous stimulus sides vs actions'
-SAVE_STR = 'stim-sides_vs_actions'
+LABEL_A = 'Decoding of previous actions model'
+LABEL_B = 'Percentage of block neurons'
+TITLE_STR = 'Comparison of decoding vs percentage of neurons'
+SAVE_STR = 'perc_block_neurons_vs_decoding_actions'
 
 # %% Plot
 # Load in data
 method_a = pd.read_pickle(join(SAVE_PATH, 'Ephys', 'Decoding', 'linear-regression',
-                            'prior-stimside_pseudo_kfold-interleaved_aligned-behavior_all_cells_beryl-atlas.p'))
+                            'prior-prevaction_pseudo_kfold_aligned-behavior_all_cells_beryl-atlas.p'))
 method_b = pd.read_pickle(join(SAVE_PATH, 'Ephys', 'Decoding', 'linear-regression',
-                            'prior-prevaction_pseudo_kfold-interleaved_aligned-behavior_all_cells_beryl-atlas.p'))
+                            'prior-stimside_pseudo_kfold_aligned-behavior_all_cells_beryl-atlas.p'))
 
 # Get decoding performance over chance
 method_a['r_over_chance'] = (method_a['r_prior'] - method_a['r_prior_null'])

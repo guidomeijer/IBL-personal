@@ -20,7 +20,7 @@ fig_path = join(paths()[1], '5HT', 'switch_neurons_brainwide')
 save_path = join(paths()[2], '5HT')
 
 MIN_REC = 5
-SHOW_REGIONS = 12
+SHOW_REGIONS = 10
 
 # Load in results
 results_df = pd.read_csv(join(save_path, 'switch_neurons.csv'))
@@ -47,3 +47,4 @@ sns.pointplot(x='percentage', y='full_region', data=plot_df,
             order=sort_regions, ci=68, join=False, estimator=np.median, color='k', ax=ax1)
 ax1.set(xlabel='Percentage switch neurons', ylabel='')
 plt.tight_layout()
+plt.savefig(join(fig_path, '_%_switch_neurons_per_region'))

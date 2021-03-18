@@ -31,7 +31,7 @@ ATLAS = 'beryl-atlas'
 MIN_NEURONS = 5
 MIN_CONTRAST = 0.1
 PRE_TRIALS = 2
-POST_TRIALS = 5
+POST_TRIALS = 8
 PRE_TIME = 0
 POST_TIME = 0.3
 
@@ -88,8 +88,7 @@ for i in range(len(eids)):
 
         # Get list of brain regions
         if ATLAS == 'beryl-atlas':
-            mapped_br = br.get(ids=remap(clusters[probe]['atlas_id']))
-            clusters_regions = mapped_br['acronym']
+            clusters_regions = remap(clusters[probe]['atlas_id'])
         elif ATLAS == 'allen-atlas':
             clusters_regions = combine_layers_cortex(clusters[probe]['acronym'])
 
