@@ -20,19 +20,22 @@ CHANCE_LEVEL = 'pseudo'
 DECODER = 'linear-regression'
 INCL_NEURONS = 'all'
 INCL_SESSIONS = 'aligned-behavior'
-VALIDATION = 'kfold-interleaved'
+VALIDATION = 'kfold'
 ATLAS = 'beryl-atlas'
-SHOW_REGIONS = 40
+SHOW_REGIONS = 10
 #SHOW_REGIONS = 'significant'
-MIN_REC = 5
+MIN_REC = 6
 MIN_TOTAL_NEURONS = 0
 MAX_TAU = 30
 YLIM = [-.2, .51]
+DPI = 80
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Ephys', 'Decoding')
 FULL_NAME = True
 PARENT_REGIONS = False
 SAVE_FIG = True
+BLOCK = False
+OVER_CHANCE = False
 
 # %% Plot
 # Load in data
@@ -42,10 +45,20 @@ decoding_result = pd.read_pickle(join(SAVE_PATH, 'Ephys', 'Decoding', DECODER,
 
 
 # Get decoding performance over chance
-decoding_result['r_over_chance_prior'] = (decoding_result['r_prior']
-                                          - decoding_result['r_prior_null'])
-decoding_result['r_over_chance_block'] = (decoding_result['r_block']
-                                          - decoding_result['r_block_null'])
+if OVER_CHANCE:
+    decoding_result['r_prior_plot'] = decoding_result['r_prior'] - decoding_result['r_prior_null']
+    if BLOCK:
+        decoding_result['r_block_plot'] = (decoding_result['r_block']
+                                           - decoding_result['r_block_null'])
+    else:
+        decoding_result['r_block_plot'] = decoding_result['r_prior_plot']
+else:
+    decoding_result['r_prior_plot'] = decoding_result['r_prior']
+    if BLOCK:
+        decoding_result['r_block_plot'] = decoding_result['r_block']
+    else:
+        decoding_result['r_block_plot'] = decoding_result['r_prior']
+
 
 # Get full region names
 if PARENT_REGIONS:
@@ -63,14 +76,14 @@ decoding_result = decoding_result[decoding_result['tau'] <= MAX_TAU]
 # Calculate average decoding performance per region
 for i, region in enumerate(decoding_result['region'].unique()):
     decoding_result.loc[decoding_result['region'] == region, 'r_mean_prior'] = decoding_result.loc[
-                            decoding_result['region'] == region, 'r_over_chance_prior'].median()
+                            decoding_result['region'] == region, 'r_prior_plot'].median()
     decoding_result.loc[decoding_result['region'] == region, 'r_mean_block'] = decoding_result.loc[
-                            decoding_result['region'] == region, 'r_over_chance_block'].median()
+                            decoding_result['region'] == region, 'r_block_plot'].median()
     decoding_result.loc[decoding_result['region'] == region, 'n_rec'] = np.sum(
                                                             decoding_result['region'] == region)
     decoding_result.loc[decoding_result['region'] == region, 'n_total_neurons'] = decoding_result.loc[
                             decoding_result['region'] == region, 'n_neurons'].sum()
-    _, p = wilcoxon(decoding_result.loc[decoding_result['region'] == region, 'r_over_chance_prior'])
+    _, p = wilcoxon(decoding_result.loc[decoding_result['region'] == region, 'r_prior_plot'])
     decoding_result.loc[decoding_result['region'] == region, 'p_value'] = p
 
 # Print some summaries
@@ -93,11 +106,11 @@ else:
                                   >= decoding_plot['r_mean_prior'].unique()[SHOW_REGIONS - 1]]
 
 figure_style(font_scale=1.8)
-f = plt.figure(figsize=(30, 20), dpi=150)
+f = plt.figure(figsize=(30, 20), dpi=DPI)
 gs = f.add_gridspec(3, 4)
-if TARGET == 'prior-prevaction':
+if 'prior-prevaction' in TARGET:
     target_str = 'previous actions'
-elif TARGET == 'prior-stimsides':
+elif 'prior-stimsides' in TARGET:
     target_str = 'stimulus sides'
 if VALIDATION == 'kfold':
     val_str = 'continuous 5-fold'
@@ -115,26 +128,31 @@ if FULL_NAME:
                 order=sort_regions, ci=68, facecolor=(1, 1, 1, 0), errcolor=".2", edgecolor=".2",
                 ax=ax1)
     """
-    sns.stripplot(x='r_over_chance_prior', y='full_region', data=decoding_plot,
+    sns.stripplot(x='r_prior_plot', y='full_region', data=decoding_plot,
                 order=sort_regions, s=6, ax=ax1)
-    sns.pointplot(x='r_over_chance_prior', y='full_region', data=decoding_plot,
+    sns.pointplot(x='r_prior_plot', y='full_region', data=decoding_plot,
                 order=sort_regions, ci=68, join=False, estimator=np.median, color='k', ax=ax1)
 else:
     sort_regions = decoding_plot.groupby('region').mean().sort_values(
                             'r_mean_prior', ascending=False).reset_index()['region']
-    sns.barplot(x='r_over_chance_prior', y='region', data=decoding_plot,
+    sns.barplot(x='r_prior_plot', y='region', data=decoding_plot,
                 order=sort_regions, ci=68, ax=ax1)
+
 ax1.plot([0, 0], ax1.get_ylim(), color=[0.5, 0.5, 0.5], ls='--')
-ax1.set(xlabel='Decoding improvement over chance (r)', ylabel='',
-        xlim=YLIM)
+if OVER_CHANCE:
+    str_xlabel = 'Decoding improvement\nover pseudo sessions (r)'
+else:
+    str_xlabel = 'Decoding performance (r)'
+ax1.set(xlabel=str_xlabel, ylabel='', xlim=YLIM)
 
 ax2 = f.add_subplot(gs[0, 1])
 ax2.hist(decoding_result.groupby('region').mean()['r_prior'], bins=30)
 ax2.set(ylabel='Recordings', xlabel='r', title='Decoding performance')
 
 ax3 = f.add_subplot(gs[0, 2])
-ax3.hist(decoding_result['r_prior_null'], bins=30)
-ax3.set(ylabel='Recordings', xlabel='r', title='Decoding of pseudo-sessions')
+if not np.isnan(decoding_result['r_prior_null'][0]):
+    ax3.hist(decoding_result['r_prior_null'], bins=30)
+    ax3.set(ylabel='Recordings', xlabel='r', title='Decoding of pseudo-sessions')
 
 ax4 = f.add_subplot(gs[0, 3])
 ax4.hist(decoding_result['r_mean_prior'], bins=30)
@@ -171,14 +189,14 @@ ax7.set(ylabel='Recordings', title='Number of neurons per region', xlim=[0, 300]
 max_neurons = 150
 ax8 = f.add_subplot(gs[2, 1])
 ax8.scatter(decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'n_neurons'],
-            decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_over_chance_prior'])
+            decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_prior_plot'])
 m, b = np.polyfit(decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'n_neurons'],
-                  decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_over_chance_prior'], 1)
+                  decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_prior_plot'], 1)
 ax8.plot(np.arange(decoding_result['n_neurons'].max()),
          m*np.arange(decoding_result['n_neurons'].max()) + b,
          lw=2, color='k')
 r, p = pearsonr(decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'n_neurons'],
-                decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_over_chance_prior'])
+                decoding_result.loc[decoding_result['n_neurons'] < max_neurons, 'r_prior_plot'])
 ax8.set(ylabel='Decoding %s (r)' % target_str, xlabel='Number of neurons',
         title='Decoding improvement over chance\n(Pearson, r=%.2f, p=%.2f)' % (r, p), xlim=[0, max_neurons],
         ylim=[-0.5, 1])
@@ -212,7 +230,7 @@ ax10.set(ylabel='Decoding %s (r)' % target_str, xlabel='Number of neurons',
         ylim=[-0.5, 1])
 
 plt.tight_layout(pad=4)
-sns.despine(trim=False)
+sns.despine(trim=True)
 
 if SAVE_FIG:
     plt.savefig(join(FIG_PATH, DECODER, '%s_%s_%s_%s_%s_cells_%s' % (

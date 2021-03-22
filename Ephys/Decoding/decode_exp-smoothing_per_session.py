@@ -32,13 +32,14 @@ POST_TIME = -0.1
 DECODER = 'linear-regression'
 ATLAS = 'beryl-atlas'
 NUM_SPLITS = 5
-VALIDATION = 'kfold-interleaved'
+VALIDATION = 'kfold'
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Ephys', 'Decoding', 'Sessions', DECODER, VALIDATION)
 INCL_NEURONS = 'all'
 INCL_SESSIONS = 'aligned-behavior'
 CHANCE_LEVEL = 'pseudo'
 N_SESSIONS = 10
+PLOT_TRIALS = 400
 BEFORE = 5
 AFTER = 20
 COLORS = (sns.color_palette('colorblind', as_cmap=True)[0],
@@ -151,8 +152,8 @@ for i in range(N_SESSIONS):
                                                       decoding_result.loc[i, 'probe'])))
     plt.close(f)
 
-    # Plot trial-to-trial probability
-    figure_style(font_scale=1.5)
+    # Plot trial-to-trial decoding
+    figure_style(font_scale=3)
     trial_blocks = (trials.probabilityLeft == 0.2).astype(int)
     f, ax1 = plt.subplots(1, 1, figsize=(12, 6), dpi=150)
 
@@ -168,17 +169,18 @@ for i in range(N_SESSIONS):
         ax1.add_patch(p)
     ax1.plot(priors, color='k', lw=1.5, label='Model output')
     ax1.plot(pred_prior, color='r', lw=1.5, label='Decoding prediction')
-    ax1.set(xlim=[90, trial_blocks.shape[0]], ylim=[-0.05, 1.05],
+    ax1.set(xlim=[0, PLOT_TRIALS], ylim=[-0.05, 1.05],
             ylabel='Prior', xlabel='Trials',
             title='Region %s; decoding performance: %.1f r' % (region, r_prior),
             yticks=[0, 1], yticklabels=['R', 'L'])
+    #ax1.legend(frameon=False)
     plt.tight_layout()
     plt.savefig(join(FIG_PATH, '%s_%s_%s_%s_trials' % (region, decoding_result.loc[i, 'subject'],
                                                        decoding_result.loc[i, 'date'],
                                                        decoding_result.loc[i, 'probe'])))
     plt.close(f)
 
-    # Plot probability around change points
+    # Plot around change points
     figure_style(font_scale=1.5)
     change_points = pd.DataFrame()
     for t, change_ind in enumerate(block_trans[2:-1]):

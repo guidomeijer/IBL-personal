@@ -27,16 +27,17 @@ br = BrainRegions()
 # Settings
 REMOVE_OLD_FIT = False
 OVERWRITE = False
-TARGET = 'prior-prevaction'  # block, stim-side. reward or choice
+TARGET = 'prior-prevaction-stim'
 MIN_NEURONS = 5  # min neurons per region
 DECODER = 'linear-regression'
-VALIDATION = 'kfold-interleaved'
+VALIDATION = 'kfold'
 INCL_NEURONS = 'all'  # all or pass-QC
 INCL_SESSIONS = 'aligned-behavior'  # all, aligned, resolved, aligned-behavior or resolved-behavior
 ATLAS = 'beryl-atlas'
 NUM_SPLITS = 5
 CHANCE_LEVEL = 'pseudo'  # pseudo, phase-rand, shuffle or none
-ITERATIONS = 50  # for null distribution estimation
+ITERATIONS = 0  # for null-distribution
+N_TRIAL_PICKS = 50  # for trial selection
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
 DATA_PATH = join(DATA_PATH, 'Ephys', 'Decoding', DECODER)
@@ -49,11 +50,28 @@ def remap(ids, source='Allen', dest='Beryl'):
     return br.id[br.mappings[dest][inds]]
 
 # Time windows
-PRE_TIME = 0.6
-POST_TIME = -0.1
+PRE_TIME = 0
+POST_TIME = 0.3
 
 # Query session list
 eids, probes, subjects = query_sessions(selection=INCL_SESSIONS, return_subjects=True)
+
+
+def balanced_trial_set(trials):
+    # A balanced random subset of left and right trials from the two blocks
+    left_stim = (trials.contrastLeft > 0) & (trials.probabilityLeft == 0.2)
+    left_stim[np.random.choice(np.where(((trials.contrastLeft > 0)
+                                         & (trials.probabilityLeft == 0.8)))[0],
+                               size=np.sum(left_stim), replace=False)] = True
+    right_stim = (trials.contrastRight > 0) & (trials.probabilityLeft == 0.8)
+    right_stim[np.random.choice(np.where(((trials.contrastRight > 0)
+                                         & (trials.probabilityLeft == 0.2)))[0],
+                               size=np.sum(right_stim), replace=False)] = True
+    incl_trials = (left_stim | right_stim
+                   | (((trials.contrastLeft == 0) | (trials.contrastRight == 0))
+                      & (trials.probabilityLeft != 0.5)))
+    return incl_trials
+
 
 # %% MAIN
 
@@ -98,10 +116,10 @@ for i, subject in enumerate(np.unique(subjects)):
     session_uuids = np.array(session_uuids)
 
     # Fit previous stimulus side model
-    if TARGET == 'prior-stimside':
+    if 'prior-stimside' in TARGET:
         model = exp_stimside(join(SAVE_PATH, 'Behavior', 'exp_smoothing_model_fits/'),
                              session_uuids, subject, actions, stimuli, stim_side)
-    elif TARGET == 'prior-prevaction':
+    elif 'prior-prevaction' in TARGET:
         model = exp_prev_action(join(SAVE_PATH, 'Behavior', 'exp_smoothing_model_fits/'),
                                 session_uuids, subject, actions, stimuli, stim_side)
     model.load_or_train(nb_steps=2000, remove_old=REMOVE_OLD_FIT)
@@ -187,57 +205,56 @@ for i, subject in enumerate(np.unique(subjects)):
                     continue
 
                 # Decode prior from model fit
-                times = np.column_stack(((trials.goCue_times - PRE_TIME),
-                                         (trials.goCue_times + POST_TIME)))
-                population_activity, cluster_ids = get_spike_counts_in_bins(spks_region,
-                                                                            clus_region, times)
-                population_activity = population_activity.T
-                if VALIDATION == 'kfold-interleaved':
-                    cv = KFold(n_splits=NUM_SPLITS, shuffle=True)
-                elif VALIDATION == 'kfold':
-                    cv = KFold(n_splits=NUM_SPLITS, shuffle=False)
-                if isinstance(priors[0], float):
-                    these_priors = priors
-                else:
-                    these_priors = priors[j][:population_activity.shape[0]]
-                pred_prior, pred_prior_train = regress(population_activity, these_priors,
-                                                       cross_validation=cv, return_training=True)
-                r_prior = pearsonr(these_priors, pred_prior)[0]
-                r_prior_train = pearsonr(these_priors, pred_prior_train)[0]
+                r_prior, r_prior_train = np.empty(N_TRIAL_PICKS), np.empty(N_TRIAL_PICKS)
+                r_prior_pseudo, r_prior_train_pseudo = np.empty(N_TRIAL_PICKS), np.empty(N_TRIAL_PICKS)
+                for n in range(N_TRIAL_PICKS):
 
-                # Decode block identity
-                pred_block = regress(population_activity, trials['probabilityLeft'],
-                                     cross_validation=cv)
-                r_block = pearsonr(trials['probabilityLeft'], pred_block)[0]
+                    # Select trials which are balanced on left and right
+                    incl_trials = balanced_trial_set(trials)
 
-                # Estimate chance level
-                r_prior_pseudo = np.empty(ITERATIONS)
-                r_prior_train_pseudo = np.empty(ITERATIONS)
-                r_block_pseudo = np.empty(ITERATIONS)
-                for k in range(ITERATIONS):
-                    if TARGET == 'prior-stimside':
-                        pseudo_trials = generate_pseudo_session(trials, generate_choices=False)
-                        pseudo_trials['choice'] = np.nan
-                    elif TARGET == 'prior-prevaction':
-                        pseudo_trials = generate_pseudo_session(trials, generate_choices=True)
-                    stim_side, stimuli, actions, prob_left = utils.format_data(pseudo_trials)
-                    p_priors = model.compute_prior(np.array(actions), np.array(stimuli),
-                                                   np.array(stim_side),
-                                                   parameter_type='posterior_mean')[0]
+                    times = np.column_stack(((trials.goCue_times[incl_trials] - PRE_TIME),
+                                             (trials.goCue_times[incl_trials] + POST_TIME)))
+                    population_activity, cluster_ids = get_spike_counts_in_bins(spks_region,
+                                                                                clus_region, times)
+                    population_activity = population_activity.T
+                    if VALIDATION == 'kfold-interleaved':
+                        cv = KFold(n_splits=NUM_SPLITS, shuffle=True)
+                    elif VALIDATION == 'kfold':
+                        cv = KFold(n_splits=NUM_SPLITS, shuffle=False)
+                    if isinstance(priors[0], float):
+                        these_priors = priors[incl_trials]
+                    else:
+                        these_priors = priors[j][:trials.shape[0]][incl_trials]
+                    pred_prior, pred_prior_train = regress(population_activity, these_priors,
+                                                           cross_validation=cv, return_training=True)
+                    r_prior[n] = pearsonr(these_priors, pred_prior)[0]
+                    r_prior_train[n] = pearsonr(these_priors, pred_prior_train)[0]
 
-                    # Decode prior
-                    p_pred_prior, p_pred_prior_train = regress(population_activity, p_priors,
-                                                               cross_validation=cv, return_training=True)
-                    r_prior_pseudo[k] = pearsonr(p_priors, p_pred_prior)[0]
-                    r_prior_train_pseudo[k] = pearsonr(p_priors, p_pred_prior_train)[0]
+                    # Estimate chance level
+                    r_pseudo, r_train_pseudo = np.empty(ITERATIONS), np.empty(ITERATIONS)
+                    for k in range(ITERATIONS):
+                        if 'prior-stimside' in TARGET:
+                            pseudo_trials = generate_pseudo_session(trials, generate_choices=False)
+                            pseudo_trials['choice'] = np.nan
+                        elif 'prior-prevaction' in TARGET:
+                            pseudo_trials = generate_pseudo_session(trials, generate_choices=True)
+                        stim_side, stimuli, actions, prob_left = utils.format_data(pseudo_trials)
+                        p_priors = model.compute_prior(np.array(actions), np.array(stimuli),
+                                                       np.array(stim_side),
+                                                       parameter_type='posterior_mean')[0]
 
-                    # Decode pseudo block identity
-                    p_pred_block = regress(population_activity, prob_left, cross_validation=cv)
-                    r_block_pseudo[k] = pearsonr(prob_left, p_pred_block)[0]
+                        # Decode prior
+                        p_pred_prior, p_pred_prior_train = regress(population_activity, p_priors,
+                                                                   cross_validation=cv, return_training=True)
+                        r_pseudo[k] = pearsonr(p_priors, p_pred_prior)[0]
+                        r_train_pseudo[k] = pearsonr(p_priors, p_pred_prior_train)[0]
 
-                # Calculate p values
-                p_prior = np.sum(r_prior_pseudo > r_prior) / r_prior_pseudo.shape[0]
-                p_block = np.sum(r_block_pseudo > r_block) / r_block_pseudo.shape[0]
+                    # Get mean over iterations
+                    if ITERATIONS > 0:
+                        r_prior_pseudo[n] = r_pseudo.mean()
+                        r_prior_train_pseudo[n] = r_train_pseudo.mean()
+                    else:
+                        r_prior_pseudo, r_prior_train_pseudo = np.nan, np.nan
 
                 # Add to dataframe
                 decoding_result = decoding_result.append(pd.DataFrame(
@@ -246,16 +263,13 @@ for i, subject in enumerate(np.unique(subjects)):
                                      'eid': eid,
                                      'probe': probe,
                                      'region': region,
-                                     'r_prior': r_prior,
-                                     'r_prior_train': r_prior_train,
-                                     'r_block': r_block,
-                                     'r_prior_null': r_prior_pseudo.mean(),
-                                     'r_prior_train_null': r_prior_train_pseudo.mean(),
-                                     'r_block_null': r_block_pseudo.mean(),
-                                     'p_prior': p_prior,
-                                     'p_block': p_block,
+                                     'r_prior': np.mean(r_prior),
+                                     'r_prior_train': np.mean(r_prior_train),
+                                     'r_prior_null': np.mean(r_prior_pseudo),
+                                     'r_prior_train_null': np.mean(r_prior_train_pseudo),
                                      'tau': 1 / params[0],
                                      'n_trials': trials.probabilityLeft.shape[0],
+                                     'n_trials_balanced': incl_trials.sum(),
                                      'n_neurons': np.unique(clus_region).shape[0]}))
 
         decoding_result.to_pickle(join(SAVE_PATH, 'Ephys', 'Decoding', DECODER,

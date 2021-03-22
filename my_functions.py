@@ -180,7 +180,7 @@ def sessions_with_region(acronym):
 
 
     # Query sessions with at least one channel in the specified region
-    sessions = one.alyx.rest('sessions', 'list', atlas_acronym=brain_region,
+    sessions = one.alyx.rest('sessions', 'list', atlas_acronym=acronym,
                         task_protocol='_iblrig_tasks_ephysChoiceWorld',
                         dataset_types = ['spikes.times', 'trials.probabilityLeft'],
                         project='ibl_neuropixel_brainwide')
@@ -219,6 +219,34 @@ def get_parent_region_name(acronyms):
         return parent_region_names[0]
     else:
         return parent_region_names
+
+
+def get_children_region_names(acronyms, return_full_name=False):
+    br = BrainRegions()
+    children_region_names = []
+    for i, acronym in enumerate(acronyms):
+        try:
+            regid = br.id[np.argwhere(br.acronym == acronym)]
+            descendants = br.descendants(regid)
+            targetlevel = 8
+            if sum(descendants.level == targetlevel) == 0:
+                if return_full_name:
+                    children_region_names.append(descendants.name[-1])
+                else:
+                    children_region_names.append(descendants.acronym[-1])
+            else:
+                if return_full_name:
+                    children_region_names.append(descendants.name[
+                        (descendants.level == targetlevel) & (descendants.id > 0)])
+                else:
+                    children_region_names.append(descendants.acronym[
+                        (descendants.level == targetlevel) & (descendants.id > 0)])
+        except IndexError:
+            children_region_names.append(acronym)
+    if len(children_region_names) == 1:
+        return children_region_names[0]
+    else:
+        return children_region_names
 
 
 def get_full_region_name(acronyms):

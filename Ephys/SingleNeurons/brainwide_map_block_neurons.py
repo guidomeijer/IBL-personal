@@ -12,6 +12,7 @@ from os.path import join, isdir
 import seaborn as sns
 from os import mkdir
 import matplotlib.pyplot as plt
+from brainbox.lfp import butter_filter
 from matplotlib.patches import Rectangle
 from my_functions import (paths, query_sessions, check_trials, combine_layers_cortex, load_trials,
                           remap)
@@ -29,7 +30,7 @@ INCL_NEURONS = 'pass-QC'
 INCL_SESSIONS = 'aligned-behavior'
 ATLAS = 'beryl-atlas'
 MIN_NEURONS = 1
-PLOT = False
+PLOT = True
 PRE_TIME = 0.6
 POST_TIME = -0.1
 TRIAL_CENTERS = np.arange(-10, 21, 3)
@@ -141,6 +142,15 @@ for i in range(len(eids)):
             results_df.loc[results_df.shape[0], 'probe'] = probe
 
             if PLOT:
+                # Subtract baseline
+                baseline = np.empty(population_activity.shape)
+                for n in range(population_activity.shape[0]):
+                    fit = np.poly1d(np.polyfit(np.arange(population_activity.shape[1]),
+                                               population_activity[n, :], 2))
+                    baseline[n, :] = fit(np.arange(population_activity.shape[1]))
+                pop_baseline = population_activity - baseline
+
+                # Get activity around block switches
                 switch_to_l = [i for i, x in enumerate(np.diff(trials.probabilityLeft) > 0.3) if x]
                 switch_to_r = [i for i, x in enumerate(np.diff(trials.probabilityLeft) < -0.3) if x]
                 all_switches = np.append(switch_to_l, switch_to_r)
@@ -148,16 +158,12 @@ for i in range(len(eids)):
                 block_switch = pd.DataFrame(columns=['mean_spike_count', 'trial_center',
                                                      'switch_side', 'cluster_id'])
                 for s, switch in enumerate(all_switches):
-                    baseline_counts = population_activity[np.isin(cluster_ids, sig_block),
-                                                          switch-BASELINE_TRIAL_WIN:switch]
                     for t, trial in enumerate(TRIAL_CENTERS):
-                        this_counts = population_activity[np.isin(cluster_ids, sig_block),
-                                                          int(switch+(trial-(TRIAL_WIN/2))):int(
-                                                                  switch+(trial+(TRIAL_WIN/2)))]
+                        this_counts = pop_baseline[np.isin(cluster_ids, sig_block),
+                                                   int(switch+(trial-(TRIAL_WIN/2))):int(
+                                                       switch+(trial+(TRIAL_WIN/2)))]
                         block_switch = block_switch.append(pd.DataFrame(
-                                                data={'sub_spike_count': (np.mean(this_counts, axis=1)
-                                                                          - np.mean(baseline_counts, axis=1)),
-                                                      'spike_count': np.mean(this_counts, axis=1),
+                                                data={'spike_count': np.mean(this_counts, axis=1),
                                                       'trial_center': trial,
                                                       'cluster_id': sig_block,
                                                       'switch_side': switch_sides[s]}), sort=False)
@@ -165,7 +171,7 @@ for i in range(len(eids)):
                 # Plot sigificant neurons
                 for n, neuron_id in enumerate(sig_block):
 
-                    # Apply some smoothing and normalize the spike rate
+                    # Apply some smoothing
                     spike_rate = np.convolve(np.squeeze(population_activity[cluster_ids == neuron_id, :]),
                                              np.ones((5,))/5, mode='same')
 
@@ -184,7 +190,7 @@ for i in range(len(eids)):
                     ax1.plot(np.arange(1, len(trials) + 1), spike_rate, color='k')
                     ax1.set(xlabel='Trials', ylabel='Firing rate (spks/s)', title='Region: %s' % region)
 
-                    sns.lineplot(x='trial_center', y='sub_spike_count', hue='switch_side',
+                    sns.lineplot(x='trial_center', y='spike_count', hue='switch_side',
                                  data=block_switch.loc[block_switch['cluster_id'] == neuron_id], ci=68,
                                  palette=COLORS, hue_order=['right', 'left'], lw=2)
                     y_lim = ax2.get_ylim()
@@ -202,6 +208,27 @@ for i in range(len(eids)):
                         subject, date, probe, cluster_ids[n])))
                     plt.close(f)
 
+                    # Plot baseline subtraction
+                    f, ax1 = plt.subplots(1, 1, figsize=(12, 5), dpi=300)
+                    ax1.plot(np.arange(1, len(trials) + 1),
+                             np.squeeze(population_activity[cluster_ids == neuron_id, :]),
+                             color='k', label='spike rate')
+                    ax1.plot(np.arange(1, len(trials) + 1),
+                             np.squeeze(baseline[cluster_ids == neuron_id, :]),
+                             color='r', lw=2, label='baseline')
+                    ax1.plot(np.arange(1, len(trials) + 1),
+                             np.squeeze(pop_baseline[cluster_ids == neuron_id, :]),
+                             color='g', label='subtracted')
+                    ax1.set(xlabel='Trials', ylabel='Firing rate (spks/s)', title='Region: %s' % region)
+                    ax1.legend(frameon=False)
+
+                    plt.tight_layout()
+                    sns.set(context='paper', font_scale=1.5, style='ticks')
+                    sns.despine()
+
+                    plt.savefig(join(fig_path, region, '%s_%s_%s_cluster-%s_baseline' % (
+                        subject, date, probe, cluster_ids[n])))
+                    plt.close(f)
 
     # Save intermediate results
     results_df.to_csv(join(save_path, 'block_neurons.csv'))

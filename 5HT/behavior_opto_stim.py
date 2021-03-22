@@ -20,7 +20,7 @@ _, fig_path, _ = paths()
 fig_path = join(fig_path, '5HT', 'opto-behavior')
 
 subjects = pd.read_csv('subjects.csv')
-
+results_df = pd.DataFrame()
 for i, nickname in enumerate(subjects['subject']):
 
     # Query sessions
@@ -42,6 +42,41 @@ for i, nickname in enumerate(subjects['subject']):
     if 'laser_probability' not in trials.columns:
         trials['laser_probability'] = trials['laser_stimulation'].copy()
 
+    # Get bias shift
+    bias_no_stim = np.abs(trials[(trials['probabilityLeft'] == 0.8)
+                                 & (trials['signed_contrast'] == 0)
+                                 & (trials['laser_stimulation'] == 0)
+                                 & (trials['laser_probability'] != 0.75)].mean()
+                          - trials[(trials['probabilityLeft'] == 0.2)
+                                   & (trials['signed_contrast'] == 0)
+                                   & (trials['laser_stimulation'] == 0)
+                                   & (trials['laser_probability'] != 0.75)].mean())['right_choice']
+    bias_stim = np.abs(trials[(trials['probabilityLeft'] == 0.8)
+                              & (trials['signed_contrast'] == 0)
+                              & (trials['laser_stimulation'] == 1)
+                              & (trials['laser_probability'] != 0.25)].mean()
+                       - trials[(trials['probabilityLeft'] == 0.2)
+                                & (trials['signed_contrast'] == 0)
+                                & (trials['laser_stimulation'] == 1)
+                                & (trials['laser_probability'] != 0.25)].mean())['right_choice']
+    bias_catch_stim = np.abs(trials[(trials['probabilityLeft'] == 0.8)
+                                    & (trials['laser_stimulation'] == 1)
+                                    & (trials['laser_probability'] == 0.25)].mean()
+                             - trials[(trials['probabilityLeft'] == 0.2)
+                                      & (trials['laser_stimulation'] == 1)
+                                      & (trials['laser_probability'] == 0.25)].mean())['right_choice']
+    bias_catch_no_stim = np.abs(trials[(trials['probabilityLeft'] == 0.8)
+                                       & (trials['laser_stimulation'] == 0)
+                                       & (trials['laser_probability'] == 0.75)].mean()
+                                - trials[(trials['probabilityLeft'] == 0.2)
+                                         & (trials['laser_stimulation'] == 0)
+                                         & (trials['laser_probability'] == 0.75)].mean())['right_choice']
+    results_df = results_df.append(pd.DataFrame(data={
+        'subject': nickname, 'sert-cre': subjects.loc[i, 'sert-cre'],
+        'bias': [bias_no_stim, bias_stim, bias_catch_stim, bias_catch_no_stim],
+        'opto_stim': [0, 1, 1, 0], 'catch_trial': [0, 0, 1, 1]}))
+
+    # Plot
     sns.set(context='talk', style='ticks', font_scale=1.5)
     f, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10), sharey=True)
 
@@ -104,3 +139,20 @@ for i, nickname in enumerate(subjects['subject']):
     sns.despine(trim=True)
     plt.tight_layout()
     plt.savefig(join(fig_path, '%s_opto_behavior_psycurve' % nickname))
+
+# %% Plot
+sns.set(context='talk', style='ticks', font_scale=1.2)
+f, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5), dpi=300)
+sns.lineplot(x='opto_stim', y='bias', hue='sert-cre', style='subject', estimator=None,
+             data=results_df[results_df['catch_trial'] == 0], dashes=False,
+             markers=['o']*int(results_df.shape[0]/4),
+             legend=False, ax=ax1)
+ax1.set(xlabel='', xticks=[0, 1], xticklabels=['No stim', 'Stim'], ylabel='Bias')
+
+sns.lineplot(x='opto_stim', y='bias', hue='sert-cre', style='subject', estimator=None,
+             data=results_df[results_df['catch_trial'] == 1], dashes=False,
+             markers=['o']*int(results_df.shape[0]/4),
+             legend=False, ax=ax2)
+ax2.set(xlabel='', xticks=[0, 1], xticklabels=['No stim', 'Stim'], ylabel='Bias',
+        title='Catch trials')
+plt.tight_layout()
