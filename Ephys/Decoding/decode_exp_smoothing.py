@@ -30,13 +30,13 @@ OVERWRITE = False
 TARGET = 'prior-prevaction'  # block, stim-side. reward or choice
 MIN_NEURONS = 5  # min neurons per region
 DECODER = 'linear-regression'
-VALIDATION = 'kfold-interleaved'
+VALIDATION = 'kfold'
 INCL_NEURONS = 'all'  # all or pass-QC
 INCL_SESSIONS = 'aligned-behavior'  # all, aligned, resolved, aligned-behavior or resolved-behavior
 ATLAS = 'beryl-atlas'
 NUM_SPLITS = 5
-CHANCE_LEVEL = 'pseudo'  # pseudo, phase-rand, shuffle or none
-ITERATIONS = 50  # for null distribution estimation
+CHANCE_LEVEL = 'other-trials'
+ITERATIONS = 100  # for null distribution estimation
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
 DATA_PATH = join(DATA_PATH, 'Ephys', 'Decoding', DECODER)
@@ -49,11 +49,15 @@ def remap(ids, source='Allen', dest='Beryl'):
     return br.id[br.mappings[dest][inds]]
 
 # Time windows
-PRE_TIME = 0.6
-POST_TIME = -0.1
+PRE_TIME = 0.2
+POST_TIME = 0
 
 # Query session list
 eids, probes, subjects = query_sessions(selection=INCL_SESSIONS, return_subjects=True)
+
+# Load in all trials
+if CHANCE_LEVEL == 'other-trials':
+    all_trials = pd.read_pickle(join(SAVE_PATH, 'Ephys', 'Decoding', 'all_trials.p'))
 
 # %% MAIN
 
@@ -61,11 +65,13 @@ eids, probes, subjects = query_sessions(selection=INCL_SESSIONS, return_subjects
 if OVERWRITE:
     decoding_result = pd.DataFrame(columns=['subject', 'date', 'eid', 'probe', 'region'])
 elif isfile(join(SAVE_PATH, 'Ephys', 'Decoding', DECODER,
-                        ('%s_%s_%s_%s_%s_cells_%s.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
-                                                        INCL_SESSIONS, INCL_NEURONS, ATLAS)))):
+                        ('%s_%s_%s_%s_%s_cells_%s_%s-%s.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
+                                                        INCL_SESSIONS, INCL_NEURONS, ATLAS,
+                                                        int(PRE_TIME*1000), int(POST_TIME*1000))))):
     decoding_result = pd.read_pickle(join(SAVE_PATH, 'Ephys', 'Decoding', DECODER,
-                        ('%s_%s_%s_%s_%s_cells_%s.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
-                                                        INCL_SESSIONS, INCL_NEURONS, ATLAS))))
+                        ('%s_%s_%s_%s_%s_cells_%s_%s-%s.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
+                                                        INCL_SESSIONS, INCL_NEURONS, ATLAS,
+                                                        int(PRE_TIME*1000), int(POST_TIME*1000)))))
 else:
     decoding_result = pd.DataFrame(columns=['subject', 'date', 'eid', 'probe', 'region'])
 
@@ -123,6 +129,9 @@ for i, subject in enumerate(np.unique(subjects)):
         # Check data integrity
         if check_trials(trials) is False:
             continue
+        ssdf
+        # Exclude 50/50 block
+        trials = trials[trials['probabilityLeft'] != 0.5]
 
         # Extract session data
         ses_info = one.get_details(eid)
@@ -130,7 +139,7 @@ for i, subject in enumerate(np.unique(subjects)):
         date = ses_info['start_time'][:10]
         probes_to_use = probes[np.where(eids == eid)[0][0]]
 
-         # Decode per brain region
+        # Decode per brain region
         for p, probe in enumerate(probes_to_use):
             print('Processing %s (%d of %d)' % (probe, p + 1, len(probes_to_use)))
 
@@ -150,6 +159,7 @@ for i, subject in enumerate(np.unique(subjects)):
             if ATLAS == 'beryl-atlas':
                 mapped_br = br.get(ids=remap(clusters[probe]['atlas_id']))
                 clusters_regions = mapped_br['acronym']
+
             elif ATLAS == 'allen-atlas':
                 clusters_regions = combine_layers_cortex(clusters[probe]['acronym'])
 
@@ -197,7 +207,7 @@ for i, subject in enumerate(np.unique(subjects)):
                 elif VALIDATION == 'kfold':
                     cv = KFold(n_splits=NUM_SPLITS, shuffle=False)
                 if isinstance(priors[0], float):
-                    these_priors = priors
+                    these_priors = priors[:population_activity.shape[0]]
                 else:
                     these_priors = priors[j][:population_activity.shape[0]]
                 pred_prior, pred_prior_train = regress(population_activity, these_priors,
@@ -206,38 +216,57 @@ for i, subject in enumerate(np.unique(subjects)):
                 r_prior_train = pearsonr(these_priors, pred_prior_train)[0]
 
                 # Decode block identity
-                pred_block = regress(population_activity, trials['probabilityLeft'],
+                pred_block = regress(population_activity, trials['probabilityLeft'].values,
                                      cross_validation=cv)
-                r_block = pearsonr(trials['probabilityLeft'], pred_block)[0]
+                r_block = pearsonr(trials['probabilityLeft'].values, pred_block)[0]
 
                 # Estimate chance level
-                r_prior_pseudo = np.empty(ITERATIONS)
-                r_prior_train_pseudo = np.empty(ITERATIONS)
-                r_block_pseudo = np.empty(ITERATIONS)
+                r_prior_null = np.empty(ITERATIONS)
+                r_prior_train_null = np.empty(ITERATIONS)
+                r_block_null = np.empty(ITERATIONS)
                 for k in range(ITERATIONS):
-                    if TARGET == 'prior-stimside':
-                        pseudo_trials = generate_pseudo_session(trials, generate_choices=False)
-                        pseudo_trials['choice'] = np.nan
-                    elif TARGET == 'prior-prevaction':
-                        pseudo_trials = generate_pseudo_session(trials, generate_choices=True)
-                    stim_side, stimuli, actions, prob_left = utils.format_data(pseudo_trials)
-                    p_priors = model.compute_prior(np.array(actions), np.array(stimuli),
-                                                   np.array(stim_side),
-                                                   parameter_type='posterior_mean')[0]
 
-                    # Decode prior
-                    p_pred_prior, p_pred_prior_train = regress(population_activity, p_priors,
-                                                               cross_validation=cv, return_training=True)
-                    r_prior_pseudo[k] = pearsonr(p_priors, p_pred_prior)[0]
-                    r_prior_train_pseudo[k] = pearsonr(p_priors, p_pred_prior_train)[0]
+                    # Null is pseudo sessions
+                    if CHANCE_LEVEL == 'pseudo':
+                        if TARGET == 'prior-stimside':
+                            pseudo_trials = generate_pseudo_session(trials, generate_choices=False)
+                            pseudo_trials['choice'] = np.nan
+                        elif TARGET == 'prior-prevaction':
+                            pseudo_trials = generate_pseudo_session(trials, generate_choices=True)
+                        stim_side, stimuli, actions, prob_left = utils.format_data(pseudo_trials)
+                        p_priors = model.compute_prior(np.array(actions), np.array(stimuli),
+                                                       np.array(stim_side),
+                                                       parameter_type='posterior_mean')[0]
 
-                    # Decode pseudo block identity
-                    p_pred_block = regress(population_activity, prob_left, cross_validation=cv)
-                    r_block_pseudo[k] = pearsonr(prob_left, p_pred_block)[0]
+                    # Null is behavior of other mice
+                    elif CHANCE_LEVEL == 'other-trials':
+                        # Exclude the current mice from all trials
+                        all_trials_excl = all_trials[all_trials['subject'] != subject]
 
-                # Calculate p values
-                p_prior = np.sum(r_prior_pseudo > r_prior) / r_prior_pseudo.shape[0]
-                p_block = np.sum(r_block_pseudo > r_block) / r_block_pseudo.shape[0]
+                        # Get a random chunck of trials the same length as the current session
+                        null_selection = np.random.randint(all_trials_excl.shape[0])
+                        while null_selection + trials.shape[0] > all_trials_excl.shape[0]:
+                            null_selection = np.random.randint(all_trials_excl.shape[0])
+                        null_trials = all_trials_excl[null_selection : (null_selection
+                                                                        + trials.shape[0])]
+                        stim_side, stimuli, actions, prob_left = utils.format_data(null_trials)
+                        p_priors = model.compute_prior(np.array(actions), np.array(stimuli),
+                                                       np.array(stim_side),
+                                                       parameter_type='posterior_mean')[0]
+
+                    # Decode prior of null trials
+                    p_pred_prior, p_pred_prior_train = regress(population_activity,
+                                                               p_priors,
+                                                               cross_validation=cv,
+                                                               return_training=True)
+                    r_prior_null[k] = pearsonr(p_priors, p_pred_prior)[0]
+                    r_prior_train_null[k] = pearsonr(p_priors, p_pred_prior_train)[0]
+
+                    # Decode null block identity
+                    p_pred_block = regress(population_activity, prob_left.values,
+                                           cross_validation=cv)
+                    r_block_null[k] = pearsonr(prob_left.values, p_pred_block)[0]
+
 
                 # Add to dataframe
                 decoding_result = decoding_result.append(pd.DataFrame(
@@ -249,15 +278,14 @@ for i, subject in enumerate(np.unique(subjects)):
                                      'r_prior': r_prior,
                                      'r_prior_train': r_prior_train,
                                      'r_block': r_block,
-                                     'r_prior_null': r_prior_pseudo.mean(),
-                                     'r_prior_train_null': r_prior_train_pseudo.mean(),
-                                     'r_block_null': r_block_pseudo.mean(),
-                                     'p_prior': p_prior,
-                                     'p_block': p_block,
+                                     'r_prior_null': r_prior_null.mean(),
+                                     'r_prior_train_null': r_prior_train_null.mean(),
+                                     'r_block_null': r_block_null.mean(),
                                      'tau': 1 / params[0],
                                      'n_trials': trials.probabilityLeft.shape[0],
-                                     'n_neurons': np.unique(clus_region).shape[0]}))
+                                     'n_neurons': np.unique(clus_region).shape[0]}), sort=False)
 
         decoding_result.to_pickle(join(SAVE_PATH, 'Ephys', 'Decoding', DECODER,
-                        ('%s_%s_%s_%s_%s_cells_%s.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
-                                                        INCL_SESSIONS, INCL_NEURONS, ATLAS))))
+                        ('%s_%s_%s_%s_%s_cells_%s_%s-%s.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
+                                                        INCL_SESSIONS, INCL_NEURONS, ATLAS,
+                                                        int(PRE_TIME*1000), int(POST_TIME*1000)))))

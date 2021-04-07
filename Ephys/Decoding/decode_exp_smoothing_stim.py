@@ -26,7 +26,7 @@ br = BrainRegions()
 
 # Settings
 REMOVE_OLD_FIT = False
-OVERWRITE = False
+OVERWRITE = True
 TARGET = 'prior-prevaction-stim'
 MIN_NEURONS = 5  # min neurons per region
 DECODER = 'linear-regression'
@@ -148,7 +148,7 @@ for i, subject in enumerate(np.unique(subjects)):
         date = ses_info['start_time'][:10]
         probes_to_use = probes[np.where(eids == eid)[0][0]]
 
-         # Decode per brain region
+        # Decode per brain region
         for p, probe in enumerate(probes_to_use):
             print('Processing %s (%d of %d)' % (probe, p + 1, len(probes_to_use)))
 

@@ -16,33 +16,33 @@ from my_functions import paths, figure_style, get_full_region_name, get_parent_r
 
 # Settings
 TARGET = 'prior-prevaction'
-CHANCE_LEVEL = 'pseudo'
+CHANCE_LEVEL = 'other-trials'
 DECODER = 'linear-regression'
 INCL_NEURONS = 'all'
 INCL_SESSIONS = 'aligned-behavior'
 VALIDATION = 'kfold'
 ATLAS = 'beryl-atlas'
-SHOW_REGIONS = 10
+SHOW_REGIONS = 20
 #SHOW_REGIONS = 'significant'
-MIN_REC = 6
+MIN_REC = 5
 MIN_TOTAL_NEURONS = 0
 MAX_TAU = 30
-YLIM = [-.2, .51]
-DPI = 80
+YLIM = [-.3, .51]
+DPI = 150
+TIME_WIN = '200-0'
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Ephys', 'Decoding')
 FULL_NAME = True
 PARENT_REGIONS = False
 SAVE_FIG = True
-BLOCK = False
-OVER_CHANCE = False
+BLOCK = True
+OVER_CHANCE = True
 
 # %% Plot
 # Load in data
 decoding_result = pd.read_pickle(join(SAVE_PATH, 'Ephys', 'Decoding', DECODER,
-                        ('%s_%s_%s_%s_%s_cells_%s.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
-                                                        INCL_SESSIONS, INCL_NEURONS, ATLAS))))
-
+                                      f'{TARGET}_{CHANCE_LEVEL}_{VALIDATION}_{INCL_SESSIONS}_' \
+                                      f'{INCL_NEURONS}_cells_{ATLAS}_{TIME_WIN}.p'))
 
 # Get decoding performance over chance
 if OVER_CHANCE:
@@ -105,7 +105,7 @@ else:
     decoding_plot = decoding_plot[decoding_plot['r_mean_prior']
                                   >= decoding_plot['r_mean_prior'].unique()[SHOW_REGIONS - 1]]
 
-figure_style(font_scale=1.8)
+figure_style(font_scale=2)
 f = plt.figure(figsize=(30, 20), dpi=DPI)
 gs = f.add_gridspec(3, 4)
 if 'prior-prevaction' in TARGET:
@@ -128,10 +128,16 @@ if FULL_NAME:
                 order=sort_regions, ci=68, facecolor=(1, 1, 1, 0), errcolor=".2", edgecolor=".2",
                 ax=ax1)
     """
+
+    ax_lines = sns.pointplot(x='r_prior_plot', y='full_region', data=decoding_plot,
+                             order=sort_regions, ci=0, join=False, estimator=np.median, color='k',
+                             markers="|", scale=2, ax=ax1)
+    #plt.setp(ax_lines.lines, zorder=100)
+    plt.setp(ax_lines.collections, zorder=100, label="")
     sns.stripplot(x='r_prior_plot', y='full_region', data=decoding_plot,
                 order=sort_regions, s=6, ax=ax1)
-    sns.pointplot(x='r_prior_plot', y='full_region', data=decoding_plot,
-                order=sort_regions, ci=68, join=False, estimator=np.median, color='k', ax=ax1)
+    #sns.pointplot(x='r_prior_plot', y='full_region', data=decoding_plot,
+    #            order=sort_regions, ci=68, join=False, estimator=np.median, color='k', ax=ax1)
 else:
     sort_regions = decoding_plot.groupby('region').mean().sort_values(
                             'r_mean_prior', ascending=False).reset_index()['region']
@@ -155,13 +161,12 @@ if not np.isnan(decoding_result['r_prior_null'][0]):
     ax3.set(ylabel='Recordings', xlabel='r', title='Decoding of pseudo-sessions')
 
 ax4 = f.add_subplot(gs[0, 3])
-ax4.hist(decoding_result['r_mean_prior'], bins=30)
-ax4.set(ylabel='Recordings', xlabel='r', title='Decoding improvement over pseudo-sessions')
+ax4.hist(decoding_result['r_mean_prior'], bins=50)
+ax4.set(ylabel='Recordings', xlabel='r', title='Decoding improvement over pseudo-sessions',
+        xlim=[-0.2, 0.3])
 
 ax5 = f.add_subplot(gs[1, 1])
-tau = decoding_result.groupby('subject').mean()['tau']
-tau = tau[tau < 30]
-ax5.hist(tau, bins=30)
+ax5.hist(decoding_result.groupby('subject').mean()['tau'], bins=30)
 ax5.set(ylabel='Mice', xlabel='tau', title='Length of integration window', xlim=[0, 30])
 
 ax6 = f.add_subplot(gs[1, 2])
@@ -233,5 +238,6 @@ plt.tight_layout(pad=4)
 sns.despine(trim=True)
 
 if SAVE_FIG:
-    plt.savefig(join(FIG_PATH, DECODER, '%s_%s_%s_%s_%s_cells_%s' % (
-                    TARGET, CHANCE_LEVEL, VALIDATION, INCL_SESSIONS, INCL_NEURONS, ATLAS)))
+    plt.savefig(join(FIG_PATH, DECODER, '%s_%s_%s_%s_%s_cells_%s_%s' % (
+                    TARGET, CHANCE_LEVEL, VALIDATION, INCL_SESSIONS, INCL_NEURONS, ATLAS,
+                    TIME_WIN)))

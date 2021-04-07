@@ -52,7 +52,7 @@ decoding_result = pd.read_pickle(join(SAVE_PATH, 'Ephys', 'Decoding', DECODER,
 
 # Get decoding performance over chance
 decoding_result['r_over_chance'] = decoding_result['r_prior'] - decoding_result['r_prior_null']
-decoding_result = decoding_result.sort_values(by='r_over_chance', ascending=False).reset_index(drop=True)
+decoding_result = decoding_result.sort_values(by='r_prior', ascending=False).reset_index(drop=True)
 
 for i in range(N_SESSIONS):
 
@@ -153,9 +153,9 @@ for i in range(N_SESSIONS):
     plt.close(f)
 
     # Plot trial-to-trial decoding
-    figure_style(font_scale=3)
+    figure_style(font_scale=2)
     trial_blocks = (trials.probabilityLeft == 0.2).astype(int)
-    f, ax1 = plt.subplots(1, 1, figsize=(12, 6), dpi=150)
+    f, ax1 = plt.subplots(1, 1, figsize=(8, 4), dpi=300)
 
     block_trans = np.append([0], np.array(np.where(np.diff(trials.probabilityLeft) != 0)) + 1)
     block_trans = np.append(block_trans, [trial_blocks.shape[0]])
