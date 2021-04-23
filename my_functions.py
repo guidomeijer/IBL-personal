@@ -10,6 +10,7 @@ import seaborn as sns
 import matplotlib
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
+from scipy.signal import filtfilt, butter
 from sklearn.metrics import accuracy_score
 from sklearn.linear_model import LinearRegression
 import pandas as pd
@@ -18,7 +19,6 @@ from os.path import join
 from brainbox.numerical import ismember
 from ibllib.atlas import BrainRegions
 from oneibl.one import ONE
-one = ONE()
 
 
 def paths():
@@ -46,17 +46,21 @@ def figure_style(font_scale=2, despine=False, trim=True):
         plt.tight_layout()
 
 
-def load_trials(eid, laser_stimulation=False, invert_choice=False):
+def load_trials(eid, laser_stimulation=False, invert_choice=False, invert_stimside=False):
+    one = ONE()
     trials = pd.DataFrame()
     if laser_stimulation:
         (trials['stimOn_times'], trials['feedback_times'], trials['goCue_times'],
          trials['probabilityLeft'], trials['contrastLeft'], trials['contrastRight'],
-         trials['feedbackType'], trials['choice'], trials['laser_stimulation'],
+         trials['feedbackType'], trials['choice'], trials['firstMovement_times'],
+         trials['feedback_times'], trials['laser_stimulation'],
          trials['laser_probability']) = one.load(
                              eid, dataset_types=['trials.stimOn_times', 'trials.feedback_times',
                                                  'trials.goCue_times', 'trials.probabilityLeft',
                                                  'trials.contrastLeft', 'trials.contrastRight',
                                                  'trials.feedbackType', 'trials.choice',
+                                                 'trials.firstMovement_times',
+                                                 'trials.feedback_times',
                                                  '_ibl_trials.laser_stimulation',
                                                  '_ibl_trials.laser_probability'])
         if trials.loc[0, 'laser_stimulation'] is None:
@@ -66,11 +70,14 @@ def load_trials(eid, laser_stimulation=False, invert_choice=False):
     else:
        (trials['stimOn_times'], trials['feedback_times'], trials['goCue_times'],
          trials['probabilityLeft'], trials['contrastLeft'], trials['contrastRight'],
-         trials['feedbackType'], trials['choice']) = one.load(
+         trials['feedbackType'], trials['choice'], trials['firstMovement_times'],
+         trials['feedback_times']) = one.load(
                              eid, dataset_types=['trials.stimOn_times', 'trials.feedback_times',
                                                  'trials.goCue_times', 'trials.probabilityLeft',
                                                  'trials.contrastLeft', 'trials.contrastRight',
-                                                 'trials.feedbackType', 'trials.choice'])
+                                                 'trials.feedbackType', 'trials.choice',
+                                                 'trials.firstMovement_times',
+                                                 'trials.feedback_times'])
     trials['signed_contrast'] = trials['contrastRight']
     trials.loc[trials['signed_contrast'].isnull(), 'signed_contrast'] = -trials['contrastLeft']
     trials['correct'] = trials['feedbackType']
@@ -83,14 +90,17 @@ def load_trials(eid, laser_stimulation=False, invert_choice=False):
                'stim_side'] = 1
     trials.loc[(trials['signed_contrast'] == 0) & (trials['contrastRight'].isnull()),
                'stim_side'] = -1
+    trials['reaction_times'] = trials['firstMovement_times'] - trials['goCue_times']
     if invert_choice:
-        trials['choice'] = trials['choice'] + 2
-        trials.loc[trials['choice'] == 3] = -1
+        trials['choice'] = -trials['choice']
+    if invert_stimside:
+        trials['stim_side'] = -trials['stim_side']
+        trials['signed_contrast'] = -trials['signed_contrast']
     return trials
 
 
 def check_trials(trials):
-
+    trials = trials.reset_index(drop=True)
     if trials is None:
         print('trials is None type')
         return False
@@ -99,9 +109,6 @@ def check_trials(trials):
         return False
     if len(trials.probabilityLeft[0].shape) > 0:
         print('trials.probabilityLeft is an array of tuples')
-        return False
-    if trials.probabilityLeft[0] != 0.5:
-        print('trials.probabilityLeft does not start with 0.5')
         return False
     if (('stimOn_times' not in trials.columns)
             or (len(trials.stimOn_times) != len(trials.probabilityLeft))):
@@ -121,7 +128,7 @@ def remap(ids, source='Allen', dest='Beryl', output='acronym'):
 
 
 def query_sessions(selection='all', return_subjects=False):
-
+    one = ONE()
     if selection == 'all':
         # Query all ephysChoiceWorld sessions
         ins = one.alyx.rest('insertions', 'list',
@@ -174,10 +181,6 @@ def query_sessions(selection='all', return_subjects=False):
 def sessions_with_region(acronym):
     from oneibl.one import ONE
     one = ONE()
-
-    traj = one.alyx.rest('trajectories', 'list',
-                        django='channels__brain_region__acronym,CP')
-
 
     # Query sessions with at least one channel in the specified region
     sessions = one.alyx.rest('sessions', 'list', atlas_acronym=acronym,
@@ -281,6 +284,7 @@ def get_eid_list():
 
 
 def criteria_opto_eids(eids, max_lapse=0.2, max_bias=0.3, min_trials=200):
+    one = ONE()
     use_eids = []
     for j, eid in enumerate(eids):
         try:
@@ -376,119 +380,101 @@ def break_xaxis(y=-0.004, **kwargs):
              verticalalignment='center', fontsize=12, fontweight='bold')
 
 
-def fit_prob_choice_model(trials, previous_trials=6):
+def px_to_mm(dlc_df, camera='left', width_mm=66, height_mm=54):
+    """
+    Transform pixel values to millimeter
 
-    data = trials.copy()
-    data = data[['choice', 'correct', 'signed_contrast', 'probabilityLeft']]
+    Parameters
+    ----------
+    width_mm:  the width of the video feed in mm
+    height_mm: the height of the video feed in mm
+    """
 
-    # Rewardeded choices:
-    data.loc[(data['choice'] == 0) & (data['correct'].isnull()), 'rchoice'] = 0  # NoGo trials
-    data.loc[(data['choice'] == -1) & (data['correct'] == 0), 'rchoice'] = 0
-    data.loc[(data['choice'] == -1) & (data['correct'] == 1), 'rchoice'] = 1
-    data.loc[(data['choice'] == 1) & (data['correct'] == 1), 'rchoice'] = -1
-    data.loc[(data['choice'] == 0) & (data['correct'].isnull()), 'rchoice'] = 0  # NoGo trials
-    data.loc[(data['choice'] == 1) & (data['correct'] == 0), 'rchoice'] = 0
+    # Set pixel dimensions for different cameras
+    if camera == 'left':
+        px_dim = [1280, 1024]
+    elif camera == 'right' or camera == 'body':
+        px_dim = [640, 512]
 
-    # Unrewarded choices:
-    data.loc[(data['choice'] == 0) & (data['correct'].isnull()), 'uchoice'] = 0  # NoGo trials
-    data.loc[(data['choice'] == -1) & (data['correct'] == 0), 'uchoice'] = 1
-    data.loc[(data['choice'] == -1) & (data['correct'] == 1), 'uchoice'] = 0
-    data.loc[(data['choice'] == 1) & (data['correct'] == 1), 'uchoice'] = 0
-    data.loc[(data['choice'] == 0) & (data['correct'].isnull()), 'uchoice'] = 0  # NoGo trials
-    data.loc[(data['choice'] == 1) & (data['correct'] == 0), 'uchoice'] = -1
+    # Transform pixels into mm
+    for key in list(dlc_df.keys()):
+        if key[-1] == 'x':
+            dlc_df[key] = dlc_df[key] * (width_mm / px_dim[0])
+        if key[-1] == 'y':
+            dlc_df[key] = dlc_df[key] * (height_mm / px_dim[1])
+    dlc_df['units'] = 'mm'
 
-    # Shift rewarded and unrewarded predictors by one
-    for i in range(previous_trials):
-        data.loc[:, 'rchoice-%s' % str(i+1)] = data['rchoice'].shift(
-                                                    periods=i+1, fill_value=0).to_numpy()
-        data.loc[:, 'uchoice-%s' % str(i+1)] = data['uchoice'].shift(
-                                                    periods=i+1, fill_value=0).to_numpy()
-
-    # Drop any nan trials
-    data.dropna(inplace=True)
-
-    # Make sensory predictors (no 0 predictor)
-    contrasts = [.25, 1, .125, .0625]
-    for i in contrasts:
-        data.loc[(data['signed_contrast'].abs() == i), i] = np.sign(
-                    data.loc[(data['signed_contrast'].abs() == i), 'signed_contrast'].to_numpy())
-        data[i].fillna(0,  inplace=True)
-
-    # Add block probability predictor
-    data.loc[(data['probabilityLeft'] == 0.5), 'block'] = 0
-    data.loc[(data['probabilityLeft'] == 0.2), 'block'] = 1
-    data.loc[(data['probabilityLeft'] == 0.8), 'block'] = -1
-
-    # Make choice in between 0 and 1 -> 1 for right and 0 for left
-    data.loc[data['choice'] == 1, 'choice'] = 0
-    data.loc[data['choice'] == -1, 'choice'] = 1
-
-    # Create predictor matrix
-    exog = data.copy()
-    exog.drop(columns=['correct', 'signed_contrast', 'choice', 'probabilityLeft',
-                       'rchoice', 'uchoice'],
-              inplace=True)
-    exog = sm.add_constant(exog)
-
-    # Fit model
-    logit_model = sm.Logit(data['choice'], exog)
-    result = logit_model.fit()
-    weights = result.params.rename(index=str)
-    return weights
+    return dlc_df
 
 
-def fit_psytrack(trials, previous_trials=0):
-    from psytrack.hyperOpt import hyperOpt
+def fit_circle(x, y):
+    x_m = np.mean(x)
+    y_m = np.mean(y)
+    u = x - x_m
+    v = y - y_m
+    Suv = np.sum(u*v)
+    Suu = np.sum(u**2)
+    Svv = np.sum(v**2)
+    Suuv = np.sum(u**2 * v)
+    Suvv = np.sum(u * v**2)
+    Suuu = np.sum(u**3)
+    Svvv = np.sum(v**3)
+    A = np.array([[Suu, Suv], [Suv, Svv]])
+    B = np.array([Suuu + Suvv, Svvv + Suuv])/2.0
+    uc, vc = np.linalg.solve(A, B)
+    xc_1 = x_m + uc
+    yc_1 = y_m + vc
+    Ri_1 = np.sqrt((x-xc_1)**2 + (y-yc_1)**2)
+    R_1 = np.mean(Ri_1)
+    return xc_1, yc_1, R_1
 
-    # Load data
-    contrast_l = trials['contrastLeft'].values
-    contrast_r = trials['contrastRight'].values
-    prob_l = trials['probabilityLeft'].values
-    correct = trials['correct'].values
-    choice = trials['choice'].values
-    day_length = trials.groupby('probabilityLeft').size().values
 
-    # Change values to what the model input
-    choice[choice == 1] = 2
-    choice[choice == -1] = 1
-    correct[correct == -1] = 0
-    contrast_l[np.isnan(contrast_l)] = 0
-    contrast_r[np.isnan(contrast_r)] = 0
+def pupil_features(dlc_df):
+    vec_x = [dlc_df['pupil_left_r_x'], dlc_df['pupil_right_r_x'],
+             dlc_df['pupil_top_r_x']]
+    vec_y = [dlc_df['pupil_left_r_y'], dlc_df['pupil_right_r_y'],
+             dlc_df['pupil_top_r_y']]
+    x = np.zeros(len(vec_x[0]))
+    y = np.zeros(len(vec_x[0]))
+    diameter = np.zeros(len(vec_x[0]))
+    for i in range(len(vec_x[0])):
+        try:
+            x[i], y[i], R = fit_circle([vec_x[0][i], vec_x[1][i], vec_x[2][i]],
+                                       [vec_y[0][i], vec_y[1][i], vec_y[2][i]])
+            diameter[i] = R*2
+        except:
+            x[i] = np.nan
+            y[i] = np.nan
+            diameter[i] = np.nan
+    return x, y, diameter
 
-    # Transform visual contrast
-    p = 3.5
-    contrast_l_transform = np.tanh(contrast_l * p) / np.tanh(p)
-    contrast_r_transform = np.tanh(contrast_r * p) / np.tanh(p)
 
-    # Reformat the stimulus vectors to matrices which include previous trials
-    s1_trans = contrast_l_transform
-    s2_trans = contrast_r_transform
-    for i in range(1, 10):
-        s1_trans = np.column_stack((s1_trans, np.append([contrast_l_transform[0]]*(i+i),
-                                                        contrast_l_transform[i:-i])))
-        s2_trans = np.column_stack((s2_trans, np.append([contrast_r_transform[0]]*(i+i),
-                                                        contrast_r_transform[i:-i])))
+def butter_filter(signal, highpass_freq=None, lowpass_freq=None, order=4, fs=2500):
 
-    # Create input dict
-    D = {'name': '',
-         'y': choice,
-         'correct': correct,
-         'dayLength': day_length,
-         'inputs': {'s1': s1_trans, 's2': s2_trans}
-         }
+    # The filter type is determined according to the values of cut-off frequencies
+    Fn = fs / 2.
+    if lowpass_freq and highpass_freq:
+        if highpass_freq < lowpass_freq:
+            Wn = (highpass_freq / Fn, lowpass_freq / Fn)
+            btype = 'bandpass'
+        else:
+            Wn = (lowpass_freq / Fn, highpass_freq / Fn)
+            btype = 'bandstop'
+    elif lowpass_freq:
+        Wn = lowpass_freq / Fn
+        btype = 'lowpass'
+    elif highpass_freq:
+        Wn = highpass_freq / Fn
+        btype = 'highpass'
+    else:
+        raise ValueError("Either highpass_freq or lowpass_freq must be given")
 
-    # Model parameters
-    weights = {'bias': 1,
-               's1': previous_trials+1,
-               's2': previous_trials+1}
-    K = np.sum([weights[i] for i in weights.keys()])
-    hyper = {'sigInit': 2**4.,
-             'sigma': [2**-4.]*K,
-             'sigDay': [2**-4.]*K}
-    optList = ['sigInit', 'sigma', 'sigDay']
+    # Filter signal
+    b, a = butter(order, Wn, btype=btype, output='ba')
+    if len(signal.shape) > 1:
+        filtered_data = filtfilt(b=b, a=a, x=signal, axis=1)
+    else:
+        filtered_data = filtfilt(b=b, a=a, x=signal)
 
-    # Fit model
-    print('Fitting model..')
-    hyp, evd, wMode, hess = hyperOpt(D, hyper, weights, optList)
+    return filtered_data
 
-    return wMode, prob_l, hyp

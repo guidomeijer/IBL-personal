@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../paper-reproducible-ephys"
+		}
+	],
+	"settings": {
+		"python.pythonPath": "/home/guido/anaconda3/envs/iblenv/bin/python"
+	}
+}

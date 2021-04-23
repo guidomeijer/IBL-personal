@@ -12,32 +12,32 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from scipy.stats import ttest_rel, pearsonr
-from my_functions import paths, figure_style, get_full_region_name, get_parent_region_name
+from my_functions import paths, figure_style
 
 # Settings
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Ephys', 'Decoding')
 FULL_NAME = True
 PARENT_REGIONS = False
-LABEL_A = 'Decoding of previous actions model'
-LABEL_B = 'Percentage of block neurons'
-TITLE_STR = 'Comparison of decoding vs percentage of neurons'
-SAVE_STR = 'perc_block_neurons_vs_decoding_actions'
+LABEL_A = '-600 to -100 ms'
+LABEL_B = '-200 to 0 ms'
+TITLE_STR = 'Comparison of timewindows'
+SAVE_STR = 'timewindow_comparison'
 
 # %% Plot
 # Load in data
 method_a = pd.read_pickle(join(SAVE_PATH, 'Ephys', 'Decoding', 'linear-regression',
-                            'prior-prevaction_pseudo_kfold_aligned-behavior_all_cells_beryl-atlas.p'))
+                'prior-prevaction_other-trials_kfold_aligned-behavior_all_cells_beryl-atlas_600-100.p'))
 method_b = pd.read_pickle(join(SAVE_PATH, 'Ephys', 'Decoding', 'linear-regression',
-                            'prior-stimside_pseudo_kfold_aligned-behavior_all_cells_beryl-atlas.p'))
+                'prior-prevaction_other-trials_kfold_aligned-behavior_all_cells_beryl-atlas_200-0.p'))
 
 # Get decoding performance over chance
-method_a['r_over_chance'] = (method_a['r_prior'] - method_a['r_prior_null'])
-method_b['r_over_chance'] = (method_b['r_prior'] - method_b['r_prior_null'])
+method_a['r_over_chance'] = (method_a['r'] - method_a['r_null'])
+method_b['r_over_chance'] = (method_b['r'] - method_b['r_null'])
 
 # Get decoding average per region
-method_a_avg = method_a.groupby('region').mean()['r_prior']
-method_b_avg = method_b.groupby('region').mean()['r_prior']
+method_a_avg = method_a.groupby('region').mean()['r']
+method_b_avg = method_b.groupby('region').mean()['r']
 method_a_avg = method_a_avg[method_a_avg.index.isin(method_b_avg.index)]
 method_b_avg = method_b_avg[method_b_avg.index.isin(method_a_avg.index)]
 

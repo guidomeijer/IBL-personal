@@ -20,3 +20,5 @@ __pycache__/
 5HT/Pharmacology/model_fit_results/
 
 5HT/model_fit_results/
+
+.ipynb_checkpoints/

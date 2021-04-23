@@ -23,15 +23,16 @@ all_trials = pd.DataFrame()
 for i, eid in enumerate(eids):
     print(f'Loading trails of session {i+1} of {len(eids)}')
     try:
-        trials = load_trials(eid)
+        trials = load_trials(eid, invert_stimside=True)
     except:
         continue
     if check_trials(trials):
         ses_info = one.get_details(eid)
         trials['subject'] = ses_info['subject']
         trials['date'] = ses_info['start_time'][:10]
-        trials = trials.drop(columns=['stimOn_times', 'feedback_times',
-                                      'goCue_times', 'right_choice'])
+        trials = trials.drop(columns=['stimOn_times', 'feedback_times', 'contrastLeft',
+                                      'contrastRight', 'goCue_times', 'right_choice',
+                                      'correct', 'firstMovement_times'])
         all_trials = all_trials.append(trials[trials['probabilityLeft'] != 0.5])
         print(f'Added {len(trials)} trial (total {len(all_trials)})')
 print('Saving results..')
