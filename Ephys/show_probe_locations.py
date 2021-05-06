@@ -12,11 +12,10 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import os
 from oneibl.one import ONE
 one = ONE()
 
-SUBJECT = 'ZFM-01507'
+SUBJECT = 'ZFM-01802'
 
 trajs = one.alyx.rest('trajectories', 'list', provenance='micro-manipulator')
 traj = pd.DataFrame(list(trajs))
@@ -53,7 +52,7 @@ traj_mm = traj.copy()
 sns.set(style="darkgrid", context="paper")
 markers = ['o', 's', 'v', 'D', 'X', '^', '*', 'h', 'H',  'd', 'p', 'P']
 
-f, ax = plt.subplots(1, 1, figsize=(10, 5), dpi=150)
+f, ax = plt.subplots(1, 1, figsize=(10, 5), dpi=300)
 df = traj[traj.subject_nickname==SUBJECT]
 sns.lineplot(data=df, x='x', y='y', hue="session_date", style="probe_label",
              hue_order=sorted(df.session_date.unique()),

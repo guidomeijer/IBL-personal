@@ -15,19 +15,19 @@ from scipy.stats import ttest_rel, pearsonr, wilcoxon
 from my_functions import paths, figure_style, get_full_region_name, get_parent_region_name
 
 # Settings
-TARGET = 'prior-norm-prevaction'
+TARGET = 'prederr-abs-prevaction'
 CHANCE_LEVEL = 'other-trials'
 DECODER = 'linear-regression'
 INCL_NEURONS = 'all'
 INCL_SESSIONS = 'aligned-behavior'
 VALIDATION = 'kfold'
 ATLAS = 'beryl-atlas'
-SHOW_REGIONS = 25
+SHOW_REGIONS = 30
 #SHOW_REGIONS = 'significant'
-MIN_REC = 5
+MIN_REC = 6
 MIN_TOTAL_NEURONS = 0
 MAX_TAU = 30
-YLIM = [-.3, .51]
+YLIM = [-.4, .61]
 DPI = 150
 TIME_WIN = '0-300'
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
@@ -106,12 +106,12 @@ else:
                                   >= decoding_plot['r_mean_prior'].unique()[SHOW_REGIONS - 1]]
 
 figure_style(font_scale=2)
-f = plt.figure(figsize=(20, 12), dpi=DPI)
+f = plt.figure(figsize=(22, 12), dpi=DPI)
 gs = f.add_gridspec(3, 2)
 if 'prior-prevaction' in TARGET:
-    target_str = 'previous actions'
-elif 'prior-stimsides' in TARGET:
-    target_str = 'stimulus sides'
+    target_str = 'prior (previous actions)'
+elif 'prior-stimside' in TARGET:
+    target_str = 'prior (stimulus sides)'
 elif 'prederr-pos' in TARGET:
     target_str = 'positive prediction error'
 elif 'prederr-neg' in TARGET:
@@ -120,6 +120,8 @@ elif 'prior-stim' in TARGET:
     target_str = 'prior during 0% contrast trials'
 elif 'prior-norm' in TARGET:
     target_str = 'prior during stimulus'
+elif 'prederr-abs' in TARGET:
+    target_str = 'unsigned prediction error'
 if VALIDATION == 'kfold':
     val_str = 'continuous 5-fold'
 elif VALIDATION == 'kfold-interleaved':
@@ -161,17 +163,17 @@ ax1.set(xlabel=str_xlabel, ylabel='', xlim=YLIM)
 
 ax2 = f.add_subplot(gs[0, 1])
 ax2.hist(decoding_result.groupby('region').mean()['r'], bins=30)
-ax2.set(ylabel='Recordings', xlabel='r', title='Decoding performance', xlim=[-.2, .2])
+ax2.set(ylabel='Recordings', xlabel='r', title='Decoding performance', xlim=[YLIM[0], YLIM[1]])
 
 ax3 = f.add_subplot(gs[1, 1])
 if not np.isnan(decoding_result['r_null'][0]):
     ax3.hist(decoding_result['r_null'], bins=30)
-    ax3.set(ylabel='Recordings', xlabel='r', title='Decoding of null', xlim=[-.2, .2])
+    ax3.set(ylabel='Recordings', xlabel='r', title='Decoding of null', xlim=[YLIM[0], YLIM[1]])
 
 ax4 = f.add_subplot(gs[2, 1])
 ax4.hist(decoding_result['r_mean_prior'], bins=50)
 ax4.set(ylabel='Recordings', xlabel='r', title='Decoding improvement over null',
-        xlim=[-0.2, 0.2])
+        xlim=[YLIM[0], YLIM[1]])
 
 plt.tight_layout(pad=2)
 sns.despine(trim=True)

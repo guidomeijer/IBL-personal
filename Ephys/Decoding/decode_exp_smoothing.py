@@ -25,8 +25,8 @@ br = BrainRegions()
 
 # Settings
 REMOVE_OLD_FIT = False
-OVERWRITE = True
-TARGET = 'prior-norm-prevaction'
+OVERWRITE = False
+TARGET = 'prior-stimside'
 MIN_NEURONS = 5  # min neurons per region
 DECODER = 'linear-regression'
 VALIDATION = 'kfold'
@@ -36,9 +36,9 @@ ATLAS = 'beryl-atlas'
 NUM_SPLITS = 5
 CHANCE_LEVEL = 'other-trials'
 ITERATIONS = 50  # for null distribution estimation
-PRE_TIME = 0
-POST_TIME = 0.3
-MIN_RT = 0  # in seconds
+PRE_TIME = 0.6
+POST_TIME = -0.1
+MIN_RT = -1  # in seconds
 EXCL_5050 = True
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
@@ -136,11 +136,16 @@ for i, subject in enumerate(np.unique(subjects)):
 
     if 'prior' in TARGET:
         target = model.compute_signal(signal='prior', act=actions, stim=stimuli, side=stim_side,
-                                      parameter_type='posterior_mean')['prior']
+                                      parameter_type='posterior_mean', verbose=False)['prior']
     elif 'prederr' in TARGET:
         target = model.compute_signal(signal='prediction_error', act=actions, stim=stimuli,
-                                      side=stim_side, parameter_type='posterior_mean')['prediction_error']
+                                      side=stim_side, verbose=False,
+                                      parameter_type='posterior_mean')['prediction_error']
     target = np.squeeze(np.array(target))
+
+    # Make target absolute
+    if 'abs' in TARGET:
+        target = np.abs(target)
 
     # Now that we have the priors from the model fit, loop over sessions and decode
     for j, eid in enumerate(session_uuids):
@@ -303,8 +308,12 @@ for i, subject in enumerate(np.unique(subjects)):
                                                        act=null_trials['choice'].values,
                                                        stim=null_trials['signed_contrast'].values,
                                                        side=null_trials['stim_side'].values,
-                                                       parameter_type='posterior_mean')[signal]
+                                                       parameter_type='posterior_mean',
+                                                       verbose=False)[signal]
                     null_target = np.squeeze(np.array(null_target))
+
+                    if 'abs' in TARGET:
+                        null_target = np.abs(null_target)
 
                     # Decode prior of null trials
                     null_pred, null_pred_train = regress(population_activity, null_target,

@@ -23,6 +23,7 @@ one = ONE()
 REMOVE_OLD_FIT = False
 PRE_TRIALS = 5
 POST_TRIALS = 11
+POSTERIOR = 'maximum_a_posteriori'
 _, fig_path, save_path = paths()
 fig_path = join(fig_path, '5HT', 'opto-behavior')
 
@@ -84,13 +85,15 @@ for i, nickname in enumerate(subjects['subject']):
     model = exp_stimside('./model_fit_results/', session_uuids, '%s_no_stim' % nickname,
                          actions_ns, stimuli_ns, stim_side_ns)
     model.load_or_train(nb_steps=2000, remove_old=REMOVE_OLD_FIT)
-    param_ss_ns = model.get_parameters(parameter_type='posterior_mean')
-    priors_stimside = model.compute_prior(actions_ns, stimuli_ns, stim_side_ns)[0]
+    param_ss_ns = model.get_parameters(parameter_type=POSTERIOR)
+    priors_stimside = model.compute_signal(signal='prior', act=actions_ns, stim=stimuli_ns,
+                                           side=stim_side_ns)['prior']
     model = exp_prev_action('./model_fit_results/', session_uuids, '%s_no_stim' % nickname,
                             actions_ns, stimuli_ns, stim_side_ns)
     model.load_or_train(nb_steps=2000, remove_old=REMOVE_OLD_FIT)
-    param_pa_ns = model.get_parameters(parameter_type='posterior_mean')
-    priors_prevaction = model.compute_prior(actions_ns, stimuli_ns, stim_side_ns)[0]
+    param_pa_ns = model.get_parameters(parameter_type=POSTERIOR)
+    priors_prevaction = model.compute_signal(signal='prior', act=actions_ns, stim=stimuli_ns,
+                                             side=stim_side_ns)['prior']
     results_df = results_df.append(pd.DataFrame(index=[len(results_df)],
                                                 data={'tau_ss': 1/param_ss_ns[0],
                                                       'tau_pa': 1/param_pa_ns[0],
@@ -114,13 +117,15 @@ for i, nickname in enumerate(subjects['subject']):
     model = exp_stimside('./model_fit_results/', session_uuids, '%s_stim' % nickname,
                          actions_s, stimuli_s, stim_side_s)
     model.load_or_train(nb_steps=2000, remove_old=REMOVE_OLD_FIT)
-    param_ss_s = model.get_parameters(parameter_type='posterior_mean')
-    priors_stimside = model.compute_prior(actions_s, stimuli_s, stim_side_s)[0]
+    param_ss_s = model.get_parameters(parameter_type=POSTERIOR)
+    priors_stimside = model.compute_signal(signal='prior', act=actions_s, stim=stimuli_s,
+                                           side=stim_side_s)['prior']
     model = exp_prev_action('./model_fit_results/', session_uuids, '%s_stim' % nickname,
                             actions_s, stimuli_s, stim_side_s)
     model.load_or_train(nb_steps=2000, remove_old=REMOVE_OLD_FIT)
-    param_pa_s = model.get_parameters(parameter_type='posterior_mean')
-    priors_prevaction = model.compute_prior(actions_s, stimuli_s, stim_side_s)[0]
+    param_pa_s = model.get_parameters(parameter_type=POSTERIOR)
+    priors_prevaction = model.compute_signal(signal='prior', act=actions_s, stim=stimuli_s,
+                                             side=stim_side_s)['prior']
     results_df = results_df.append(pd.DataFrame(index=[len(results_df)],
                                                 data={'tau_ss': 1/param_ss_s[0],
                                                       'tau_pa': 1/param_pa_s[0],
@@ -150,6 +155,7 @@ for i, nickname in enumerate(subjects['subject']):
                         'subject': nickname}))
 
     # Plot for this animal
+    sns.set(context='talk', style='ticks', font_scale=1.5)
     f, ax1 = plt.subplots(1, 1, figsize=(10, 10))
     sns.lineplot(x='trial', y='prior_stimside', data=block_switches[block_switches['subject'] == nickname],
              hue='change_to', style='opto', palette='colorblind', ax=ax1, ci=68)
@@ -187,6 +193,7 @@ sns.lineplot(x='opto_stim', y='tau_ss', hue='sert-cre', style='subject', estimat
              legend=False, ax=ax1)
 ax1.set(xlabel='', ylabel='Lenght of integration window (tau)')
 
+"""
 sns.lineplot(x='trial', y='prior_stimside', data=block_switches,
              hue='change_to', style='opto', palette='colorblind', ax=ax2, ci=68)
 #plt.plot([0, 0], [0, 1], color=[0.5, 0.5, 0.5], ls='--')
@@ -195,6 +202,13 @@ labels = ['', 'Change to R', 'Change to L', '', 'No stim', 'Stim']
 ax2.legend(handles, labels, frameon=False, prop={'size': 20})
 ax2.set(ylabel='Prior', xlabel='Trials relative to block switch',
         title='Exponential smoothed previous stimulus side model')
+"""
+
+sns.lineplot(x='opto_stim', y='tau_ss', hue='sert-cre', style='subject', estimator=None,
+             data=results_df, dashes=False, markers=['o']*int(results_df.shape[0]/2),
+             legend=False, ax=ax1)
+ax1.set(xlabel='', ylabel='Lenght of integration window (tau)')
+
 
 sns.despine(trim=True)
 plt.tight_layout()
