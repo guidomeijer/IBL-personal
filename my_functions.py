@@ -46,23 +46,25 @@ def figure_style(font_scale=2, despine=False, trim=True):
         plt.tight_layout()
 
 
-def load_trials(eid, laser_stimulation=False, invert_choice=False, invert_stimside=False):
-    one = ONE()
+def load_trials(eid, laser_stimulation=False, invert_choice=False, invert_stimside=False, one=None):
+    if one is None:
+        one = ONE()
     trials = pd.DataFrame()
     if laser_stimulation:
         (trials['stimOn_times'], trials['feedback_times'], trials['goCue_times'],
          trials['probabilityLeft'], trials['contrastLeft'], trials['contrastRight'],
-         trials['feedbackType'], trials['choice'], trials['firstMovement_times'],
-         trials['feedback_times'], trials['laser_stimulation'],
+         trials['feedbackType'], trials['choice'],
+         trials['feedback_times'], trials['laser_stimulation'], trials['firstMovement_times'],
          trials['laser_probability']) = one.load(
                              eid, dataset_types=['trials.stimOn_times', 'trials.feedback_times',
                                                  'trials.goCue_times', 'trials.probabilityLeft',
                                                  'trials.contrastLeft', 'trials.contrastRight',
                                                  'trials.feedbackType', 'trials.choice',
-                                                 'trials.firstMovement_times',
-                                                 'trials.feedback_times',
+                                                 'trials.feedback_times', 'trials.firstMovement_times',
                                                  '_ibl_trials.laser_stimulation',
                                                  '_ibl_trials.laser_probability'])
+        if trials.shape[0] == 0:
+            return
         if trials.loc[0, 'laser_stimulation'] is None:
             trials = trials.drop(columns=['laser_stimulation'])
         if trials.loc[0, 'laser_probability'] is None:
@@ -78,6 +80,8 @@ def load_trials(eid, laser_stimulation=False, invert_choice=False, invert_stimsi
                                                  'trials.feedbackType', 'trials.choice',
                                                  'trials.firstMovement_times',
                                                  'trials.feedback_times'])
+    if trials.shape[0] == 0:
+        return
     trials['signed_contrast'] = trials['contrastRight']
     trials.loc[trials['signed_contrast'].isnull(), 'signed_contrast'] = -trials['contrastLeft']
     trials['correct'] = trials['feedbackType']
@@ -90,7 +94,8 @@ def load_trials(eid, laser_stimulation=False, invert_choice=False, invert_stimsi
                'stim_side'] = 1
     trials.loc[(trials['signed_contrast'] == 0) & (trials['contrastRight'].isnull()),
                'stim_side'] = -1
-    trials['reaction_times'] = trials['firstMovement_times'] - trials['goCue_times']
+    if 'firstMovement_times' in trials.columns.values:
+        trials['reaction_times'] = trials['firstMovement_times'] - trials['goCue_times']
     if invert_choice:
         trials['choice'] = -trials['choice']
     if invert_stimside:

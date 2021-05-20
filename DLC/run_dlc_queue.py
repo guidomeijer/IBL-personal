@@ -1,19 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu Apr 29 10:00:29 2021
+Created on Fri May 14 08:54:51 2021
 
 @author: guido
 """
 
-from iblvideo import run_session
-from oneibl.one import ONE
-one = ONE()
+from ibvideo import run_queue
 
-session = one.search(task_protocol='_iblrig_NPH_tasks_trainingChoiceWorld')
-# session = one.search(task_protocol='_iblrig_tasks_opto_biasedChoiceWorld')
-
-for eid in session:
-    print(f'Processing session {eid}')
-    status = run_session(eid, machine='guido', cams=['left'], one=one, frames=10000)
-
+status_dict = run_queue(machine='guido')

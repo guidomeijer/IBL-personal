@@ -20,6 +20,8 @@ _, fig_path, _ = paths()
 fig_path = join(fig_path, '5HT', 'opto-behavior')
 
 subjects = pd.read_csv('subjects.csv')
+subjects = subjects[subjects['subject'] == 'ZFM-01867'].reset_index(drop=True)
+
 results_df = pd.DataFrame()
 for i, nickname in enumerate(subjects['subject']):
 
@@ -29,7 +31,7 @@ for i, nickname in enumerate(subjects['subject']):
     else:
         eids = one.search(subject=nickname, task_protocol='_iblrig_tasks_opto_biasedChoiceWorld',
                           date_range=[subjects.loc[i, 'date_range'][:10], subjects.loc[i, 'date_range'][11:]])
-    eids = criteria_opto_eids(eids, max_lapse=0.3, max_bias=0.5, min_trials=300)
+    #eids = criteria_opto_eids(eids, max_lapse=0.3, max_bias=0.5, min_trials=300)
 
     # Get trials DataFrame
     trials = pd.DataFrame()

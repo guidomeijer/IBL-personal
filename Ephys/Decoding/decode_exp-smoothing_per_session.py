@@ -10,7 +10,7 @@ from os.path import join
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
-from brainbox.population import regress, get_spike_counts_in_bins
+from brainbox.population.decode import regress, get_spike_counts_in_bins
 import pandas as pd
 from scipy.stats import wilcoxon
 from matplotlib.patches import Rectangle
@@ -39,7 +39,7 @@ INCL_NEURONS = 'all'
 INCL_SESSIONS = 'aligned-behavior'
 CHANCE_LEVEL = 'pseudo'
 N_SESSIONS = 10
-PLOT_TRIALS = 400
+PLOT_TRIALS = [300, 600]
 BEFORE = 5
 AFTER = 20
 COLORS = (sns.color_palette('colorblind', as_cmap=True)[0],
@@ -86,8 +86,9 @@ for i in range(N_SESSIONS):
     # Get priors per trial
     trials = load_trials(eid)
     stim_side, stimuli, actions, prob_left = utils.format_data(trials)
-    priors = model.compute_prior(np.array(actions), np.array(stimuli), np.array(stim_side),
-                                 parameter_type='posterior_mean')[0]
+    priors = model.compute_signal(signal='prior', act=np.array(actions), stim=np.array(stimuli),
+                                  side=np.array(stim_side),
+                                  parameter_type='posterior_mean')['prior']
 
     # Get clusters in this brain region
     spikes, clusters, channels = bbone.load_spike_sorting_with_channel(eid, aligned=True, one=one)
@@ -155,7 +156,7 @@ for i in range(N_SESSIONS):
     # Plot trial-to-trial decoding
     figure_style(font_scale=2)
     trial_blocks = (trials.probabilityLeft == 0.2).astype(int)
-    f, ax1 = plt.subplots(1, 1, figsize=(8, 4), dpi=300)
+    f, ax1 = plt.subplots(1, 1, figsize=(5, 4), dpi=150)
 
     block_trans = np.append([0], np.array(np.where(np.diff(trials.probabilityLeft) != 0)) + 1)
     block_trans = np.append(block_trans, [trial_blocks.shape[0]])
@@ -169,9 +170,9 @@ for i in range(N_SESSIONS):
         ax1.add_patch(p)
     ax1.plot(priors, color='k', lw=1.5, label='Model output')
     ax1.plot(pred_prior, color='r', lw=1.5, label='Decoding prediction')
-    ax1.set(xlim=[0, PLOT_TRIALS], ylim=[-0.05, 1.05],
+    ax1.set(xlim=PLOT_TRIALS, ylim=[-0.05, 1.05],
             ylabel='Prior', xlabel='Trials',
-            title='Region %s; decoding performance: %.1f r' % (region, r_prior),
+            title='Region %s; R2: %.1f r' % (region, r_prior),
             yticks=[0, 1], yticklabels=['R', 'L'])
     #ax1.legend(frameon=False)
     plt.tight_layout()

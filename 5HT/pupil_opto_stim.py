@@ -23,6 +23,7 @@ _, fig_path, _ = paths()
 fig_path = join(fig_path, '5HT', 'opto-pupil')
 
 subjects = pd.read_csv('subjects.csv')
+subjects = subjects[subjects['subject'] == 'ZFM-01867'].reset_index(drop=True)
 results_df = pd.DataFrame()
 for i, nickname in enumerate(subjects['subject']):
 
@@ -39,7 +40,12 @@ for i, nickname in enumerate(subjects['subject']):
         print(f'Processing session {j+1} of {len(eids)}')
 
         # Load in trials and video data
-        trials = load_trials(eid, laser_stimulation=True)
+        try:
+            trials = load_trials(eid, laser_stimulation=True, one=one)
+        except:
+            print('could not load trials')
+        if trials is None:
+            continue
         if 'laser_stimulation' not in trials.columns.values:
             continue
         if 'laser_probability' not in trials.columns.values:

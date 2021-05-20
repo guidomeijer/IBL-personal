@@ -19,6 +19,7 @@ from models.expSmoothing_stimside import expSmoothing_stimside as exp_stimside
 import brainbox.io.one as bbone
 from oneibl.one import ONE
 from ibllib.atlas import BrainRegions
+from sklearn.metrics import mean_squared_error
 from brainbox.numerical import ismember
 one = ONE()
 br = BrainRegions()
@@ -26,7 +27,7 @@ br = BrainRegions()
 # Settings
 REMOVE_OLD_FIT = False
 OVERWRITE = False
-TARGET = 'prior-stimside'
+TARGET = 'prior-prevaction'
 MIN_NEURONS = 5  # min neurons per region
 DECODER = 'linear-regression'
 VALIDATION = 'kfold'
@@ -36,8 +37,8 @@ ATLAS = 'beryl-atlas'
 NUM_SPLITS = 5
 CHANCE_LEVEL = 'other-trials'
 ITERATIONS = 50  # for null distribution estimation
-PRE_TIME = 0.6
-POST_TIME = -0.1
+PRE_TIME = .6
+POST_TIME = -.1
 MIN_RT = -1  # in seconds
 EXCL_5050 = True
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
@@ -60,6 +61,8 @@ def get_incl_trials(trials, target, excl_5050, min_rt):
         incl_trials[trials['feedbackType'] == -1] = False  # Exclude all rew. ommissions
     if 'neg' in target:
         incl_trials[trials['feedbackType'] == 1] = False  # Exclude all rewards
+    if '0' in target:
+        incl_trials[trials['signed_contrast'] != 0] = False  # Only include 0% contrast
     if ('prior' in target) and ('stim' in target):
         incl_trials[trials['signed_contrast'] != 0] = False  # Only include 0% contrast
     incl_trials[trials['reaction_times'] < min_rt] = False  # Exclude trials with fast rt
@@ -99,7 +102,7 @@ for i, subject in enumerate(np.unique(subjects)):
     for j, eid in enumerate(eids[subjects == subject]):
         try:
             # Load in trials vectors
-            trials = load_trials(eid, invert_stimside=True)
+            trials = load_trials(eid, invert_stimside=True, one=one)
             incl_trials = get_incl_trials(trials, TARGET, EXCL_5050, MIN_RT)
             stimuli_arr.append(trials['signed_contrast'][incl_trials].values)
             actions_arr.append(trials['choice'][incl_trials].values)
@@ -265,7 +268,9 @@ for i, subject in enumerate(np.unique(subjects)):
                                                          this_target, cross_validation=cv,
                                                          return_training=True)
                 r_target = pearsonr(this_target, pred_target)[0]
+                mse_target = mean_squared_error(this_target, pred_target)
                 r_target_train = pearsonr(this_target, pred_target_train)[0]
+                mse_target_train = mean_squared_error(this_target, pred_target_train)
 
                 # Decode block identity
                 pred_block = regress(population_activity, trials['probabilityLeft'].values,
@@ -275,6 +280,8 @@ for i, subject in enumerate(np.unique(subjects)):
                 # Estimate chance level
                 r_null = np.empty(ITERATIONS)
                 r_train_null = np.empty(ITERATIONS)
+                mse_null = np.empty(ITERATIONS)
+                mse_train_null = np.empty(ITERATIONS)
                 r_block_null = np.empty(ITERATIONS)
                 for k in range(ITERATIONS):
 
@@ -319,7 +326,9 @@ for i, subject in enumerate(np.unique(subjects)):
                     null_pred, null_pred_train = regress(population_activity, null_target,
                                                          cross_validation=cv, return_training=True)
                     r_null[k] = pearsonr(null_target, null_pred)[0]
+                    mse_null[k] = mean_squared_error(null_target, null_pred)
                     r_train_null[k] = pearsonr(null_target, null_pred_train)[0]
+                    mse_train_null[k] = mean_squared_error(null_target, null_pred_train)
 
                     # Decode null block identity
                     p_pred_block = regress(population_activity,
@@ -335,11 +344,17 @@ for i, subject in enumerate(np.unique(subjects)):
                                      'probe': probe,
                                      'region': region,
                                      'r': r_target,
+                                     'mse': mse_target,
                                      'r_train': r_target_train,
                                      'r_block': r_block,
+                                     'mse_train': mse_target_train,
                                      'r_null': r_null.mean(),
+                                     'mse_null': mse_null.mean(),
                                      'r_train_null': r_train_null.mean(),
+                                     'mse_train_null': mse_train_null.mean(),
                                      'r_block_null': r_block_null.mean(),
+                                     'p_value_r': np.sum(r_target > r_null) / len(r_null),
+                                     'p_value_mse': np.sum(mse_target > mse_null) / len(mse_null),
                                      'tau': 1 / params[0],
                                      'n_trials': trials.probabilityLeft.shape[0],
                                      'n_neurons': np.unique(clus_region).shape[0]}), sort=False)

@@ -54,11 +54,11 @@ controller = atlas_controller.AtlasController()
 controller.initialize(resolution, mapping, embed_ui=True, jupyter=False)
 
 # Load in data
-file_path = '/home/guido/Data/Ephys/Decoding/linear-regression/prior-prevaction_pseudo_kfold_aligned-behavior_all_cells_beryl-atlas.p'
+file_path = '/home/guido/Data/Ephys/Decoding/linear-regression/prior-prevaction_other-trials_kfold_aligned-behavior_pass-QC_cells_beryl-atlas_600--100.p'
 df = pd.read_pickle(file_path)
 
 # Duplicate entries for all children
-df['r_over_chance'] = df['r_prior'] - df['r_prior_null']
+df['r_over_chance'] = df['r'] - df['r_null']
 filtered_df = df.groupby('region')['r_over_chance'].median()[df.groupby('region').size() > MIN_REC]
 """
 children = get_children_region_names(filtered_df.index.values)

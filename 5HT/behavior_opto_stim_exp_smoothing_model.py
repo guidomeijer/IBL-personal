@@ -28,6 +28,7 @@ _, fig_path, save_path = paths()
 fig_path = join(fig_path, '5HT', 'opto-behavior')
 
 subjects = pd.read_csv('subjects.csv')
+subjects = subjects[subjects['subject'] == 'ZFM-01867'].reset_index(drop=True)
 
 results_df = pd.DataFrame()
 block_switches = pd.DataFrame()
@@ -39,7 +40,9 @@ for i, nickname in enumerate(subjects['subject']):
     else:
         eids = one.search(subject=nickname, task_protocol='_iblrig_tasks_opto_biasedChoiceWorld',
                           date_range=[subjects.loc[i, 'date_range'][:10], subjects.loc[i, 'date_range'][11:]])
-    eids = criteria_opto_eids(eids, max_lapse=0.3, max_bias=0.5, min_trials=200)
+    #eids = criteria_opto_eids(eids, max_lapse=0.3, max_bias=0.5, min_trials=200)
+    if len(eids) == 0:
+        continue
 
     # Get trial data
     stimuli_arr_ns, actions_arr_ns, stim_sides_arr_ns, prob_left_ns, session_uuids = [], [], [], [], []
@@ -88,6 +91,7 @@ for i, nickname in enumerate(subjects['subject']):
     param_ss_ns = model.get_parameters(parameter_type=POSTERIOR)
     priors_stimside = model.compute_signal(signal='prior', act=actions_ns, stim=stimuli_ns,
                                            side=stim_side_ns)['prior']
+
     model = exp_prev_action('./model_fit_results/', session_uuids, '%s_no_stim' % nickname,
                             actions_ns, stimuli_ns, stim_side_ns)
     model.load_or_train(nb_steps=2000, remove_old=REMOVE_OLD_FIT)
@@ -105,14 +109,15 @@ for i, nickname in enumerate(subjects['subject']):
     for k in range(len(priors_stimside)):
         transitions = np.array(np.where(np.diff(prob_left_ns[k]) != 0)[0]) + 1
         for t, trans in enumerate(transitions):
-            block_switches = block_switches.append(pd.DataFrame(data={
-                        'prior_stimside': priors_stimside[k][trans-PRE_TRIALS:trans+POST_TRIALS],
-                        'prior_prevaction': priors_prevaction[k][trans-PRE_TRIALS:trans+POST_TRIALS],
-                        'trial': np.append(np.arange(-PRE_TRIALS, 0), np.arange(0, POST_TRIALS)),
-                        'change_to': prob_left_ns[k][trans],
-                        'opto': 'no stim',
-                        'sert_cre': subjects.loc[i, 'sert-cre'],
-                        'subject': nickname}))
+            if trans >= PRE_TRIALS:
+                block_switches = block_switches.append(pd.DataFrame(data={
+                            'prior_stimside': priors_stimside[k][trans-PRE_TRIALS:trans+POST_TRIALS],
+                            'prior_prevaction': priors_prevaction[k][trans-PRE_TRIALS:trans+POST_TRIALS],
+                            'trial': np.append(np.arange(-PRE_TRIALS, 0), np.arange(0, POST_TRIALS)),
+                            'change_to': prob_left_ns[k][trans],
+                            'opto': 'no stim',
+                            'sert_cre': subjects.loc[i, 'sert-cre'],
+                            'subject': nickname}))
 
     model = exp_stimside('./model_fit_results/', session_uuids, '%s_stim' % nickname,
                          actions_s, stimuli_s, stim_side_s)
