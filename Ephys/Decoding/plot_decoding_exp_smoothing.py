@@ -17,12 +17,12 @@ from my_functions import paths, figure_style, get_full_region_name, get_parent_r
 # Settings
 TARGET = 'prior-prevaction'
 CHANCE_LEVEL = 'other-trials'
-DECODER = 'linear-regression'
+DECODER = 'linear-regression-L2'
 INCL_NEURONS = 'pass-QC'
 INCL_SESSIONS = 'aligned-behavior'
 VALIDATION = 'kfold'
 ATLAS = 'beryl-atlas'
-SHOW_REGIONS = 20
+SHOW_REGIONS = 10
 #SHOW_REGIONS = 'significant'
 MIN_REC = 5
 MIN_TOTAL_NEURONS = 0
@@ -30,6 +30,7 @@ MAX_TAU = 30
 YLIM = [-.4, .61]
 DPI = 150
 #TIME_WIN = '0-300'
+#TIME_WIN = '200-0'
 TIME_WIN = '600--100'
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Ephys', 'Decoding')
@@ -37,7 +38,7 @@ FULL_NAME = True
 PARENT_REGIONS = False
 SAVE_FIG = True
 BLOCK = False
-OVER_CHANCE = True
+OVER_CHANCE = False
 
 # %% Plot
 # Load in data
@@ -157,7 +158,7 @@ else:
 
 ax1.plot([0, 0], ax1.get_ylim(), color=[0.5, 0.5, 0.5], ls='--')
 if OVER_CHANCE:
-    str_xlabel = 'Decoding improvement\nover pseudo sessions (%R^2%)'
+    str_xlabel = 'Decoding improvement\nover pseudo sessions ($R^2$)'
 else:
     str_xlabel = 'Decoding performance ($R^2$)'
 ax1.set(xlabel=str_xlabel, ylabel='', xlim=YLIM)

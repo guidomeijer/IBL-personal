@@ -42,10 +42,10 @@ def get_children_region_names(acronyms, return_full_name=False):
 
 nan_color = [0, 0, 0]
 nan_alpha = 0
-VMIN = -0.15
-VMAX = 0.15
+VMIN = -0.2
+VMAX = 0.2
 COLOR_MAP = 'seismic'
-MIN_REC = 1
+MIN_REC = 5
 
 # Initialize
 resolution = 25  # units = um
@@ -54,12 +54,12 @@ controller = atlas_controller.AtlasController()
 controller.initialize(resolution, mapping, embed_ui=True, jupyter=False)
 
 # Load in data
-file_path = '/home/guido/Data/Ephys/Decoding/linear-regression/prior-prevaction_other-trials_kfold_aligned-behavior_pass-QC_cells_beryl-atlas_600--100.p'
+file_path = '/home/guido/Data/Ephys/Decoding/linear-regression-L2/prior-prevaction_other-trials_kfold_aligned-behavior_pass-QC_cells_beryl-atlas_600--100.p'
 df = pd.read_pickle(file_path)
 
 # Duplicate entries for all children
 df['r_over_chance'] = df['r'] - df['r_null']
-filtered_df = df.groupby('region')['r_over_chance'].median()[df.groupby('region').size() > MIN_REC]
+filtered_df = df.groupby('region')['r'].median()[df.groupby('region').size() > MIN_REC]
 """
 children = get_children_region_names(filtered_df.index.values)
 for i, acronym in enumerate(filtered_df.index.values):

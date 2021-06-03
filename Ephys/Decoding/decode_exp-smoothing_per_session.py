@@ -29,15 +29,16 @@ one = ONE()
 TARGET = 'prior-prevaction'
 PRE_TIME = 0.6
 POST_TIME = -0.1
-DECODER = 'linear-regression'
+DECODER = 'linear-regression-L2'
 ATLAS = 'beryl-atlas'
 NUM_SPLITS = 5
 VALIDATION = 'kfold'
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'Ephys', 'Decoding', 'Sessions', DECODER, VALIDATION)
-INCL_NEURONS = 'all'
+INCL_NEURONS = 'pass-QC'
 INCL_SESSIONS = 'aligned-behavior'
-CHANCE_LEVEL = 'pseudo'
+CHANCE_LEVEL = 'other-trials'
+TIME_WIN = '600--100'
 N_SESSIONS = 10
 PLOT_TRIALS = [300, 600]
 BEFORE = 5
@@ -47,12 +48,13 @@ COLORS = (sns.color_palette('colorblind', as_cmap=True)[0],
 
 # %%
 decoding_result = pd.read_pickle(join(SAVE_PATH, 'Ephys', 'Decoding', DECODER,
-       ('%s_%s_%s_%s_%s_cells_%s.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
-                                       INCL_SESSIONS, INCL_NEURONS, ATLAS))))
+       ('%s_%s_%s_%s_%s_cells_%s_%s.p' % (TARGET, CHANCE_LEVEL, VALIDATION,
+                                       INCL_SESSIONS, INCL_NEURONS, ATLAS, TIME_WIN))))
 
 # Get decoding performance over chance
-decoding_result['r_over_chance'] = decoding_result['r_prior'] - decoding_result['r_prior_null']
-decoding_result = decoding_result.sort_values(by='r_prior', ascending=False).reset_index(drop=True)
+#decoding_result['r_over_chance'] = decoding_result['r_prior'] - decoding_result['r_prior_null']
+decoding_result['r_over_chance'] = decoding_result['r']
+decoding_result = decoding_result.sort_values(by='r', ascending=False).reset_index(drop=True)
 
 for i in range(N_SESSIONS):
 

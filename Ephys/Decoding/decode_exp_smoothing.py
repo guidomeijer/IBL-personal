@@ -29,17 +29,18 @@ REMOVE_OLD_FIT = False
 OVERWRITE = False
 TARGET = 'prior-prevaction'
 MIN_NEURONS = 5  # min neurons per region
-DECODER = 'linear-regression'
+REGULARIZATION = 'L2'
+DECODER = 'linear-regression-%s' % REGULARIZATION
 VALIDATION = 'kfold'
 INCL_NEURONS = 'all'  # all or pass-QC
 INCL_SESSIONS = 'aligned-behavior'  # all, aligned, resolved, aligned-behavior or resolved-behavior
 ATLAS = 'beryl-atlas'
 NUM_SPLITS = 5
 CHANCE_LEVEL = 'other-trials'
-ITERATIONS = 50  # for null distribution estimation
+ITERATIONS = 20  # for null distribution estimation
 PRE_TIME = .6
 POST_TIME = -.1
-MIN_RT = -1  # in seconds
+MIN_RT = 0.08  # in seconds
 EXCL_5050 = True
 DATA_PATH, FIG_PATH, SAVE_PATH = paths()
 FIG_PATH = join(FIG_PATH, 'WholeBrain')
@@ -266,23 +267,18 @@ for i, subject in enumerate(np.unique(subjects)):
                 # Decode selected trials
                 pred_target, pred_target_train = regress(population_activity,
                                                          this_target, cross_validation=cv,
-                                                         return_training=True)
+                                                         return_training=True,
+                                                         regularization=REGULARIZATION)
                 r_target = pearsonr(this_target, pred_target)[0]
                 mse_target = mean_squared_error(this_target, pred_target)
                 r_target_train = pearsonr(this_target, pred_target_train)[0]
                 mse_target_train = mean_squared_error(this_target, pred_target_train)
-
-                # Decode block identity
-                pred_block = regress(population_activity, trials['probabilityLeft'].values,
-                                     cross_validation=cv)
-                r_block = pearsonr(trials['probabilityLeft'].values, pred_block)[0]
 
                 # Estimate chance level
                 r_null = np.empty(ITERATIONS)
                 r_train_null = np.empty(ITERATIONS)
                 mse_null = np.empty(ITERATIONS)
                 mse_train_null = np.empty(ITERATIONS)
-                r_block_null = np.empty(ITERATIONS)
                 for k in range(ITERATIONS):
 
                     # Null is pseudo sessions
@@ -324,17 +320,12 @@ for i, subject in enumerate(np.unique(subjects)):
 
                     # Decode prior of null trials
                     null_pred, null_pred_train = regress(population_activity, null_target,
-                                                         cross_validation=cv, return_training=True)
+                                                         cross_validation=cv, return_training=True,
+                                                         regularization=REGULARIZATION)
                     r_null[k] = pearsonr(null_target, null_pred)[0]
                     mse_null[k] = mean_squared_error(null_target, null_pred)
                     r_train_null[k] = pearsonr(null_target, null_pred_train)[0]
                     mse_train_null[k] = mean_squared_error(null_target, null_pred_train)
-
-                    # Decode null block identity
-                    p_pred_block = regress(population_activity,
-                                           null_trials['probabilityLeft'].values,
-                                           cross_validation=cv)
-                    r_block_null[k] = pearsonr(null_trials['probabilityLeft'], p_pred_block)[0]
 
                 # Add to dataframe
                 decoding_result = decoding_result.append(pd.DataFrame(
@@ -346,13 +337,11 @@ for i, subject in enumerate(np.unique(subjects)):
                                      'r': r_target,
                                      'mse': mse_target,
                                      'r_train': r_target_train,
-                                     'r_block': r_block,
                                      'mse_train': mse_target_train,
                                      'r_null': r_null.mean(),
                                      'mse_null': mse_null.mean(),
                                      'r_train_null': r_train_null.mean(),
                                      'mse_train_null': mse_train_null.mean(),
-                                     'r_block_null': r_block_null.mean(),
                                      'p_value_r': np.sum(r_target > r_null) / len(r_null),
                                      'p_value_mse': np.sum(mse_target > mse_null) / len(mse_null),
                                      'tau': 1 / params[0],

@@ -54,7 +54,7 @@ def load_trials(eid, laser_stimulation=False, invert_choice=False, invert_stimsi
         (trials['stimOn_times'], trials['feedback_times'], trials['goCue_times'],
          trials['probabilityLeft'], trials['contrastLeft'], trials['contrastRight'],
          trials['feedbackType'], trials['choice'],
-         trials['feedback_times'], trials['laser_stimulation'], trials['firstMovement_times'],
+         trials['feedback_times'], trials['firstMovement_times'], trials['laser_stimulation'],
          trials['laser_probability']) = one.load(
                              eid, dataset_types=['trials.stimOn_times', 'trials.feedback_times',
                                                  'trials.goCue_times', 'trials.probabilityLeft',
@@ -288,8 +288,9 @@ def get_eid_list():
     return eids
 
 
-def criteria_opto_eids(eids, max_lapse=0.2, max_bias=0.3, min_trials=200):
-    one = ONE()
+def criteria_opto_eids(eids, max_lapse=0.2, max_bias=0.3, min_trials=200, one=None):
+    if one is None:
+        one = ONE()
     use_eids = []
     for j, eid in enumerate(eids):
         try:
@@ -313,19 +314,49 @@ def criteria_opto_eids(eids, max_lapse=0.2, max_bias=0.3, min_trials=200):
             print('Could not load session %s' % eid)
     return use_eids
 
+def load_exp_smoothing_trials(eids, one):
+    stimuli_arr, actions_arr, stim_sides_arr, session_uuids = [], [], [], []
+    for j, eid in enumerate(eids):
+        try:
+            # Load in trials vectors
+            trials = load_trials(eid, invert_stimside=True, one=one)
+            stimuli_arr.append(trials['signed_contrast'].values)
+            actions_arr.append(trials['choice'].values)
+            stim_sides_arr.append(trials['stim_side'].values)
+            session_uuids.append(eid)
+        except:
+            print(f'Could not load trials for {eid}')
+
+    # Get maximum number of trials across sessions
+    max_len = np.array([len(stimuli_arr[k]) for k in range(len(stimuli_arr))]).max()
+
+    # Pad with 0 such that we obtain nd arrays of size nb_sessions x nb_trials
+    stimuli = np.array([np.concatenate((stimuli_arr[k], np.zeros(max_len-len(stimuli_arr[k]))))
+                        for k in range(len(stimuli_arr))])
+    actions = np.array([np.concatenate((actions_arr[k], np.zeros(max_len-len(actions_arr[k]))))
+                        for k in range(len(actions_arr))])
+    stim_side = np.array([np.concatenate((stim_sides_arr[k],
+                                          np.zeros(max_len-len(stim_sides_arr[k]))))
+                          for k in range(len(stim_sides_arr))])
+    session_uuids = np.array(session_uuids)
+
+    return actions, stimuli, stim_side, session_uuids
+
 
 def fit_psychfunc(stim_levels, n_trials, proportion):
     # Fit a psychometric function with two lapse rates
     #
-    # Returns vector pars with [threshold, bias, lapselow, lapsehigh]
+    # Returns vector pars with [bias, threshold, lapselow, lapsehigh]
     from ibl_pipeline.utils import psychofit as psy
     assert(stim_levels.shape == n_trials.shape == proportion.shape)
+    if stim_levels.max() <= 1:
+        stim_levels = stim_levels * 100
 
     pars, _ = psy.mle_fit_psycho(np.vstack((stim_levels, n_trials, proportion)),
                                  P_model='erf_psycho_2gammas',
                                  parstart=np.array([0, 20, 0.05, 0.05]),
-                                 parmin=np.array([-100, 2, 0, 0]),
-                                 parmax=np.array([100, 100., 1, 1]))
+                                 parmin=np.array([-100, 5, 0, 0]),
+                                 parmax=np.array([100, 100, 1, 1]))
     return pars
 
 
