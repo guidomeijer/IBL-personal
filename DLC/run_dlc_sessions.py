@@ -11,7 +11,7 @@ from oneibl.one import ONE
 one = ONE()
 
 # session = one.search(task_protocol='_iblrig_NPH_tasks_trainingChoiceWorld')
-session = one.search(task_protocol='_iblrig_tasks_opto_biasedChoiceWorld', subject='ZFM-01867')
+session = one.search(task_protocol='_iblrig_tasks_opto_biasedChoiceWorld')
 
 for eid in session:
     print(f'Processing session {eid}')
