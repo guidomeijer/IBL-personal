@@ -9,8 +9,8 @@ Created on Mon Nov  2 13:28:36 2020
 from os.path import join
 import matplotlib.pyplot as plt
 import numpy as np
-from brainbox.task import generate_pseudo_stimuli, generate_pseudo_session
-from brainbox.population import linear_regression
+from brainbox.task.closed_loop import generate_pseudo_stimuli, generate_pseudo_session
+from brainbox.population.decode import regress
 from matplotlib.patches import Rectangle
 from scipy.stats import pearsonr
 import seaborn as sns

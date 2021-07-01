@@ -183,16 +183,18 @@ def query_sessions(selection='all', return_subjects=False):
         return eids, probes
 
 
-def sessions_with_region(acronym):
-    from oneibl.one import ONE
-    one = ONE()
-
-    # Query sessions with at least one channel in the specified region
-    sessions = one.alyx.rest('sessions', 'list', atlas_acronym=acronym,
-                        task_protocol='_iblrig_tasks_ephysChoiceWorld',
-                        dataset_types = ['spikes.times', 'trials.probabilityLeft'],
-                        project='ibl_neuropixel_brainwide')
-    return sessions
+def sessions_with_region(acronym, one=None):
+    if one is None:
+        one = ONE()
+    query_str = f'channels__brain_region__acronym__icontains,{acronym},' \
+                'probe_insertion__session__project__name__icontains,ibl_neuropixel_brainwide_01,' \
+                'probe_insertion__session__qc__lt,50,' \
+                '~probe_insertion__json__qc,CRITICAL'
+    traj = one.alyx.rest('trajectories', 'list', provenance='Ephys aligned histology track',
+                         django=query_str)
+    eids = np.array([i['session']['id'] for i in traj])
+    probes = np.array([i['probe_name'] for i in traj])
+    return eids, probes
 
 
 def combine_layers_cortex(regions):
