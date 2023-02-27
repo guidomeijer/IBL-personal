@@ -12,10 +12,10 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from oneibl.one import ONE
+from one.api import ONE
 one = ONE()
 
-SUBJECT = 'ZFM-01936'
+SUBJECT = 'ZFM-02369'
 
 trajs = one.alyx.rest('trajectories', 'list', provenance='micro-manipulator')
 traj = pd.DataFrame(list(trajs))
